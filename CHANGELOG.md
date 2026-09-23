@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added an opt-in Jev advisory pilot for synthetic English/Spanish checkout,
+  pledge-management and transactional-email text. It captures existing renderers,
+  checks paired faithful/flawed controls and reports uncertainty without changing
+  existing gates. Shared evaluation and transport live in Platform Test Core 0.3.0;
+  no model dependency was added to the product runtime.
+
 - Subscribe assigned campaign users to runner reports by default. Campaigns
   settings lets editors uncheck users and Save/Publish campaign-specific
   opt-outs, while retaining additional recipients. Scheduled reports, manual

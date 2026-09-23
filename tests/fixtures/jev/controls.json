@@ -1,0 +1,162 @@
+[
+  {
+    "id": "control-pending-en-pass",
+    "lang": "en",
+    "category": "pending",
+    "expected": "pass",
+    "candidate": "We are still confirming your pledge. Check its status again.",
+    "requirements": {
+      "pending": "Says pledge confirmation is still pending, without claiming the pledge is already saved."
+    }
+  },
+  {
+    "id": "control-pending-en-fail",
+    "lang": "en",
+    "category": "pending",
+    "expected": "fail",
+    "candidate": "Your pledge is saved. Everything is confirmed.",
+    "requirements": {
+      "pending": "Says pledge confirmation is still pending, without claiming the pledge is already saved."
+    }
+  },
+  {
+    "id": "control-conditional-en-pass",
+    "lang": "en",
+    "category": "conditional",
+    "expected": "pass",
+    "candidate": "Your card is saved. No charge now; we charge only if the campaign reaches its funding goal.",
+    "requirements": {
+      "conditional": "Says no charge occurs now and charging depends on the campaign reaching its funding goal."
+    }
+  },
+  {
+    "id": "control-conditional-en-fail",
+    "lang": "en",
+    "category": "conditional",
+    "expected": "fail",
+    "candidate": "Your card is saved. We charge at the deadline whether or not the campaign reaches its goal.",
+    "requirements": {
+      "conditional": "Says no charge occurs now and charging depends on the campaign reaching its funding goal."
+    }
+  },
+  {
+    "id": "control-locked-en-pass",
+    "lang": "en",
+    "category": "locked",
+    "expected": "pass",
+    "candidate": "The deadline has passed. Your pledge is locked; you can still update your card.",
+    "requirements": {
+      "locked": "Says the campaign deadline has passed and the pledge is locked."
+    }
+  },
+  {
+    "id": "control-locked-en-fail",
+    "lang": "en",
+    "category": "locked",
+    "expected": "fail",
+    "candidate": "The deadline has passed. Your pledge remains editable; change or cancel it anytime.",
+    "requirements": {
+      "locked": "Says the campaign deadline has passed and the pledge is locked."
+    }
+  },
+  {
+    "id": "control-recovery-en-pass",
+    "lang": "en",
+    "category": "recovery",
+    "expected": "pass",
+    "candidate": "Payment failed. Please update your payment method to complete your pledge.",
+    "requirements": {
+      "recovery": "Asks the supporter to update their payment method to complete the pledge."
+    }
+  },
+  {
+    "id": "control-recovery-en-fail",
+    "lang": "en",
+    "category": "recovery",
+    "expected": "fail",
+    "candidate": "Payment failed. Start a second pledge to pay; updating your card will not help.",
+    "requirements": {
+      "recovery": "Asks the supporter to update their payment method to complete the pledge."
+    }
+  },
+  {
+    "id": "control-pending-es-pass",
+    "lang": "es",
+    "category": "pending",
+    "expected": "pass",
+    "candidate": "Todavía estamos confirmando tu aporte. Vuelve a consultar su estado.",
+    "requirements": {
+      "pending": "Says pledge confirmation is still pending, without claiming the pledge is already saved."
+    }
+  },
+  {
+    "id": "control-pending-es-fail",
+    "lang": "es",
+    "category": "pending",
+    "expected": "fail",
+    "candidate": "Tu aporte está guardado. Todo está confirmado.",
+    "requirements": {
+      "pending": "Says pledge confirmation is still pending, without claiming the pledge is already saved."
+    }
+  },
+  {
+    "id": "control-conditional-es-pass",
+    "lang": "es",
+    "category": "conditional",
+    "expected": "pass",
+    "candidate": "Tu tarjeta está guardada. No hay un cobro ahora; solo cobraremos si la campaña alcanza su meta.",
+    "requirements": {
+      "conditional": "Says no charge occurs now and charging depends on the campaign reaching its funding goal."
+    }
+  },
+  {
+    "id": "control-conditional-es-fail",
+    "lang": "es",
+    "category": "conditional",
+    "expected": "fail",
+    "candidate": "Tu tarjeta está guardada. Cobraremos al terminar la campaña, aunque no alcance su meta.",
+    "requirements": {
+      "conditional": "Says no charge occurs now and charging depends on the campaign reaching its funding goal."
+    }
+  },
+  {
+    "id": "control-locked-es-pass",
+    "lang": "es",
+    "category": "locked",
+    "expected": "pass",
+    "candidate": "El plazo terminó y tu aporte está bloqueado. Aún puedes actualizar tu tarjeta.",
+    "requirements": {
+      "locked": "Says the campaign deadline has passed and the pledge is locked."
+    }
+  },
+  {
+    "id": "control-locked-es-fail",
+    "lang": "es",
+    "category": "locked",
+    "expected": "fail",
+    "candidate": "El plazo terminó y tu aporte sigue abierto. Puedes cambiarlo o cancelarlo cuando quieras.",
+    "requirements": {
+      "locked": "Says the campaign deadline has passed and the pledge is locked."
+    }
+  },
+  {
+    "id": "control-recovery-es-pass",
+    "lang": "es",
+    "category": "recovery",
+    "expected": "pass",
+    "candidate": "El pago falló. Actualiza tu método de pago para completar tu aporte.",
+    "requirements": {
+      "recovery": "Asks the supporter to update their payment method to complete the pledge."
+    }
+  },
+  {
+    "id": "control-recovery-es-fail",
+    "lang": "es",
+    "category": "recovery",
+    "expected": "fail",
+    "candidate": "El pago falló. Crea otro aporte para pagar; actualizar tu tarjeta no servirá.",
+    "requirements": {
+      "recovery": "Asks the supporter to update their payment method to complete the pledge."
+    }
+  }
+]
