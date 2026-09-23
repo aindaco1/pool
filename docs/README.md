@@ -37,7 +37,7 @@ implementation and operating procedures.
 | Task | Guide |
 | --- | --- |
 | Work on Worker routes and request/response contracts | [Worker API](WORKER_API.md), [Worker entry point](../worker/README.md) |
-| Run automated tests and local verification | [Testing](TESTING.md) |
+| Run automated tests, the advisory Jev pilot, and local verification | [Testing](TESTING.md) |
 | Clean stale branches and generated output | [Local workspace cleanup](CONTRIBUTING.md#local-workspace-cleanup) |
 | Complete operator checks and record release sign-off | [Merge smoke checklist](MERGE_SMOKE_CHECKLIST.md) |
 | Prepare a pull request | [PR template](PULL_REQUEST_TEMPLATE.md) |

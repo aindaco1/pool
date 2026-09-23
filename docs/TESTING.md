@@ -200,6 +200,11 @@ synthetic candidates and questions go to Cloudflare/TypeSafe; source paths,
 account IDs, credentials and real supporter data are excluded. Email URLs are
 removed from semantic input after local routing checks. No email is sent.
 
+Retain `corpus.json`, `report.json` and `review.md` for runs cited in release
+evidence. The run's `site/` directory is a disposable build; the next invocation
+creates a fresh one. Follow [workspace cleanup](CONTRIBUTING.md#local-workspace-cleanup)
+for other generated output and recovery copies.
+
 Sixteen paired control examples measure false passes, false failures and reviews.
 These engineering-authored labels are diagnostic, not independent human ratings
 or an unseen validation set. The 0.10 probability margin is provisional, borrowed
