@@ -91,6 +91,13 @@ belong in the [Changelog](../CHANGELOG.md), with release verification in
 
 ## Developer Workflow And Platform Validation
 
+- Review the advisory Jev supporter-message pilot before adding any default or
+  CI gate. Have a fluent reviewer label representative English/Spanish examples,
+  calibrate on a separate set, validate on fresh held-out examples, and confirm
+  repeated-run stability and incremental coverage over existing exact checks.
+  Keep checkout arithmetic, permissions and provider acceptance deterministic.
+  The current workflow belongs in [Testing](TESTING.md#advisory-jev-pilot).
+
 - Add a containerized manual checkout/browser path when it provides coverage
   beyond the automated headless Podman suite.
 - Add Podman wrappers for remaining host-only helpers when teams need those

@@ -96,6 +96,7 @@ does not mean a file is disposable.
 | Keep for development, testing, or recovery | Regenerate when needed |
 | --- | --- |
 | Source, `_campaigns/`, `_campaign_drafts/`, repository media, tests/fixtures, and committed release evidence | `_site/` and temporary duplicate site builds |
+| Jev corpus/report/review files cited in release evidence | Jev run `site/` directories |
 | Root and Worker `node_modules/`, installed Ruby gems, `.bundle/` configuration, and shared submodules | `.jekyll-cache/`, `.sass-cache/`, and `.jekyll-metadata` |
 | `_config.local*.yml`, `worker/.dev.vars`, and local environment files | Completed `test-results/`, `playwright-report/`, and coverage output |
 | `worker/.wrangler/state/`, browser profiles/drafts, and recovery exports | Inspected disposable files under `tmp/` and `worker/.wrangler/tmp/` |
