@@ -109,6 +109,7 @@ tiers:
   - id: "deinonychus-antirrhopus"
     name: "Deinonychus antirrhopus"
     price: 6000
+    image: "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg"
     description: "This tier includes: *Everything from the previous tiers* + the director will **shave her head** and live stream the entire event. **YOU get to pick a dinosaur tattoo** for the director to get, and she will *livestream the entire thing!*"
     limit_total: 1
     stackable: false
