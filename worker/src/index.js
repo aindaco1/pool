@@ -2145,10 +2145,10 @@ function buildCampaignRunnerEncouragement(campaign, reportKind, pledges = [], no
 
 function shouldRunCampaignRunnerReportsNow(env, date = new Date()) {
   const parts = getPlatformTimeParts(env, date);
-  return (
-    parts.hour === getCampaignRunnerReportHour(env) &&
-    parts.minute === getCampaignRunnerReportMinute(env)
-  );
+  // Cron invocations can arrive after their scheduled minute. Keep today's
+  // reports eligible until a complete pass succeeds; daily markers dedupe.
+  return parts.hour * 60 + parts.minute >=
+    getCampaignRunnerReportHour(env) * 60 + getCampaignRunnerReportMinute(env);
 }
 
 function shouldRunSupporterEmailRetryNow(date = new Date()) {
@@ -6302,6 +6302,9 @@ export default {
         const reportResults = await processCampaignRunnerReports(env, now);
         if (env.PLEDGES && reportResults.attempted) {
           await env.PLEDGES.put('cron:lastCampaignRunnerReportRun', now.toISOString(), { expirationTtl: 172800 });
+        }
+        if (reportResults.errors?.length) {
+          throw new Error(`Campaign runner reports incomplete: ${reportResults.errors.map(result => result.campaignSlug).join(', ')}`);
         }
         console.log('📊 Campaign runner report cron complete:', reportResults);
       } catch (err) {
@@ -10996,7 +10999,7 @@ function getFulfillmentSummary(report, {
   return summary;
 }
 
-async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate = new Date(), recipients = null) {
+async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate = new Date(), recipients = null, deduplicate = false) {
   recipients = recipients || await getCampaignRunnerReportRecipients(env, campaign);
   const isFulfillmentReport = reportKind === 'Fulfillment report';
   if ((!recipients.length && !isFulfillmentReport) || !pledges.length) {
@@ -11059,6 +11062,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
           campaignTitle,
           reportKind,
           reportDateLabel,
+          _outboxDedupeKey: deduplicate ? `report:fulfillment:${campaign.slug}:${recipients[index]}` : '',
           statsSummary: runnerSummary,
           encouragement: fulfillmentEncouragement,
           csvFilename: runnerCsvFilename,
@@ -11092,6 +11096,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
         campaignTitle,
         reportKind: 'Platform fulfillment report',
         reportDateLabel,
+        _outboxDedupeKey: deduplicate ? `report:platform-fulfillment:${campaign.slug}:${supportEmail}` : '',
         statsSummary: platformSummary,
         encouragement: platformEncouragement,
         csvFilename: platformCsvFilename,
@@ -11133,6 +11138,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
       campaignTitle,
       reportKind,
       reportDateLabel,
+      _outboxDedupeKey: deduplicate ? `report:pledge:${campaign.slug}:${datePart}:${recipients[index]}` : '',
       statsSummary: summary,
       encouragement,
       csvFilename,
@@ -11150,9 +11156,16 @@ async function processCampaignRunnerReports(env, now = new Date()) {
     return { attempted: false, sent: 0, skipped: 'disabled-or-outside-window' };
   }
 
+  const reportDateKey = getPlatformDateKey(env, now);
+  const completedKey = `cron:campaign-runner-reports:${reportDateKey}`;
+  if (await env.PLEDGES.get(completedKey)) {
+    return { attempted: false, sent: 0, skipped: 'already-completed' };
+  }
   const campaignsData = await getCampaigns(env);
   const campaigns = campaignsData?.campaigns || campaignsData || [];
-  const reportDateKey = getPlatformDateKey(env, now);
+  // The campaign loader falls back to an empty list when the site is
+  // unavailable. Do not consume the day in that case; a later tick retries.
+  if (!campaigns.length) return { attempted: false, sent: 0, skipped: 'no-campaigns' };
   const reportDateLabel = formatCampaignRunnerReportDateLabel(env, now);
   const adminUsers = await getEffectiveAdminUsers(env);
   const results = {
@@ -11182,7 +11195,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
         const markerKey = `campaign-runner-report:pledge:${campaign.slug}:${reportDateKey}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges, now, recipients);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges, now, recipients, true);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),
@@ -11199,7 +11212,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
         const markerKey = `campaign-runner-report:fulfillment:${campaign.slug}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges, now, recipients);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges, now, recipients, true);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),
@@ -11219,6 +11232,11 @@ async function processCampaignRunnerReports(env, now = new Date()) {
     }
   }
 
+  if (!results.errors.length) {
+    await env.PLEDGES.put(completedKey, JSON.stringify({
+      completedAt: new Date().toISOString(), reportDateKey
+    }), { expirationTtl: 172800 });
+  }
   return results;
 }
 

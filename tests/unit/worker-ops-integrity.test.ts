@@ -550,6 +550,131 @@ describe('worker operational integrity', () => {
     expect(Boolean(await kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21'))).toBe(!optedOut);
   });
 
+  async function seedDailyReport(overrides: Record<string, unknown> = {}) {
+    const env = createEnv(overrides);
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['daily-report']));
+    await kv.put('pledge:daily-report', JSON.stringify({
+      orderId: 'daily-report', email: 'buyer@example.com', campaignSlug: 'hand-relations',
+      tierId: 'frame-slot', tierQty: 1, subtotal: 500, amount: 500,
+      pledgeStatus: 'active', createdAt: '2026-01-01T12:00:00.000Z'
+    }));
+    global.fetch = vi.fn(async () => jsonResponse({ campaigns: [{
+      ...campaignFixture, goal_deadline: '2027-12-31', runner_report_emails: ['runner@example.com']
+    }] })) as typeof fetch;
+    return env;
+  }
+
+  it.each([
+    ['2026-09-23T13:00:26Z', '2026-09-23T13:02:03Z', '2026-09-23'],
+    ['2026-09-24T13:00:57Z', '2026-09-24T13:02:01Z', '2026-09-24'],
+    ['2026-04-21T22:15:00Z', '2026-04-21T22:15:00Z', '2026-04-21'],
+    ['2026-11-02T14:00:00Z', '2026-11-02T14:02:00Z', '2026-11-02']
+  ])('delivers a delayed or missed daily report once (%s)', async (scheduledTime, executionTime, dateKey) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(executionTime));
+    const env = await seedDailyReport({ PLATFORM_TIMEZONE: 'America/Denver' });
+    const event = { cron: '* * * * *', scheduledTime: Date.parse(scheduledTime) };
+    await worker.scheduled(event, env, { waitUntil: () => {} });
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      csvFilename: `hand-relations-pledge-report-${dateKey}.csv`
+    }));
+    expect(await env.PLEDGES.get(`cron:campaign-runner-reports:${dateKey}`)).toBeTruthy();
+    const fetchCount = vi.mocked(fetch).mock.calls.length;
+    vi.setSystemTime(new Date(Date.parse(executionTime) + 60_000));
+    await worker.scheduled(event, env, { waitUntil: () => {} });
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch).mock.calls.length).toBe(fetchCount);
+  });
+
+  it('waits for the configured local minute and starts a new report day independently', async () => {
+    vi.useFakeTimers();
+    const env = await seedDailyReport({ PLATFORM_TIMEZONE: 'America/Denver', CAMPAIGN_RUNNER_REPORT_MINUTE: '15' });
+    for (const [time, count] of [
+      ['2026-04-21T13:14:59Z', 0], ['2026-04-21T13:16:00Z', 1],
+      ['2026-04-22T06:01:00Z', 1], ['2026-04-22T13:16:00Z', 2]
+    ] as const) {
+      vi.setSystemTime(new Date(time));
+      await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+      expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(count);
+    }
+  });
+
+  it('retries failed reports on a later tick without consuming the day', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:02:00Z'));
+    const env = await seedDailyReport();
+    mockSendCampaignRunnerReportEmail.mockRejectedValueOnce(new Error('Temporary enqueue failure'));
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(await env.PLEDGES.get('cron:campaign-runner-reports:2026-04-21')).toBeNull();
+    expect(await env.PLEDGES.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).toBeNull();
+    expect(await env.PLEDGES.get('cron:lastError', { type: 'json' })).toMatchObject({
+      error: 'Campaign runner reports incomplete: hand-relations'
+    });
+    vi.setSystemTime(new Date('2026-04-21T13:03:00Z'));
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(2);
+    expect(await env.PLEDGES.get('cron:campaign-runner-reports:2026-04-21')).toBeTruthy();
+  });
+
+  it('keeps the day retryable when the campaign catalog is temporarily unavailable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:02:00Z'));
+    const env = await seedDailyReport();
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: 'Unavailable' }, 503));
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(mockSendCampaignRunnerReportEmail).not.toHaveBeenCalled();
+    expect(await env.PLEDGES.get('cron:campaign-runner-reports:2026-04-21')).toBeNull();
+    vi.setSystemTime(new Date('2026-04-21T13:03:00Z'));
+    await worker.scheduled({ cron: '* * * * *' }, env, { waitUntil: () => {} });
+    expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves explicit manual reports without consuming the scheduled daily report', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:02:00Z'));
+    const env = await seedDailyReport({ EMAIL_OUTBOX_ENABLED: 'true' });
+    const response = await worker.fetch(new Request('https://pool.test/admin/report/campaign-runner', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-key': 'admin-secret' },
+      body: JSON.stringify({ campaignSlug: 'hand-relations', reportType: 'pledge', markAsSent: false })
+    }), env, { waitUntil: () => {} });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ markedAsSent: false, sent: 1 });
+    vi.setSystemTime(new Date('2026-04-21T13:03:00Z'));
+    await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
+    const jobs = [...(env.PLEDGES as PaginatedKVNamespace).store.keys()].filter(key => key.startsWith('email-outbox:v1:'));
+    expect(jobs).toHaveLength(2);
+    expect(await env.PLEDGES.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).toBeTruthy();
+  });
+
+  it('deduplicates queued reports if writing the daily sent marker fails', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:02:00Z'));
+    const env = await seedDailyReport({ EMAIL_OUTBOX_ENABLED: 'true' });
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+    const put = kv.put.bind(kv);
+    let failMarker = true;
+    vi.spyOn(kv, 'put').mockImplementation(async (key, value) => {
+      if (key === 'campaign-runner-report:pledge:hand-relations:2026-04-21' && failMarker) {
+        failMarker = false;
+        throw new Error('Temporary marker write failure');
+      }
+      return put(key, value);
+    });
+    // Legacy report-only trigger keeps the queued payload available for inspection.
+    await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
+    const queued = [...kv.store.entries()].filter(([key]) => key.startsWith('email-outbox:v1:'));
+    expect(queued).toHaveLength(1);
+    expect(await kv.get('cron:campaign-runner-reports:2026-04-21')).toBeNull();
+    vi.setSystemTime(new Date('2026-04-21T13:03:00Z'));
+    await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
+    expect([...kv.store.entries()].filter(([key]) => key.startsWith('email-outbox:v1:'))).toEqual(queued);
+    expect(await kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).toBeTruthy();
+    expect(await kv.get('cron:campaign-runner-reports:2026-04-21')).toBeTruthy();
+    expect(mockSendCampaignRunnerReportEmail).not.toHaveBeenCalled();
+  });
+
   it('dispatches queued launch reminders once and writes sent markers', async () => {
     const env = createEnv();
     const kv = env.PLEDGES as PaginatedKVNamespace;

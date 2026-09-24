@@ -289,9 +289,17 @@ normalized and deduplicated. An empty effective list skips daily reports.
 
 For a missing report, use the [campaign-runner report dry run](WORKER_API.md#post-adminreportcampaign-runner)
 to check the effective recipients, campaign state, row count, and
-sent marker before investigating provider delivery. Saving recipients after
-the configured send time takes effect on the next scheduled day; a same-day
-catch-up requires an explicit manual send.
+sent marker before investigating provider delivery. Reports become due at the
+configured local time and remain eligible for the rest of that local day.
+Delayed or missed cron ticks and transient enqueue failures retry on subsequent
+ticks. `cron:campaign-runner-reports:<local-date>` records a complete pass for
+two days, so later ticks skip campaign/pledge reads. A failed or empty catalog
+load does not consume the day. Per-campaign errors remain retryable and appear
+in `cron:lastError`.
+
+Saving recipients after a completed daily pass takes effect on the next
+scheduled day; same-day additions and earlier missed dates require an explicit
+manual send. Automatic retries do not reconstruct historical snapshots.
 
 Report types:
 
@@ -301,6 +309,12 @@ Report types:
 Current behavior:
 
 - Timing uses `platform.timezone`.
+- Report sent markers record durable enqueue, not provider delivery. Confirm
+  delivery separately in outbox delivery evidence or Resend.
+- Scheduled daily outbox identities use campaign, report date, and recipient; fulfillment
+  identities use campaign, audience, and recipient. Retrying after a partial
+  enqueue or sent-marker write failure reuses the queued payload. Explicit manual
+  reports retain their payload-based identities and `markAsSent` behavior.
 - CSV attachments are optional by config.
 - Campaign-runner recipients receive campaign-fulfilled rows.
 - `platform.support_email` can receive separate platform-fulfillment rows when platform add-ons need fulfillment.

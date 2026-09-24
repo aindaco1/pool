@@ -3370,7 +3370,7 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'blast image upload');
   });
 
-  it('scopes campaign media uploads to campaign admins and keeps platform uploads super-admin only', async () => {
+  it.each(['campaign-content', 'campaign-add-on'])('scopes %s uploads to assigned campaign users and keeps platform uploads super-admin only', async (kind) => {
     const env = {
       ...createEnv(),
       GITHUB_TOKEN: 'github-token',
@@ -3393,7 +3393,7 @@ runner_report_emails:
       if (url === 'https://pool.test/api/campaigns.json') {
         return jsonResponse({ campaigns: [campaignFixture] });
       }
-      if (url.includes('/contents/assets/images/campaigns/hand-relations/content-image-1-') && method === 'PUT') {
+      if (url.includes(kind === 'campaign-add-on' ? '/contents/assets/images/campaign-add-ons/add-on-content-image-1-' : '/contents/assets/images/campaigns/hand-relations/content-image-1-') && method === 'PUT') {
         const body = JSON.parse(String(init?.body || '{}'));
         githubCalls.push({ url, method, body });
         return jsonResponse({
@@ -3413,7 +3413,7 @@ runner_report_emails:
         filename: 'Content Image.png',
         contentType: 'image/png',
         content: 'data:image/png;base64,aGVsbG8=',
-        kind: 'campaign-content',
+        kind,
         campaignSlug: 'hand-relations',
         collection: 'content',
         fieldPath: 'long_content[0].src',
@@ -3431,7 +3431,7 @@ runner_report_emails:
         filename: 'Other Image.png',
         contentType: 'image/png',
         content: 'data:image/png;base64,aGVsbG8=',
-        kind: 'campaign-content',
+        kind,
         campaignSlug: 'smoke-editable',
         collection: 'content',
         fieldPath: 'long_content[0].src'

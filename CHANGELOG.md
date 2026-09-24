@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Retry daily campaign reports after delayed cron execution or transient
+  enqueue failure, using local-day completion markers and stable recipient
+  outbox identities to prevent duplicates. Record incomplete runs in diagnostics.
+- Fix campaign add-on photo uploads requesting platform-only permissions.
+  Existing and new add-ons inherit their campaign editor's upload scope.
+
 - Added an opt-in Jev advisory pilot for synthetic English/Spanish checkout,
   pledge-management and transactional-email text. It captures existing renderers,
   checks paired faithful/flawed controls and reports uncertainty without changing
