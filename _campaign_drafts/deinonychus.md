@@ -68,7 +68,7 @@ campaign_add_ons:
   - id: "drawing-of-you-as-a-dinosaur"
     name: "Drawing of YOU as a Dinosaur"
     description: "A customized drawing of you as a dinosaur, created by a talented local artist."
-    image_url: ""
+    image_url: "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg"
     price: 30.00
     category: "physical"
     shipping_preset: "signed_script"
@@ -76,7 +76,7 @@ campaign_add_ons:
   - id: "dino-plushie"
     name: "Dino plushie"
     description: "An adorable plushie, handmade by a local artist."
-    image_url: ""
+    image_url: "/assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d.jpg"
     price: 50.00
     category: "physical"
     shipping_preset: "tshirt"
@@ -244,8 +244,8 @@ diary:
             alt: "liane casting"
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
-_pool_draft_base_hash: "d7f9ac5842c42a71d5e36f005fc4829b87ca1c54be0ea8f3ef5afdc82209a836"
-_pool_draft_saved_at: "2026-09-16T17:48:37.026Z"
+_pool_draft_base_hash: "29fb3a2e51d165c91c75e2c37cafc143f34b7bdbcb74109935e1c45bdda912e0"
+_pool_draft_saved_at: "2026-09-24T20:39:25.899Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 hero_video: "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4"
 campaign_background: "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png"
