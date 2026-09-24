@@ -109,6 +109,7 @@ tiers:
   - id: "deinonychus-antirrhopus"
     name: "Deinonychus antirrhopus"
     price: 6000
+    image: "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg"
     description: "This tier includes: *Everything from the previous tiers* + the director will **shave her head** and live stream the entire event. **YOU get to pick a dinosaur tattoo** for the director to get, and she will *livestream the entire thing!*"
     limit_total: 1
     stackable: false
@@ -244,8 +245,8 @@ diary:
             alt: "liane casting"
 decisions: []
 preview_updated_at: "2026-09-09T19:57:39.367Z"
-_pool_draft_base_hash: "29fb3a2e51d165c91c75e2c37cafc143f34b7bdbcb74109935e1c45bdda912e0"
-_pool_draft_saved_at: "2026-09-24T20:39:25.899Z"
+_pool_draft_base_hash: "076115c34a7e66f946455bfbf71af83076d4984836aaa9b8a0715c73a2e19aaf"
+_pool_draft_saved_at: "2026-09-24T20:43:59.397Z"
 instagram: "https://www.instagram.com/deinonychus_shortfilm/"
 hero_video: "/assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4"
 campaign_background: "/assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png"
