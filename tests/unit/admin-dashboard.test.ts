@@ -2558,6 +2558,33 @@ campaign_add_ons:
     expectNoKvWritesOrLists(env, 'campaign settings read');
   });
 
+  it.each([
+    ['2026-09-15T05:59:59Z', 'upcoming'],
+    ['2026-09-15T06:00:00Z', 'live'],
+    ['2026-10-17T05:59:59Z', 'live'],
+    ['2026-10-17T06:00:00Z', 'post']
+  ])('shows the date-based dashboard State at %s as %s for campaign users', async (now, expectedState) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(now));
+    const env = { ...createEnv(), PLATFORM_TIMEZONE: 'America/Denver' };
+    const campaign = { ...campaignFixture, state: 'upcoming', start_date: '2026-09-15', goal_deadline: '2026-10-16' };
+    const original = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === 'https://pool.test/api/campaigns.json') return jsonResponse({ campaigns: [campaign] });
+      return original(input, init);
+    }) as typeof fetch;
+    const userKey = `admin-user:${await sha256Hex('creator@example.com')}`;
+    env.PLEDGES.store.set(userKey, JSON.stringify({ email: 'creator@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations'] }));
+    const { cookie, ctx } = await signInAdmin(env, 'creator@example.com');
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings', { headers: { Cookie: cookie } }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.campaigns[0].rows.find((row: any) => row.label === 'State')).toMatchObject({ value: expectedState, editable: false });
+    expect(campaign.state).toBe('upcoming');
+    expectNoKvWritesOrLists(env, 'date-based campaign state');
+  });
+
   it('shows archive controls only to super admins for non-live campaigns', async () => {
     const env = createEnv();
     const archiveableCampaign = {

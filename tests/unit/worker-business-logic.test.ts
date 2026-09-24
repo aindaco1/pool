@@ -1119,6 +1119,37 @@ describe('Worker business logic hardening', () => {
     });
   });
 
+  it.each([null, 0])('validates campaign add-on checkout with inventory=%j from the published JSON catalog', async (inventory) => {
+    const catalog = JSON.parse(JSON.stringify(addOnCatalogFixture));
+    const product = catalog.products.find((entry: any) => entry.scope === 'campaign');
+    product.inventory = inventory;
+    const original = global.fetch;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === 'https://pool.test/api/add-ons.json') return jsonResponse(catalog);
+      return original(input, init);
+    }) as typeof fetch;
+    const env = createEnv({
+      CHECKOUT_PROVIDER: 'first_party', CHECKOUT_INTENT_SECRET: 'checkout_secret_123',
+      CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(), TIER_INVENTORY_COORDINATOR: new MockTierInventoryNamespace()
+    });
+    const response = await worker.fetch(new Request('https://pool.test/checkout-intent/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: [
+        { id: 'smoke-editable__standard-pass', quantity: 1 },
+        { id: `addon__${product.id}`, quantity: 2 }
+      ], email: 'buyer@example.com', bundleAddOnAnchorCampaignSlug: 'smoke-editable' })
+    }), env, { waitUntil: () => {} });
+    expect(response.status).toBe(inventory === null ? 200 : 400);
+    if (inventory === null) {
+      const session = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
+      const manifest = await env.PLEDGES.get(`pending-checkout:${session.metadata.orderId}`, { type: 'json' });
+      expect(manifest.bundleAddOns).toEqual([expect.objectContaining({ productId: product.id, quantity: 2, unitPrice: 600, scope: 'campaign' })]);
+    } else {
+      expect((await response.json()).error).toContain('Only 0 remaining');
+      expect(mockStripeClient.checkout.sessions.create).not.toHaveBeenCalled();
+    }
+  });
+
   it('rejects an add-on catalog price above the canonical checkout amount ceiling', async () => {
     const excessiveCatalog = JSON.parse(JSON.stringify(addOnCatalogFixture));
     excessiveCatalog.products.find((product: { id: string }) => product.id === 'dust-wave-tshirt')

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const ADD_ON_INVENTORY_CACHE_KEY = 'pool_add_on_inventory';
+  const ADD_ON_INVENTORY_CACHE_KEY = 'pool_add_on_inventory:v2';
 
   function getCatalog(config) {
     const source = config || window.POOL_CONFIG?.addOns || {};
@@ -61,7 +61,9 @@
   }
 
   function getConfiguredInventory(entry) {
-    const parsed = Number(entry?.inventory);
+    const raw = entry?.inventory;
+    if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+    const parsed = Number(raw);
     return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
   }
 
@@ -398,6 +400,7 @@
     ADD_ON_INVENTORY_CACHE_KEY,
     getCatalog,
     getLowStockThreshold,
+    getConfiguredInventory,
     findProduct,
     findVariant,
     resolveAddOnUnitPriceCents,

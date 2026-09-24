@@ -299,6 +299,7 @@ describe('manage page script', () => {
   });
 
   afterEach(() => {
+    delete (window as any).PoolAddOnUtils;
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -1284,9 +1285,10 @@ describe('manage page script', () => {
     });
   });
 
-  it('renders campaign add-ons in a separate Manage section for the current pledge campaign', async () => {
+  it.each([false, true])('renders unlimited campaign add-ons in Manage with shared helpers=%s', async (sharedHelpers) => {
+    delete (window as any).PoolAddOnUtils;
     (window as any).POOL_CONFIG = {
-      addOns: ADD_ON_CONFIG,
+      addOns: { ...ADD_ON_CONFIG, products: ADD_ON_CONFIG.products.map(product => ({ ...product, inventory: product.scope === 'campaign' ? null : product.inventory })) },
       i18n: {
         currentLang: 'es',
         messages: {
@@ -1297,6 +1299,7 @@ describe('manage page script', () => {
       }
     };
     mockManageFetch({
+      addOnsInventory: { products: { "hand-relations__first-time-sexpot-poster": { inventory: null, remaining: null, available: true } } },
       campaigns: [
         {
           ...baseCampaign,
@@ -1308,7 +1311,7 @@ describe('manage page script', () => {
               image_url: '/assets/images/campaign-add-ons/sexpot-poster.png',
               price: 35,
               category: 'physical',
-              inventory: 10,
+              inventory: null,
               variants: []
             }
           ]
@@ -1317,6 +1320,7 @@ describe('manage page script', () => {
     });
     window.history.replaceState({}, '', '/manage/?t=token-123');
 
+    if (sharedHelpers) await import('../../assets/js/add-on-utils.js');
     await import('../../assets/js/manage-page.js');
 
     await vi.waitFor(() => {
@@ -1326,6 +1330,14 @@ describe('manage page script', () => {
     expect(document.body.textContent).toContain('Complementos de la campaña');
     expect(document.body.textContent).toContain('First Time Sexpot Poster');
     expect(document.querySelector('[data-manage-addon-add][data-addon-product-id="hand-relations__first-time-sexpot-poster"]')).not.toBeNull();
+    const quantity = document.querySelector('[data-manage-addon-quantity][data-addon-product-id="hand-relations__first-time-sexpot-poster"]') as HTMLInputElement;
+    expect(quantity.max).toBe('');
+    quantity.value = '2';
+    quantity.dispatchEvent(new Event('input', { bubbles: true }));
+    (document.querySelector('[data-manage-addon-add][data-addon-product-id="hand-relations__first-time-sexpot-poster"]') as HTMLButtonElement).click();
+    const selectedQuantity = document.querySelector('[data-manage-selected-addon-quantity][data-addon-product-id="hand-relations__first-time-sexpot-poster"]') as HTMLInputElement;
+    expect(selectedQuantity.value).toBe('2');
+    expect(selectedQuantity.max).toBe('');
   });
 
   it('lets Manage Pledge edit and remove already-selected bundle add-ons', async () => {

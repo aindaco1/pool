@@ -174,7 +174,7 @@
   const addOnUtils = window.PoolAddOnUtils || {
     invalidateCachedInventory: function() {
       try {
-        localStorage.removeItem('pool_add_on_inventory');
+        localStorage.removeItem('pool_add_on_inventory:v2');
       } catch (_error) {}
     },
     getCatalog: function(config) {
@@ -388,6 +388,14 @@
       return Math.max(0, Number(config?.low_stock_threshold ?? config?.lowStockThreshold ?? 5) || 5);
     };
   }
+  if (typeof addOnUtils.getConfiguredInventory !== 'function') {
+    addOnUtils.getConfiguredInventory = function(entry) {
+      const raw = entry?.inventory;
+      if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
+    };
+  }
   if (typeof addOnUtils.buildProductStateEntries !== 'function') {
     addOnUtils.buildProductStateEntries = function(catalog, selections, inventorySnapshot) {
       const resolvedCatalog = this.getCatalog(catalog);
@@ -409,7 +417,7 @@
         const variantStates = variants.map((variant) => {
           const variantId = String(variant?.id || '');
           const variantSnapshot = snapshot?.variants?.[variantId] || {};
-          const configuredInventory = Number.isFinite(Number(variant?.inventory)) && Number(variant.inventory) >= 0 ? Math.round(Number(variant.inventory)) : null;
+          const configuredInventory = this.getConfiguredInventory(variant);
           const remaining = variantSnapshot?.remaining === null || variantSnapshot?.remaining === undefined
             ? configuredInventory
             : (Number.isFinite(Number(variantSnapshot.remaining)) ? Math.max(0, Number(variantSnapshot.remaining)) : configuredInventory);
@@ -435,7 +443,7 @@
         const defaultVariant = hasVariants
           ? (variantStates.find((variant) => variant.selected) || variantStates[0] || null)
           : null;
-        const configuredInventory = Number.isFinite(Number(product?.inventory)) && Number(product.inventory) >= 0 ? Math.round(Number(product.inventory)) : null;
+        const configuredInventory = this.getConfiguredInventory(product);
         const remaining = snapshot?.remaining === null || snapshot?.remaining === undefined
           ? configuredInventory
           : (Number.isFinite(Number(snapshot.remaining)) ? Math.max(0, Number(snapshot.remaining)) : configuredInventory);
@@ -477,7 +485,7 @@
   }
   const ADD_ON_CATALOG = addOnUtils.getCatalog(window.POOL_CONFIG?.addOns);
   const ADD_ON_OPTIONS = addOnUtils.flattenCatalogOptions(ADD_ON_CATALOG);
-  const ADD_ON_INVENTORY_CACHE_KEY = 'pool_add_on_inventory';
+  const ADD_ON_INVENTORY_CACHE_KEY = 'pool_add_on_inventory:v2';
   let addOnInventorySnapshot = null;
   let addOnInventoryRequest = null;
   let requestCartAddOnInventoryRerender = null;
@@ -2192,8 +2200,8 @@
     return (product.variants || []).map((variant) => `
       <option
         value="${escapeAttribute(variant.id)}"
-        data-max-quantity="${escapeAttribute(String(Math.max(1, Number(variant.maxQuantity ?? 1))))}"
-        data-remaining="${escapeAttribute(String(Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : ''))}"
+        data-max-quantity="${escapeAttribute(String(variant.maxQuantity === null ? '' : Math.max(1, Number(variant.maxQuantity ?? 1))))}"
+        data-remaining="${escapeAttribute(String(variant.remaining !== null && Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : ''))}"
         data-low-stock="${variant.lowStock ? 'true' : 'false'}"
         data-price-cents="${escapeAttribute(String(Math.max(0, Number(variant.priceCents || 0))))}"
         ${variant.id === selectedVariantId ? ' selected' : ''}
@@ -2221,9 +2229,9 @@
     const priceField = card.querySelector('[data-cart-addon-price]');
     if (!(quantityField instanceof HTMLInputElement)) return;
     if (!(variantField instanceof HTMLSelectElement)) {
-      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '1', 10) || 1);
+      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '', 10) || Infinity);
       const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
-      quantityField.max = String(fallbackMax);
+      quantityField.max = Number.isFinite(fallbackMax) ? String(fallbackMax) : '';
       quantityField.value = String(Math.min(fallbackMax, currentQuantity));
       return;
     }
@@ -2232,11 +2240,11 @@
       || variantField.selectedOptions?.[0]
       || variantField.options?.[variantField.selectedIndex]
       || null;
-    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '1', 10) || 1);
+    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '', 10) || Infinity);
     const remaining = parseInt(selectedOption?.getAttribute('data-remaining') || '', 10);
     const isLowStock = selectedOption?.getAttribute('data-low-stock') === 'true';
     const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
-    quantityField.max = String(maxQuantity);
+    quantityField.max = Number.isFinite(maxQuantity) ? String(maxQuantity) : '';
     quantityField.value = String(Math.min(maxQuantity, currentQuantity));
     if (priceField instanceof HTMLElement) {
       priceField.textContent = formatCents(Math.max(0, Number(selectedOption?.getAttribute('data-price-cents') || 0)));
@@ -2271,7 +2279,7 @@
         ${products.map((product) => {
           const draft = getCartAddOnDraft(product);
           const selectedVariant = getCartAddOnSelectedVariant(product, draft);
-          const maxQuantity = Math.max(1, Number(selectedVariant?.maxQuantity ?? product.maxQuantity ?? 1));
+          const maxQuantity = Math.max(1, Number((selectedVariant ? selectedVariant.maxQuantity : product.maxQuantity) ?? Infinity));
           const stockCopy = getCartAddOnStockCopy(product, selectedVariant);
           const stockClass = (selectedVariant?.lowStock || product.lowStock)
             ? 'addon-product-card__status addon-product-card__status--block addon-product-card__status--low-stock'
@@ -2315,7 +2323,7 @@
                     class="pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
                     type="number"
                     min="1"
-                    max="${escapeAttribute(String(maxQuantity))}"
+                    max="${escapeAttribute(Number.isFinite(maxQuantity) ? String(maxQuantity) : '')}"
                     step="1"
                     inputmode="numeric"
                     pattern="[0-9]*"
@@ -5596,7 +5604,7 @@
           const variantId = variantField instanceof HTMLSelectElement ? String(variantField.value || '') : '';
           const quantity = quantityField instanceof HTMLInputElement
             ? Math.min(
-                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.max, 10) || Infinity),
                 Math.max(1, parseInt(quantityField.value, 10) || 1)
               )
             : 1;
@@ -5779,7 +5787,7 @@
           syncCartAddOnCardVariantState(card);
           const quantity = quantityField instanceof HTMLInputElement
             ? Math.min(
-                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.max, 10) || Infinity),
                 Math.max(1, parseInt(quantityField.value, 10) || 1)
               )
             : 1;

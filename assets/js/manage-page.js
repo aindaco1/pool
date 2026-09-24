@@ -165,7 +165,7 @@
   const addOnUtils = window.PoolAddOnUtils || {
     invalidateCachedInventory: function() {
       try {
-        localStorage.removeItem('pool_add_on_inventory');
+        localStorage.removeItem('pool_add_on_inventory:v2');
       } catch (_error) {}
     },
     getCatalog: function(config) {
@@ -327,6 +327,14 @@
       return Math.max(0, Number(config?.low_stock_threshold ?? config?.lowStockThreshold ?? 5) || 5);
     };
   }
+  if (typeof addOnUtils.getConfiguredInventory !== 'function') {
+    addOnUtils.getConfiguredInventory = function(entry) {
+      const raw = entry?.inventory;
+      if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
+    };
+  }
   if (typeof addOnUtils.buildProductStateEntries !== 'function') {
     addOnUtils.buildProductStateEntries = function(catalog, selections, inventorySnapshot) {
       const resolvedCatalog = this.getCatalog(catalog);
@@ -347,7 +355,7 @@
         const variantStates = variants.map((variant) => {
           const variantId = String(variant?.id || '');
           const variantSnapshot = snapshot?.variants?.[variantId] || {};
-          const configuredInventory = Number.isFinite(Number(variant?.inventory)) && Number(variant.inventory) >= 0 ? Math.round(Number(variant.inventory)) : null;
+          const configuredInventory = this.getConfiguredInventory(variant);
           const remaining = variantSnapshot?.remaining === null || variantSnapshot?.remaining === undefined
             ? configuredInventory
             : (Number.isFinite(Number(variantSnapshot.remaining)) ? Math.max(0, Number(variantSnapshot.remaining)) : configuredInventory);
@@ -373,7 +381,7 @@
         const defaultVariant = hasVariants
           ? (variantStates.find((variant) => variant.selected) || variantStates[0] || null)
           : null;
-        const configuredInventory = Number.isFinite(Number(product?.inventory)) && Number(product.inventory) >= 0 ? Math.round(Number(product.inventory)) : null;
+        const configuredInventory = this.getConfiguredInventory(product);
         const remaining = snapshot?.remaining === null || snapshot?.remaining === undefined
           ? configuredInventory
           : (Number.isFinite(Number(snapshot.remaining)) ? Math.max(0, Number(snapshot.remaining)) : configuredInventory);
@@ -680,9 +688,9 @@
     return (product.variants || []).map((variant) => `
       <option
         value="${escapeAttribute(variant.id)}"
-        data-max-quantity="${escapeAttribute(String(Math.max(1, Number(variant.maxQuantity ?? 1))))}"
-        data-editable-max-quantity="${escapeAttribute(String(Math.max(1, Number(variant.editableMaxQuantity ?? variant.maxQuantity ?? 1))))}"
-        data-remaining="${escapeAttribute(String(Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : ''))}"
+        data-max-quantity="${escapeAttribute(String(variant.maxQuantity === null ? '' : Math.max(1, Number(variant.maxQuantity ?? 1))))}"
+        data-editable-max-quantity="${escapeAttribute(String(variant.editableMaxQuantity === null ? '' : Math.max(1, Number(variant.editableMaxQuantity ?? variant.maxQuantity ?? 1))))}"
+        data-remaining="${escapeAttribute(String(variant.remaining !== null && Number.isFinite(Number(variant.remaining)) ? Number(variant.remaining) : ''))}"
         data-low-stock="${variant.lowStock ? 'true' : 'false'}"
         data-price-cents="${escapeAttribute(String(Math.max(0, Number(variant.priceCents || 0))))}"
         ${variant.id === selectedVariantId ? ' selected' : ''}
@@ -726,7 +734,8 @@
               ? 'support-option-item__input--with-variant'
               : 'support-option-item__input--no-variant'
           ].filter(Boolean).join(' ');
-          const maxQuantity = Math.max(1, Number(effectiveVariant?.maxQuantity ?? cardState?.maxQuantity ?? selection.quantity ?? 1));
+          const rawMaxQuantity = effectiveVariant ? effectiveVariant.maxQuantity : cardState?.maxQuantity;
+          const maxQuantity = rawMaxQuantity === null ? Infinity : Math.max(1, Number(rawMaxQuantity ?? selection.quantity ?? 1));
           const stockCopy = getManageAddOnStockCopy(cardState || product, effectiveVariant);
           const stockClass = [
             'support-option-item__current',
@@ -770,7 +779,7 @@
                     class="qty-input"
                     type="number"
                     min="1"
-                    max="${escapeAttribute(String(maxQuantity))}"
+                    max="${escapeAttribute(Number.isFinite(maxQuantity) ? String(maxQuantity) : '')}"
                     step="1"
                     aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
                     value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(selection.quantity || 1)))))}"
@@ -808,9 +817,9 @@
     if (!(quantityField instanceof HTMLInputElement)) return;
 
     if (!(variantField instanceof HTMLSelectElement)) {
-      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '1', 10) || 1);
+      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '', 10) || Infinity);
       const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
-      quantityField.max = String(fallbackMax);
+      quantityField.max = Number.isFinite(fallbackMax) ? String(fallbackMax) : '';
       quantityField.value = String(Math.min(fallbackMax, currentQuantity));
       return;
     }
@@ -819,9 +828,9 @@
       || variantField.selectedOptions?.[0]
       || variantField.options?.[variantField.selectedIndex]
       || null;
-    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '1', 10) || 1);
+    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '', 10) || Infinity);
     const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
-    quantityField.max = String(maxQuantity);
+    quantityField.max = Number.isFinite(maxQuantity) ? String(maxQuantity) : '';
     quantityField.value = String(Math.min(maxQuantity, currentQuantity));
   }
 
@@ -834,7 +843,7 @@
       <div class="addon-product-grid manage-addon-available-grid">
         ${productCards.map((product) => {
           const selectedVariant = product.variants?.find((variant) => variant.id === product.selectedVariantId) || product.variants?.[0] || null;
-          const maxQuantity = Math.max(1, Number(selectedVariant?.maxQuantity ?? product.maxQuantity ?? 1));
+          const maxQuantity = Math.max(1, Number((selectedVariant ? selectedVariant.maxQuantity : product.maxQuantity) ?? Infinity));
           const stockCopy = getManageAddOnStockCopy(product, selectedVariant);
           const stockClass = (selectedVariant?.lowStock || product.lowStock)
             ? 'addon-product-card__status addon-product-card__status--block addon-product-card__status--low-stock'
@@ -886,7 +895,7 @@
                       class="qty-input pool-first-party-cart__input pool-first-party-cart__input--addon-qty"
                       type="number"
                       min="1"
-                      max="${escapeAttribute(String(maxQuantity))}"
+                      max="${escapeAttribute(Number.isFinite(maxQuantity) ? String(maxQuantity) : '')}"
                       step="1"
                       inputmode="numeric"
                       pattern="[0-9]*"
@@ -988,9 +997,9 @@
     const priceField = card.querySelector('[data-manage-addon-price]');
     if (!(quantityField instanceof HTMLInputElement)) return;
     if (!(variantField instanceof HTMLSelectElement)) {
-      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '1', 10) || 1);
+      const fallbackMax = Math.max(1, parseInt(quantityField.getAttribute('max') || '', 10) || Infinity);
       const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
-      quantityField.max = String(fallbackMax);
+      quantityField.max = Number.isFinite(fallbackMax) ? String(fallbackMax) : '';
       quantityField.value = String(Math.min(fallbackMax, currentQuantity));
       return;
     }
@@ -999,11 +1008,11 @@
       || variantField.selectedOptions?.[0]
       || variantField.options?.[variantField.selectedIndex]
       || null;
-    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '1', 10) || 1);
+    const maxQuantity = Math.max(1, parseInt(selectedOption?.getAttribute('data-max-quantity') || '', 10) || Infinity);
     const remaining = parseInt(selectedOption?.getAttribute('data-remaining') || '', 10);
     const isLowStock = selectedOption?.getAttribute('data-low-stock') === 'true';
     const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
-    quantityField.max = String(maxQuantity);
+    quantityField.max = Number.isFinite(maxQuantity) ? String(maxQuantity) : '';
     quantityField.value = String(Math.min(maxQuantity, currentQuantity));
     if (priceField instanceof HTMLElement) {
       priceField.textContent = formatMoney(Math.max(0, Number(selectedOption?.getAttribute('data-price-cents') || 0)));
@@ -1873,7 +1882,7 @@
     }
 
     if (!force) {
-      const cached = readCachedValue('pool_add_on_inventory', LIVE_INVENTORY_CACHE_TTL_MS);
+      const cached = readCachedValue('pool_add_on_inventory:v2', LIVE_INVENTORY_CACHE_TTL_MS);
       if (cached) {
         addOnInventorySnapshot = cached;
         return cached;
@@ -1887,7 +1896,7 @@
       }
       const data = await res.json();
       addOnInventorySnapshot = data;
-      writeCachedValue('pool_add_on_inventory', data);
+      writeCachedValue('pool_add_on_inventory:v2', data);
       return data;
     } catch (_error) {
       return addOnInventorySnapshot || {
@@ -3397,7 +3406,7 @@
           syncManageAddOnCardVariantState(cardNode);
           if (quantityField instanceof HTMLInputElement) {
             const nextQuantity = Math.min(
-              Math.max(1, parseInt(quantityField.max, 10) || 1),
+              Math.max(1, parseInt(quantityField.max, 10) || Infinity),
               Math.max(1, parseInt(quantityField.value, 10) || 1)
             );
             quantityField.value = String(nextQuantity);
@@ -3427,7 +3436,7 @@
           const delta = parseInt(trigger?.getAttribute('data-manage-addon-adjust') || '0', 10) || 0;
           if (!delta) return;
           const currentQuantity = Math.max(1, parseInt(quantityField.value, 10) || 1);
-          const maxQuantity = Math.max(1, parseInt(quantityField.max, 10) || currentQuantity);
+          const maxQuantity = Math.max(1, parseInt(quantityField.max, 10) || Infinity);
           const nextQuantity = Math.min(maxQuantity, Math.max(1, currentQuantity + delta));
           quantityField.value = String(nextQuantity);
           quantityField.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3443,7 +3452,7 @@
           const variantId = variantField instanceof HTMLSelectElement ? String(variantField.value || '') : '';
           const quantity = quantityField instanceof HTMLInputElement
             ? Math.min(
-                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.max, 10) || Infinity),
                 Math.max(1, parseInt(quantityField.value, 10) || 1)
               )
             : 1;
@@ -3477,7 +3486,7 @@
           if (!(quantityField instanceof HTMLInputElement)) return;
           const delta = parseInt(trigger.getAttribute('data-manage-selected-addon-adjust') || '0', 10) || 0;
           const currentQuantity = Math.max(1, parseInt(quantityField.value || '1', 10) || 1);
-          const maxQuantity = Math.max(1, parseInt(quantityField.max, 10) || currentQuantity);
+          const maxQuantity = Math.max(1, parseInt(quantityField.max, 10) || Infinity);
           const nextQuantity = Math.min(maxQuantity, Math.max(1, currentQuantity + delta));
           quantityField.value = String(nextQuantity);
           quantityField.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3492,7 +3501,7 @@
           const quantityField = findSelectedQuantityField(productId);
           const quantity = quantityField instanceof HTMLInputElement
             ? Math.min(
-                Math.max(1, parseInt(quantityField.max, 10) || 1),
+                Math.max(1, parseInt(quantityField.max, 10) || Infinity),
                 Math.max(1, parseInt(quantityField.value, 10) || 1)
               )
             : 1;

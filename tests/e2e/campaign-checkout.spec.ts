@@ -1634,6 +1634,33 @@ test.describe('Checkout Flow', () => {
     await expect(page.locator('[data-cart-summary-total]')).toHaveText('$36.75');
   });
 
+  for (const [locale, variants] of [['', false], ['/es', false], ['', true], ['/es', true]] as const) {
+    test(`blank campaign add-on inventory variants=${variants} remains selectable in the ${locale || 'English'} cart`, async ({ page }) => {
+      await page.route('**/add-ons/inventory', route => route.fulfill({ json: {
+        products: { 'unlimited-campaign-print': { remaining: null, available: true, variants: { open: { remaining: null, available: true } } }, 'sold-out-print': { remaining: 0, available: false } }
+      } }));
+      await page.goto(`${locale}/campaigns/smoke-editable/`);
+      await page.evaluate((withVariants) => {
+        const config = (window as any).POOL_CONFIG;
+        // Match published Jekyll JSON: optional inventory is serialized as null.
+        config.addOns.products.push(
+          { id: 'unlimited-campaign-print', name: 'Unlimited campaign print', price: 30, category: 'digital', inventory: null, variants: withVariants ? [{ id: 'open', label: 'Open', inventory: null }] : [], scope: 'campaign', campaign_slug: 'smoke-editable' },
+          { id: 'sold-out-print', name: 'Sold-out print', price: 30, inventory: 0, scope: 'campaign', campaign_slug: 'smoke-editable' }
+        );
+        localStorage.setItem('pool_add_on_inventory', JSON.stringify({ savedAt: Date.now(), data: { products: { 'unlimited-campaign-print': { remaining: 0 } } } }));
+      }, variants);
+      await page.locator('[data-item-id="smoke-editable__standard-pass"]').first().click();
+      const card = page.locator('[data-cart-addon-product="unlimited-campaign-print"]');
+      await expect(card).toBeVisible();
+      await expect(page.locator('[data-cart-addon-product="sold-out-print"]')).toHaveCount(0);
+      await card.locator('[data-cart-addon-product-quantity]').fill('2');
+      await card.locator('[data-cart-addon-add]').click();
+      const snapshot = await getCartSnapshot(page);
+      expect(snapshot.items).toContainEqual(expect.objectContaining({ id: `addon__unlimited-campaign-print${variants ? '__variant__open' : ''}`, price: 30, quantity: 2 }));
+      await expect(card).toHaveCount(0);
+    });
+  }
+
   test('campaign add-ons keep the campaign shipping override in mixed carts', async ({ page }) => {
     await page.goto('/campaigns/smoke-editable/');
     const smokeButton = page.locator('[data-item-id="smoke-editable__standard-pass"]').first();

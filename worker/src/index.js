@@ -12693,7 +12693,7 @@ function campaignSettingsSection(campaign = {}, env = {}, options = {}) {
     ['Goal amount', settings.goalAmount, editableAdminSetting('goal_amount', 'number', settings.slug)],
     ['Charged', settings.charged, readOnlyAdminSettingHelp('Read-only flag showing whether this campaign has been marked as charged after fundraising.', 'campaign-goal-charged')],
     ['Test campaign', settings.testOnly, editableAdminSetting('test_only', 'boolean', settings.slug)],
-    ['State', settings.state, readOnlyAdminSettingHelp('Read-only configured lifecycle state. Public behavior also depends on dates and campaign operations.', 'campaign-test-state')],
+    ['State', settings.effectiveState, readOnlyAdminSettingHelp('Current lifecycle state based on the campaign dates in the platform timezone.', 'campaign-test-state')],
     ['Single tier mode', settings.singleTierOnly, editableAdminSetting('single_tier_only', 'boolean', settings.slug)],
     ['Show ongoing support', settings.showOngoing, editableAdminSetting('show_ongoing', 'boolean', settings.slug)],
     ['Hide locked stretch goals', settings.stretchHidden, editableAdminSetting('stretch_hidden', 'boolean', settings.slug)],

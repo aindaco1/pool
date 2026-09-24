@@ -58,6 +58,27 @@ describe('add-on inventory snapshot cache', () => {
     })) as any);
   }
 
+  it.each([undefined, null, '', '  '])('keeps blank catalog inventory (%j) unlimited after sales while enforcing zero and finite stock', async (inventory) => {
+    const env = { SITE_BASE: 'https://pool.test', PLEDGES: new MockKVNamespace() } as any;
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ enabled: true, products: [
+      { id: 'open', inventory, scope: 'campaign', campaign_slug: 'deinonychus' },
+      { id: 'zero', inventory: 0 },
+      { id: 'limited', inventory: 3 },
+      { id: 'variants', variants: [{ id: 'open', inventory }, { id: 'zero', inventory: 0 }, { id: 'limited', inventory: 2 }] }
+    ] }))));
+    await applyAddOnInventoryProjectionDelta(env, [], [
+      { productId: 'open', quantity: 7 }, { productId: 'limited', quantity: 1 },
+      { productId: 'variants', variantId: 'open', quantity: 7 }
+    ]);
+    const { products } = await getAddOnInventorySnapshot(env);
+    expect(products.open).toMatchObject({ configuredInventory: null, inventory: null, remaining: null, sold: 7, available: true, soldOut: false });
+    expect(products.zero).toMatchObject({ inventory: 0, remaining: 0, available: false, soldOut: true });
+    expect(products.limited).toMatchObject({ inventory: 3, remaining: 2, sold: 1, available: true });
+    expect(products.variants.variants.open).toMatchObject({ inventory: null, remaining: null, sold: 7, available: true });
+    expect(products.variants.variants.zero).toMatchObject({ remaining: 0, available: false });
+    expect(products.variants.variants.limited).toMatchObject({ remaining: 2, available: true });
+  });
+
   it('rebuilds add-on inventory after invalidation when saved pledges change', async () => {
     const env = {
       SITE_BASE: 'https://pool.test',
