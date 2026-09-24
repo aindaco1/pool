@@ -215,6 +215,80 @@
       ]
     },
     {
+      "path": "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d.jpg",
+      "publicPath": "/assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d.jpg",
+      "name": "add-on-dino-plushie-20260924-203913-19e1151d.jpg",
+      "label": "add on dino plushie 20260924 203913 19e1151d",
+      "type": "image",
+      "scope": "platform",
+      "campaignSlug": "",
+      "bytes": 1810073,
+      "sha256": "0bfe1d1d63037f4bef137f20b2fe24603a00f3bd2c50cc7e9a5f81995e2c587a",
+      "width": 3024,
+      "height": 4032,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-320.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-480.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-640.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-960.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-1600.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-320.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-480.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-640.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-960.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-1600.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "name": "add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "label": "add on drawing of you as a dinosaur 20260924 203855 b40c8b8f",
+      "type": "image",
+      "scope": "platform",
+      "campaignSlug": "",
+      "bytes": 395874,
+      "sha256": "97e31a4f6d9a44b69ab1b82703566e4c58f88733c9fe3017222027ce904868bf",
+      "width": 1542,
+      "height": 2048,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/campaign-add-ons/sexpot-condom-pack.png",
       "publicPath": "/assets/images/campaign-add-ons/sexpot-condom-pack.png",
       "name": "sexpot-condom-pack.png",
@@ -1475,6 +1549,65 @@
           "count": 1
         }
       ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg",
+      "name": "tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg",
+      "label": "tier deinonychus antirrhopus 20260924 204350 8c13af6a",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 98554,
+      "sha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+      "width": 1290,
+      "height": 964,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-320.webp",
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-480.webp",
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-640.webp",
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-320.webp",
+          "bytes": 6976,
+          "sha256": "bf26662acb428a6c3c523e21ec914e953dace65fcd61fca7d2fd8476ed6ca5e7",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-480.webp",
+          "bytes": 12158,
+          "sha256": "29453c8cd57a1e5f8d3f545c30723c584966977f1f72f70eba81f7c83934f97e",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-640.webp",
+          "bytes": 18050,
+          "sha256": "cf6607a8423d62d3f5edac27d3840bcfa8cca73e53a8667f32c65f37c0fe58e4",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-960.webp",
+          "bytes": 29004,
+          "sha256": "5fe747417b8f447f6177dad327116e2409270c5dc32b41e09418e0a1aece888b",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
     },
     {
       "path": "assets/images/campaigns/deinonychus/tier-moros-intrepidus-20260915-215047-929ac1d8.jpg",
