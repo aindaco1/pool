@@ -292,6 +292,8 @@ Leaving a variant price blank inherits the product base price. Publishing writes
 
 ## Campaigns
 
+The read-only **State** field shows the effective lifecycle state from the campaign dates in the platform timezone, including automatic launch and deadline transitions. It does not display a stale `state` value saved in campaign front matter.
+
 Campaigns are shown in a left sidebar. Super admins see all campaigns. Campaign users see only assigned campaigns.
 
 For super admins, the first row of the Campaigns sidebar is an icon-only `+` button for **Create new campaign**. Existing campaigns appear below that row. Campaign users do not see the create button.

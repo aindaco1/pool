@@ -37,9 +37,10 @@
     window.__poolPledgeConfirmedOrderId = orderId;
     window.dispatchEvent(new CustomEvent('pool:pledge-confirmed', { detail: { orderId } }));
     try {
-      Object.keys(localStorage).forEach(function(key) {
-        if (key.startsWith('pool_stats_') || key.startsWith('pool_inventory_') || key === 'pool_add_on_inventory') localStorage.removeItem(key);
-      });
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index) || '';
+        if (key.startsWith('pool_stats_') || key.startsWith('pool_inventory_') || key.startsWith('pool_add_on_inventory')) localStorage.removeItem(key);
+      }
     } catch (_error) {}
   }
   async function check() {

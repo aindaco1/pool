@@ -89,6 +89,7 @@ describe('cart provider shim', () => {
   });
 
   afterEach(() => {
+    delete (window as any).PoolAddOnUtils;
     const documentAny = document as any;
     const cleanupHandlers = [
       ['click', '_poolFirstPartyCartChromeHandler'],
@@ -429,6 +430,38 @@ describe('cart provider shim', () => {
         })
       ])
     );
+  });
+
+  it.each([false, true])('offers unlimited campaign add-ons with shared helpers=%s and refreshes pre-fix inventory cache', async (sharedHelpers) => {
+    delete (window as any).PoolAddOnUtils;
+    (window as any).POOL_CONFIG.addOns = { enabled: true, products: [
+      { id: 'dino-plushie', name: 'Dino plushie', price: 50, inventory: null, scope: 'campaign', campaign_slug: 'deinonychus' },
+      { id: 'sold-out', name: 'Sold out', price: 5, inventory: 0, scope: 'campaign', campaign_slug: 'deinonychus' }
+    ] };
+    localStorage.setItem('pool_add_on_inventory', JSON.stringify({ savedAt: Date.now(), data: { products: { 'dino-plushie': { remaining: 0 } } } }));
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ products: { 'dino-plushie': { remaining: null } } })));
+    vi.stubGlobal('fetch', fetchMock);
+    if (sharedHelpers) await import('../../assets/js/add-on-utils.js');
+    await import('../../assets/js/cart-provider.js');
+    const provider = (window as any).PoolCartProvider;
+    const api = await provider.whenReady();
+    await clearProviderCart(provider);
+    await api.api.cart.items.add({ id: 'deinonychus__tier', name: 'Deinonychus', price: 5, url: '/campaigns/deinonychus/' });
+    await api.api.theme.cart.open();
+    const root = document.querySelector('[data-pool-cart-root]')!;
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/add-ons/inventory`));
+    const button = root.querySelector('[data-cart-addon-add][data-addon-product-id="dino-plushie"]') as HTMLButtonElement;
+    expect(button).not.toBeNull();
+    expect(root.querySelector('[data-cart-addon-product="sold-out"]')).toBeNull();
+    const quantity = root.querySelector('[data-cart-addon-product-quantity][data-addon-product-id="dino-plushie"]') as HTMLInputElement;
+    expect(quantity.max).toBe('');
+    quantity.value = '2';
+    quantity.dispatchEvent(new Event('input', { bubbles: true }));
+    button.click();
+    expect(provider.store.getState().cart.items.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'addon__dino-plushie', price: 50, quantity: 2 })
+    ]));
+    delete (window as any).PoolAddOnUtils;
   });
 
   it('renders campaign add-ons in a separate section for the owning campaign and removes them when that campaign leaves the cart', async () => {

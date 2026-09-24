@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Keep campaign and platform add-ons with blank inventory available in the cart,
+  Manage Pledge, and canonical checkout, including unlimited variant quantities.
+  Refresh stale inventory caches while preserving explicit sold-out limits.
+- Show the date-based campaign lifecycle state in dashboard Settings instead
+  of stale saved front matter, with localized help text.
+
 - Retry daily campaign reports after delayed cron execution or transient
   enqueue failure, using local-day completion markers and stable recipient
   outbox identities to prevent duplicates. Record incomplete runs in diagnostics.

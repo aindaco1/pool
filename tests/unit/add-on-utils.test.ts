@@ -87,6 +87,29 @@ describe('add-on utils', () => {
     };
   });
 
+  it.each([undefined, null, '', '  '])('preserves unlimited product and variant inventory (%j) through JSON catalogs', async (inventory) => {
+    await import('../../assets/js/add-on-utils.js');
+    const utils = (window as any).PoolAddOnUtils;
+    const catalog = JSON.parse(JSON.stringify({ enabled: true, products: [
+      { id: 'open', name: 'Open', inventory, scope: 'campaign', campaign_slug: 'deinonychus', price: 30 },
+      { id: 'zero', name: 'Sold out', inventory: 0 },
+      { id: 'limited', name: 'Limited', inventory: 3 },
+      { id: 'variants', name: 'Variants', variants: [
+        { id: 'open', inventory }, { id: 'zero', inventory: 0 }, { id: 'limited', inventory: 2 }
+      ] }
+    ] }));
+    const entries = utils.buildProductStateEntries(catalog, [], { products: { open: { remaining: null, sold: 7 } } });
+    expect(entries.find((entry: any) => entry.productId === 'open')).toMatchObject({
+      inventory: null, remaining: null, available: true, lowStock: false, scope: 'campaign', campaignSlug: 'deinonychus'
+    });
+    expect(entries.some((entry: any) => entry.productId === 'zero')).toBe(false);
+    expect(entries.find((entry: any) => entry.productId === 'limited')).toMatchObject({ remaining: 3, lowStock: true });
+    expect(entries.find((entry: any) => entry.productId === 'variants').variants).toEqual([
+      expect.objectContaining({ id: 'open', remaining: null, available: true, lowStock: false }),
+      expect.objectContaining({ id: 'limited', remaining: 2 })
+    ]);
+  });
+
   it('hides sold-out variants and marks low stock from the shared inventory snapshot', async () => {
     await import('../../assets/js/add-on-utils.js');
 

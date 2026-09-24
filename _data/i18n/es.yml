@@ -973,7 +973,7 @@ admin:
   campaign_field_test_only_label: "Campaña de prueba"
   campaign_field_test_only_help: "Mantiene esta campaña fuera de listas públicas de producción a menos que las campañas de prueba estén habilitadas explícitamente."
   campaign_readonly_state_label: "Estado"
-  campaign_readonly_state_help: "Estado de ciclo de vida configurado, de solo lectura. El comportamiento público también depende de fechas y operaciones de campaña."
+  campaign_readonly_state_help: "Estado actual del ciclo de vida según las fechas de la campaña en la zona horaria de la plataforma."
   campaign_field_single_tier_only_label: "Modo de un solo nivel"
   campaign_field_single_tier_only_help: "Limita cada aporte a una sola selección de nivel. La cantidad del nivel sigue controlada por la opción Apilable de cada nivel."
   campaign_field_show_ongoing_label: "Mostrar apoyo continuo"

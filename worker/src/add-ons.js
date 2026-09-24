@@ -45,7 +45,9 @@ export async function getAddOnProduct(env, productId) {
 }
 
 function getConfiguredInventory(entry) {
-  const parsed = Number(entry?.inventory);
+  const raw = entry?.inventory;
+  if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+  const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
 }
 

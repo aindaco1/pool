@@ -981,7 +981,7 @@ admin:
   campaign_field_test_only_label: "Test campaign"
   campaign_field_test_only_help: "Keeps this campaign out of public production lists unless test campaigns are explicitly enabled."
   campaign_readonly_state_label: "State"
-  campaign_readonly_state_help: "Read-only configured lifecycle state. Public behavior also depends on dates and campaign operations."
+  campaign_readonly_state_help: "Current lifecycle state based on the campaign dates in the platform timezone."
   campaign_field_single_tier_only_label: "Single tier mode"
   campaign_field_single_tier_only_help: "Limits each pledge to one tier selection. Tier quantity is still controlled by each tier's Stackable setting."
   campaign_field_show_ongoing_label: "Show ongoing support"
