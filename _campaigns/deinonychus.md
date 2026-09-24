@@ -68,7 +68,7 @@ campaign_add_ons:
   - id: "drawing-of-you-as-a-dinosaur"
     name: "Drawing of YOU as a Dinosaur"
     description: "A customized drawing of you as a dinosaur, created by a talented local artist."
-    image_url: ""
+    image_url: "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg"
     price: 30.00
     category: "physical"
     shipping_preset: "signed_script"
@@ -76,7 +76,7 @@ campaign_add_ons:
   - id: "dino-plushie"
     name: "Dino plushie"
     description: "An adorable plushie, handmade by a local artist."
-    image_url: ""
+    image_url: "/assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d.jpg"
     price: 50.00
     category: "physical"
     shipping_preset: "tshirt"
