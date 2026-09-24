@@ -420,6 +420,12 @@ Digital support items hide shipping fields. Physical support items can use shipp
 
 Campaign add-ons are optional products attached only to one campaign. They follow the same product/variant model as platform add-ons but contribute to the campaign's accounting instead of platform add-on revenue.
 
+Published campaigns remain editable. In **Campaigns -> Add-Ons**, assigned
+campaign users can upload photos for existing or new campaign products, then
+Save and Publish the revision. Uploads inherit the editor's campaign scope;
+individual add-on records do not need a campaign slug. The top-level platform
+Add-ons editor and its uploads remain restricted to super admins.
+
 ### Stretch Goals
 
 Stretch goals define funding milestones with thresholds, titles, descriptions, and display status.

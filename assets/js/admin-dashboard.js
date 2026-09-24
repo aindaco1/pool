@@ -3917,8 +3917,8 @@
         emptyText: t('add_on_image_no_preview', 'No product image'),
         uploadLabel: t('add_on_image_upload', 'Upload product image'),
         uploadedText: t('add_on_image_uploaded', 'Product image uploaded. Publish settings to use it.'),
-        kind: 'add-on',
-        campaignSlug: product.campaign_slug || product.campaignSlug || '',
+        kind: row.campaignSlug ? 'campaign-add-on' : 'add-on',
+        campaignSlug: row.campaignSlug || '',
         filenameBase: function(rootNode) {
           return rootNode?.closest?.('[data-add-on-product-card]')?.querySelector?.('[data-add-on-product-field="name"]')?.value ||
             product.name || product.id || 'add-on';

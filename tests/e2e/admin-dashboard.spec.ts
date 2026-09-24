@@ -3002,6 +3002,40 @@ test.describe('Admin Dashboard', () => {
     });
   }
 
+  test('lets an assigned campaign user upload an add-on photo and publish a live campaign revision', async ({ page }) => {
+    const calls = await routeAdminWorker(page, { role: 'campaign_user' });
+    await page.goto('/admin/?admin_login=creator-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    const panel = page.locator('[data-campaign-settings-panel="hand-relations"]');
+    await panel.locator('[data-campaign-settings-subtab="campaign_add_ons"]').click();
+    const addOns = panel.locator('[data-settings-path="campaign_add_ons"]');
+    // Existing and newly added products inherit the owning campaign, even
+    // though individual product records have no campaign_slug field.
+    for (const isNew of [false, true]) {
+      if (isNew) {
+        await addOns.getByRole('button', { name: 'Add product', exact: true }).click();
+        await addOns.locator('[data-add-on-product-field="name"]').first().fill('New print');
+      }
+      await addOns.locator('[data-add-on-product-image-upload]').first().setInputFiles({
+        name: isNew ? 'new-print.png' : 'poster.png', mimeType: 'image/png', buffer: tinyPng
+      });
+      await expect.poll(() => calls.imageUpload.length).toBe(isNew ? 2 : 1);
+      expect(calls.imageUpload.at(-1)).toMatchObject({ kind: 'campaign-add-on', campaignSlug: 'hand-relations' });
+    }
+    await expect(page.locator('#admin-campaign-save')).toBeEnabled();
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    const change = calls.projectSave[0].changes.find((change: any) => change.path === 'campaign_add_ons');
+    expect(JSON.parse(change.value).map((product: any) => product.image_url)).toEqual([
+      '/assets/images/campaigns/hand-relations/image-e2e.png',
+      '/assets/images/campaigns/hand-relations/image-e2e.png'
+    ]);
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    await expect.poll(() => calls.projectPublish.length).toBe(1);
+    expect(calls.projectPublish[0].baseRevision).toBe('draft:e2e-1');
+  });
+
   test('stages content editor media locally and uploads it only when publishing', async ({ page }) => {
     const calls = await signInWithMagicToken(page);
 
