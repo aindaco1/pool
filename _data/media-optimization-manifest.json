@@ -215,6 +215,65 @@
       ]
     },
     {
+      "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "name": "add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "label": "add on drawing of you as a dinosaur 20260924 203855 b40c8b8f",
+      "type": "image",
+      "scope": "platform",
+      "campaignSlug": "",
+      "bytes": 373372,
+      "sha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+      "width": 1542,
+      "height": 2048,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+          "bytes": 21856,
+          "sha256": "112cc899a65dd98dd64d6468a4eecec9ca117c79149aa61e01ce9e01234f0705",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+          "bytes": 37708,
+          "sha256": "244d72fbfb3f735a59707db51d9cb449b3a5a8e29f41af8e4734e678cc45c1a8",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+          "bytes": 53882,
+          "sha256": "42a7a801b98911d9c848f1b3c7803ffb11be52faa95cb62005f72bd8ada09ae8",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp",
+          "bytes": 88494,
+          "sha256": "8c11b2c0b8056f03103cbc09a922194dc7e0818a945f09fbb68645a15250ac2c",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaign-add-ons/sexpot-condom-pack.png",
       "publicPath": "/assets/images/campaign-add-ons/sexpot-condom-pack.png",
       "name": "sexpot-condom-pack.png",
