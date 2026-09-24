@@ -631,6 +631,23 @@ describe('worker operational integrity', () => {
     expect(mockSendCampaignRunnerReportEmail).toHaveBeenCalledTimes(1);
   });
 
+  it('preserves explicit manual reports without consuming the scheduled daily report', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-21T13:02:00Z'));
+    const env = await seedDailyReport({ EMAIL_OUTBOX_ENABLED: 'true' });
+    const response = await worker.fetch(new Request('https://pool.test/admin/report/campaign-runner', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-admin-key': 'admin-secret' },
+      body: JSON.stringify({ campaignSlug: 'hand-relations', reportType: 'pledge', markAsSent: false })
+    }), env, { waitUntil: () => {} });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ markedAsSent: false, sent: 1 });
+    vi.setSystemTime(new Date('2026-04-21T13:03:00Z'));
+    await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
+    const jobs = [...(env.PLEDGES as PaginatedKVNamespace).store.keys()].filter(key => key.startsWith('email-outbox:v1:'));
+    expect(jobs).toHaveLength(2);
+    expect(await env.PLEDGES.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).toBeTruthy();
+  });
+
   it('deduplicates queued reports if writing the daily sent marker fails', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-21T13:02:00Z'));

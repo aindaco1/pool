@@ -10999,7 +10999,7 @@ function getFulfillmentSummary(report, {
   return summary;
 }
 
-async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate = new Date(), recipients = null) {
+async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDateKey, reportDateLabel, pledges, reportDate = new Date(), recipients = null, deduplicate = false) {
   recipients = recipients || await getCampaignRunnerReportRecipients(env, campaign);
   const isFulfillmentReport = reportKind === 'Fulfillment report';
   if ((!recipients.length && !isFulfillmentReport) || !pledges.length) {
@@ -11062,7 +11062,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
           campaignTitle,
           reportKind,
           reportDateLabel,
-          _outboxDedupeKey: `report:fulfillment:${campaign.slug}:${recipients[index]}`,
+          _outboxDedupeKey: deduplicate ? `report:fulfillment:${campaign.slug}:${recipients[index]}` : '',
           statsSummary: runnerSummary,
           encouragement: fulfillmentEncouragement,
           csvFilename: runnerCsvFilename,
@@ -11096,7 +11096,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
         campaignTitle,
         reportKind: 'Platform fulfillment report',
         reportDateLabel,
-        _outboxDedupeKey: `report:platform-fulfillment:${campaign.slug}:${supportEmail}`,
+        _outboxDedupeKey: deduplicate ? `report:platform-fulfillment:${campaign.slug}:${supportEmail}` : '',
         statsSummary: platformSummary,
         encouragement: platformEncouragement,
         csvFilename: platformCsvFilename,
@@ -11138,7 +11138,7 @@ async function maybeSendCampaignRunnerReport(env, campaign, reportKind, reportDa
       campaignTitle,
       reportKind,
       reportDateLabel,
-      _outboxDedupeKey: `report:pledge:${campaign.slug}:${datePart}:${recipients[index]}`,
+      _outboxDedupeKey: deduplicate ? `report:pledge:${campaign.slug}:${datePart}:${recipients[index]}` : '',
       statsSummary: summary,
       encouragement,
       csvFilename,
@@ -11195,7 +11195,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
         const markerKey = `campaign-runner-report:pledge:${campaign.slug}:${reportDateKey}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges, now, recipients);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Daily pledge report', reportDateKey, reportDateLabel, pledges, now, recipients, true);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),
@@ -11212,7 +11212,7 @@ async function processCampaignRunnerReports(env, now = new Date()) {
         const markerKey = `campaign-runner-report:fulfillment:${campaign.slug}`;
         const alreadySent = await env.PLEDGES.get(markerKey);
         if (!alreadySent) {
-          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges, now, recipients);
+          const outcome = await maybeSendCampaignRunnerReport(env, campaign, 'Fulfillment report', reportDateKey, reportDateLabel, pledges, now, recipients, true);
           if (outcome.attempted && outcome.sent > 0) {
             await env.PLEDGES.put(markerKey, JSON.stringify({
               sentAt: new Date().toISOString(),

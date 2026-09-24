@@ -311,9 +311,10 @@ Current behavior:
 - Timing uses `platform.timezone`.
 - Report sent markers record durable enqueue, not provider delivery. Confirm
   delivery separately in outbox delivery evidence or Resend.
-- Daily outbox identities use campaign, report date, and recipient; fulfillment
+- Scheduled daily outbox identities use campaign, report date, and recipient; fulfillment
   identities use campaign, audience, and recipient. Retrying after a partial
-  enqueue or sent-marker write failure reuses the queued payload.
+  enqueue or sent-marker write failure reuses the queued payload. Explicit manual
+  reports retain their payload-based identities and `markAsSent` behavior.
 - CSV attachments are optional by config.
 - Campaign-runner recipients receive campaign-fulfilled rows.
 - `platform.support_email` can receive separate platform-fulfillment rows when platform add-ons need fulfillment.

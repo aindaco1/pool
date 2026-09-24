@@ -391,7 +391,7 @@ Notes:
 
 - `dryRun: true` returns recipients, row counts, filename, and marker status without sending
 - omitting `markAsSent` defaults it to `true` for live sends so the matching scheduled run does not immediately duplicate the report
-- repeated daily sends for the same campaign, date, and recipient reuse the durable outbox job; fulfillment jobs are one-time per campaign, audience, and recipient, even if the earlier marker write failed
+- automatic retries reuse scheduled outbox identities; explicit manual sends retain their existing payload-based deduplication, so `markAsSent: false` does not consume the scheduled report
 - campaign recipients are current assigned campaign users plus front matter `runner_report_emails`, excluding `runner_report_excluded_emails`; previews, scheduled sends, and manual sends use the same resolution
 - `reportType: "pledge"` is the daily live-campaign ledger report
 - `reportType: "fulfillment"` is the one-time post-deadline shipment/export report
