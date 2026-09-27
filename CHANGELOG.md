@@ -2,37 +2,64 @@
 
 ## Unreleased
 
-- Keep campaign and platform add-ons with blank inventory available in the cart,
-  Manage Pledge, and canonical checkout, including unlimited variant quantities.
-  Refresh stale inventory caches while preserving explicit sold-out limits.
+## v1.2.21 - 2026-09-27
+
+Maintenance rollup of the work committed since v1.2.20, plus validated local
+Jev evaluation controls. This release groups previously deployed improvements
+under one tag; it introduces no new product behavior. See the
+[release evidence](docs/release-evidence/v1.2.21.md) for verification and
+deployment boundaries.
+
+### Campaign saving, previews, and administration
+
+- Add project-wide Save, protected previews of saved revisions, and explicit Publish for both new and already-public campaigns. Preserve browser-local Save draft and existing recovery data; keep public campaign content, prices, and media unchanged until publication.
+
+- Campaign loading preserves unpublished browser drafts instead of replacing
+  them with server content. Save draft no longer disables Publish or the
+  leave-page warning for unpublished work.
+
+- Storage failures and staged media produce explicit save messages. Delayed
+  campaign responses and another tab's draft changes cannot silently replace
+  the active draft. Added refresh/recovery regression tests and operator guidance.
+
+- Load the existing preview styles on protected sharing pages so the campaign
+  frame fills the available width instead of using the browser's tiny default.
+
+- Fixed preview-page 404s for unpublished campaigns. The existing generator
+  reads campaign sources omitted from Jekyll's public collection and creates
+  the same generic protected shells in each supported language.
+
+- Added a real Jekyll regression covering unpublished previews and continued
+  exclusion of draft content from public routes, catalogs, and sitemaps.
+
+- Fixed GitHub-backed dashboard requests failing before network access because
+  the Worker runtime rejects the shared client's redirect mode. Pool's GitHub
+  adapter uses manual redirect handling and still refuses redirects.
+
+- Campaign creation preserves unrelated unassigned users instead of rejecting
+  the entire user list. Selected users retain their previous assignments.
+  Explicit user edits still require campaign users to have a campaign.
+
+- Added real Worker-runtime GitHub coverage and campaign creation regressions
+  for assignment preservation and failed writes without account or email effects.
+
+- Fix user assignments to newly created, unpublished campaigns by validating against the dashboard campaign list.
+
+- Preserve existing unassigned campaign users when other users are edited.
+  Their campaign access remains empty; client-provided exceptions cannot
+  create an unassigned user or clear an existing assignment.
+
 - Show the date-based campaign lifecycle state in dashboard Settings instead
   of stale saved front matter, with localized help text.
 
-- Retry daily campaign reports after delayed cron execution or transient
-  enqueue failure, using local-day completion markers and stable recipient
-  outbox identities to prevent duplicates. Record incomplete runs in diagnostics.
-- Fix campaign add-on photo uploads requesting platform-only permissions.
-  Existing and new add-ons inherit their campaign editor's upload scope.
+### Checkout, tax, and add-on availability
 
-- Added an opt-in Jev advisory pilot for synthetic English/Spanish checkout,
-  pledge-management and transactional-email text. It captures existing renderers,
-  checks paired faithful/flawed controls and reports uncertainty without changing
-  existing gates. Shared evaluation and transport live in Platform Test Core 0.3.0;
-  no model dependency was added to the product runtime.
-
-- Subscribe assigned campaign users to runner reports by default. Campaigns
-  settings lets editors uncheck users and Save/Publish campaign-specific
-  opt-outs, while retaining additional recipients. Scheduled reports, manual
-  sends, previews, and dashboard status share recipient resolution.
-
-- Render cart item descriptions with the existing shared safe inline Markdown
-  renderer, including nested emphasis and underline in newly added and restored
-  carts. Preserve description formatting through campaign and featured-tier
-  buttons while keeping unsafe HTML and links inert.
-
-- Consolidate seven reviewed Deinonychus image-optimization branches, adding
-  28 responsive WebP variants and lossless source compression. Retain the
-  original MP4 after rejecting a larger generated WebM.
+- Fix saved-card checkouts failing pledge confirmation when Stripe supplies a fuller
+  address. Webhook and browser recovery share the verified quote, support current
+  and legacy Stripe shipping fields, and serialize completion per order. Preserve
+  accepted totals and pending recovery references; retry confirmation without
+  creating another setup session. English/Spanish checkout and result pages show
+  explicit unconfirmed status until persistence is verified.
 
 - Restore live tax-provider requests in Cloudflare Workers through Tax Core
   0.3.1. Use supported manual redirect handling and reject 3xx responses
@@ -45,12 +72,38 @@
   quotes from the saved billing or shipping address before falling back to a
   historical quote destination, and retain four-decimal tax rates in labels.
 
-- Fix saved-card checkouts failing pledge confirmation when Stripe supplies a fuller
-  address. Webhook and browser recovery share the verified quote, support current
-  and legacy Stripe shipping fields, and serialize completion per order. Preserve
-  accepted totals and pending recovery references; retry confirmation without
-  creating another setup session. English/Spanish checkout and result pages show
-  explicit unconfirmed status until persistence is verified.
+- Keep campaign and platform add-ons with blank inventory available in the cart,
+  Manage Pledge, and canonical checkout, including unlimited variant quantities.
+  Refresh stale inventory caches while preserving explicit sold-out limits.
+
+- Render cart item descriptions with the existing shared safe inline Markdown
+  renderer, including nested emphasis and underline in newly added and restored
+  carts. Preserve description formatting through campaign and featured-tier
+  buttons while keeping unsafe HTML and links inert.
+
+### Campaign reports and uploads
+
+- Subscribe assigned campaign users to runner reports by default. Campaigns
+  settings lets editors uncheck users and Save/Publish campaign-specific
+  opt-outs, while retaining additional recipients. Scheduled reports, manual
+  sends, previews, and dashboard status share recipient resolution.
+
+- Retry daily campaign reports after delayed cron execution or transient
+  enqueue failure, using local-day completion markers and stable recipient
+  outbox identities to prevent duplicates. Record incomplete runs in diagnostics.
+
+- Fix campaign add-on photo uploads requesting platform-only permissions.
+  Existing and new add-ons inherit their campaign editor's upload scope.
+
+- Fix campaign video uploads failing at the shared GitHub helper's 2 MB limit.
+  Hero, Content, Diary, and replacement uploads stream binary files up to
+  100 MB to GitHub, with bounded memory and exact size validation.
+
+- Render uploaded campaign hero videos with their actual MP4, WebM, or MOV
+  source type instead of labeling every upload as WebM. Share source rendering
+  with content videos, including mixed-case extensions and URL query strings.
+
+### Editor presentation and media
 
 - Adopt Platform Admin Shell 0.12.0 and Design Core 0.3.0 for shared editor
   rendering, upload previews, optional image descriptions, blank placeholders,
@@ -58,84 +111,64 @@
   previews after upload and Save while public assets await deployment. Render
   nested bold/italic text consistently in the editor and mobile/public previews.
 
-
 - Make image alt text advisory for campaign and diary Save/Publish. Normalize
   descriptions safely, preserve explicit decorative state, and omit empty
   diary text placeholders while retaining real content validation.
+
 - Render inline Markdown emphasis in public summaries and reward descriptions.
   Restore preview styles, fit preview images to the mobile frame, and show
   staged image thumbnails before upload. Keep media panels and long filenames
   within their containers and above neighboring gallery controls.
 
-- Render uploaded campaign hero videos with their actual MP4, WebM, or MOV
-  source type instead of labeling every upload as WebM. Share source rendering
-  with content videos, including mixed-case extensions and URL query strings.
+- Consolidate seven reviewed Deinonychus image-optimization branches, adding
+  28 responsive WebP variants and lossless source compression. Retain the
+  original MP4 after rejecting a larger generated WebM.
+
+### Advisory evaluation
+
+- Added an opt-in Jev advisory pilot for synthetic English/Spanish checkout,
+  pledge-management and transactional-email text. It captures existing renderers,
+  checks paired faithful/flawed controls and reports uncertainty without changing
+  existing gates. Shared evaluation and transport live in Platform Test Core 0.3.0;
+  no model dependency was added to the product runtime.
+
+- Add four English/Spanish charged-versus-saved controls, bringing the
+  synthetic control set to 20, and regression coverage that detects a judge
+  accepting saved-card language as a charge confirmation. Retain the prior
+  four-request probe as dated advisory evidence; no live inference or product
+  deployment is required for these development-only changes.
+
+### Shared tooling, dependencies, and security
+
+- Pin the Worker development toolchain's transitive Sharp dependency to 0.35.4
+  to resolve GHSA-rgj7-g3m4-5g8c without changing Wrangler or production code.
+
+- Added explicit root and Worker production/full audit checks to Merge Smoke,
+  separate from installation and tests. Transient npm failures have bounded
+  retries; missing evidence fails the check instead of appearing clean.
+
+- Updated Vitest and its V8 coverage provider to 4.1.11, Vite to 8.2.2, and
+  axe-core to 4.13.0.
+
+- Kept shared build/release tooling on Platform's reviewed esbuild 0.28.1 and
+  smol-toml 1.7.1, made the root requirements exact, and added regression coverage
+  for manifest/lockfile alignment and version-only Dependabot exclusions.
+
+- Disabled Cloudflare Worker preview URLs explicitly and made missing or enabled
+  preview URLs a production-posture failure.
 
 - Keep Podman project tools on the selected shared engine. Remove automatic VM
   restarts and host-port process killing so other local projects remain running.
   Preserve explicit endpoints, the CLI on PATH, and release resource checks.
 
-- Fix campaign video uploads failing at the shared GitHub helper's 2 MB limit.
-  Hero, Content, Diary, and replacement uploads stream binary files up to
-  100 MB to GitHub, with bounded memory and exact size validation.
+- Preserved the caller's Ruby/Bundler and Node selection across pre-merge host
+  phases. Login shells could previously pass dependency checks under rbenv,
+  then switch to macOS system Ruby for the build and unnecessarily fall back
+  to Podman. Added regression coverage for host and Podman build dispatch.
 
-- Fix user assignments to newly created, unpublished campaigns by validating against the dashboard campaign list.
-
-- Preserve existing unassigned campaign users when other users are edited.
-  Their campaign access remains empty; client-provided exceptions cannot
-  create an unassigned user or clear an existing assignment.
-
-### Project saving and publication
-
-- Add project-wide Save, protected previews of saved revisions, and explicit Publish for both new and already-public campaigns. Preserve browser-local Save draft and existing recovery data; keep public campaign content, prices, and media unchanged until publication.
-
-### Campaign draft recovery
-
-- Campaign loading preserves unpublished browser drafts instead of replacing
-  them with server content. Save draft no longer disables Publish or the
-  leave-page warning for unpublished work.
-- Storage failures and staged media produce explicit save messages. Delayed
-  campaign responses and another tab's draft changes cannot silently replace
-  the active draft. Added refresh/recovery regression tests and operator guidance.
-
-### Campaign preview
-
-- Load the existing preview styles on protected sharing pages so the campaign
-  frame fills the available width instead of using the browser's tiny default.
-- Fixed preview-page 404s for unpublished campaigns. The existing generator
-  reads campaign sources omitted from Jekyll's public collection and creates
-  the same generic protected shells in each supported language.
-- Added a real Jekyll regression covering unpublished previews and continued
-  exclusion of draft content from public routes, catalogs, and sitemaps.
-
-### Campaign creation
-
-- Fixed GitHub-backed dashboard requests failing before network access because
-  the Worker runtime rejects the shared client's redirect mode. Pool's GitHub
-  adapter uses manual redirect handling and still refuses redirects.
-- Campaign creation preserves unrelated unassigned users instead of rejecting
-  the entire user list. Selected users retain their previous assignments.
-  Explicit user edits still require campaign users to have a campaign.
-- Added real Worker-runtime GitHub coverage and campaign creation regressions
-  for assignment preservation and failed writes without account or email effects.
-
-### Dependency maintenance
-
-- Pin the Worker development toolchain's transitive Sharp dependency to 0.35.4
-  to resolve GHSA-rgj7-g3m4-5g8c without changing Wrangler or production code.
-- Added explicit root and Worker production/full audit checks to Merge Smoke,
-  separate from installation and tests. Transient npm failures have bounded
-  retries; missing evidence fails the check instead of appearing clean.
-- Updated Vitest and its V8 coverage provider to 4.1.11, Vite to 8.2.2, and
-  axe-core to 4.13.0.
-- Kept shared build/release tooling on Platform's reviewed esbuild 0.28.1 and
-  smol-toml 1.7.1, made the root requirements exact, and added regression coverage
-  for manifest/lockfile alignment and version-only Dependabot exclusions.
-
-### Production posture
-
-- Disabled Cloudflare Worker preview URLs explicitly and made missing or enabled
-  preview URLs a production-posture failure.
+- Reuse the pinned Platform dependency-audit, backup-retention, evidence-age,
+  receipt-inspection, and video-preview primitives while retaining Pool-owned
+  configuration and independent rollback.
 
 ### Documentation
 
@@ -144,29 +177,28 @@
   card update, campaign email preferences, and pledge/email independence.
   The copy review covers payment expectations, privacy, access, and messaging;
   existing fulfillment remedies and statutory-rights protections remain intact.
+
 - Added a task-based documentation index and consolidated the overview,
   workflow, and developer-note guides into architecture, campaign content,
   and Worker API references. Setup, deployment, reporting, and verification
   procedures now live with their owning guides; root and Worker READMEs are
   concise entry points.
+
 - Corrected stale Worker deployment, provider-tax, and report-accounting
   descriptions while retaining current-state, roadmap, and release-history
   boundaries.
+
 - Excluded maintainer documentation from the public Jekyll artifact and added
   a pre-merge artifact check, preserving the root and localized website pages.
+
 - Separated current behavior, prospective work, and release history across the
   README, practice guides, roadmap, changelog, and release evidence.
+
 - Removed dated provider snapshots, completed-work roadmaps, release-specific
   status ledgers, and duplicate future-work lists from current-state guides.
+
 - Moved the tax calculator guide into Pool so provider behavior, configuration,
   troubleshooting, and verification have one upstream documentation source.
-
-### Local verification
-
-- Preserved the caller's Ruby/Bundler and Node selection across pre-merge host
-  phases. Login shells could previously pass dependency checks under rbenv,
-  then switch to macOS system Ruby for the build and unnecessarily fall back
-  to Podman. Added regression coverage for host and Podman build dispatch.
 
 ## v1.2.20 - 2026-08-06
 

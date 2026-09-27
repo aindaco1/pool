@@ -14,13 +14,36 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('Pool Jev advisory adapter', () => {
   it('keeps matched faithful/flawed controls for both locales with identical requirements', () => {
-    expect(controls).toHaveLength(16);
+    expect(controls).toHaveLength(20);
     for (const good of controls.filter((row: any) => row.expected === 'pass')) {
       const bad = controls.find((row: any) => row.category === good.category && row.lang === good.lang && row.expected === 'fail');
       expect(bad.requirements).toEqual(good.requirements);
       expect(bad.candidate).not.toBe(good.candidate);
       expect(Object.keys(good.requirements)).toHaveLength(1);
     }
+  });
+
+  it('grades the charge-vs-save distinction: pledge-save language in a charge confirmation must fail', async () => {
+    const charged = controls.filter((row: any) => row.category === 'charged');
+    expect(charged).toHaveLength(4);
+    expect(charged.filter((row: any) => row.lang === 'en')).toHaveLength(2);
+    expect(charged.filter((row: any) => row.lang === 'es')).toHaveLength(2);
+    // Faithful judgment simulator: pass iff the candidate names an actual charge
+    // and does not leak "card saved / not charged unless the goal is reached" language.
+    const savedLeak = /card is saved|no charge|unless.*(reaches|meta|goal)|tarjeta est\u00e1 guardada|no se cobrar\u00e1|a menos que/i;
+    const chargedClaim = /successfully charged|se ha cobrado/i;
+    const judge = async (payload: any) => {
+      const text = payload.input.state.candidate;
+      const choice = chargedClaim.test(text) && !savedLeak.test(text) ? 'pass' : 'fail';
+      return response(payload, choice);
+    };
+    const report = await evaluateJevCases(charged, { policy: POLICY, call: judge });
+    const summary = summarize(report, charged).controls;
+    expect(summary).toEqual({ correct: 4, falsePasses: 0, falseFailures: 0, review: 0, unevaluated: 0 });
+    // A judge that ignores the save-leak (the exact Pool false-alarm class) must be caught.
+    const naive = async (payload: any) => response(payload, /Payment confirmed|Pago confirmado/i.test(payload.input.state.candidate) ? 'pass' : 'fail');
+    const naiveReport = await evaluateJevCases(charged, { policy: POLICY, call: naive });
+    expect(summarize(naiveReport, charged).controls.falsePasses).toBe(2);
   });
 
   it('captures actual bilingual HTML/plain-text email output without any network or live identity', async () => {
@@ -54,13 +77,13 @@ describe('Pool Jev advisory adapter', () => {
     const preview = await evaluateJevCases(controls, { policy: POLICY });
     expect(preview.networkAttempts).toBe(0);
     expect(preview.complete).toBe(false);
-    expect(summarize(preview, controls).controls.unevaluated).toBe(16);
+    expect(summarize(preview, controls).controls.unevaluated).toBe(20);
     expect(summarize(preview, controls).controls.review).toBe(0);
     const call = vi.fn().mockRejectedValue(new Error('synthetic transport failure'));
     const report = await evaluateJevCases(controls, { policy: POLICY, call });
     expect(call).toHaveBeenCalledTimes(1);
     expect(report.complete).toBe(false);
     expect(report.error).toBeTruthy();
-    expect(summarize(report, controls).controls.unevaluated).toBe(16);
+    expect(summarize(report, controls).controls.unevaluated).toBe(20);
   });
 });
