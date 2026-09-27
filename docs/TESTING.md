@@ -422,7 +422,7 @@ Public-page coverage also protects localized campaign chrome, including:
 - production-phase labels and CTA copy
 - gallery accessibility labels
 
-The content-safety filter suite in `tests/unit/content-safety-filter.test.ts` also falls back to Podman when host Bundler/Jekyll gems are unavailable. On macOS, it can start the Podman machine as part of that fallback.
+The content-safety filter suite in `tests/unit/content-safety-filter.test.ts` also falls back to Podman when host Bundler/Jekyll gems are unavailable. It uses the caller's endpoint or Podman's selected default connection and requires a reachable engine; it does not start or restart a shared machine. See [Podman](PODMAN.md#start-local-dev) for host setup.
 
 The current Podman scope is intentionally narrow:
 
