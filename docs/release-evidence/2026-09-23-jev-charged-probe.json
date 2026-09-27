@@ -1,0 +1,100 @@
+{
+  "complete": true,
+  "networkAttempts": 4,
+  "error": null,
+  "cases": [
+    {
+      "id": "control-charged-en-pass",
+      "expected": "pass",
+      "decision": "pass",
+      "correct": true,
+      "findings": [
+        {
+          "key": "charged",
+          "decision": "pass",
+          "probabilities": {
+            "fail": 0,
+            "pass": 1,
+            "uncertain": 0
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 439,
+        "output_tokens": 40
+      }
+    },
+    {
+      "id": "control-charged-en-fail",
+      "expected": "fail",
+      "decision": "fail",
+      "correct": true,
+      "findings": [
+        {
+          "key": "charged",
+          "decision": "fail",
+          "probabilities": {
+            "uncertain": 0,
+            "pass": 0.11,
+            "fail": 0.89
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 40
+      }
+    },
+    {
+      "id": "control-charged-es-pass",
+      "expected": "pass",
+      "decision": "pass",
+      "correct": true,
+      "findings": [
+        {
+          "key": "charged",
+          "decision": "pass",
+          "probabilities": {
+            "fail": 0,
+            "pass": 1,
+            "uncertain": 0
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 40
+      }
+    },
+    {
+      "id": "control-charged-es-fail",
+      "expected": "fail",
+      "decision": "fail",
+      "correct": true,
+      "findings": [
+        {
+          "key": "charged",
+          "decision": "fail",
+          "probabilities": {
+            "uncertain": 0.01,
+            "pass": 0.27,
+            "fail": 0.72
+          }
+        }
+      ],
+      "usage": {
+        "input_tokens": 456,
+        "output_tokens": 40
+      }
+    }
+  ],
+  "tally": {
+    "correct": 4,
+    "falsePasses": 0,
+    "falseFailures": 0,
+    "review": 0,
+    "unevaluated": 0
+  },
+  "inputTokens": 1787,
+  "estimatedInferenceUsd": 0.000075054
+}

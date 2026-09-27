@@ -158,5 +158,45 @@
     "requirements": {
       "recovery": "Asks the supporter to update their payment method to complete the pledge."
     }
+  },
+  {
+    "id": "control-charged-en-pass",
+    "lang": "en",
+    "category": "charged",
+    "expected": "pass",
+    "candidate": "Payment confirmed. Your pledge has been successfully charged. Thank you for helping make this project happen!",
+    "requirements": {
+      "charged": "Confirms payment was successfully charged, rather than merely saving a pledge."
+    }
+  },
+  {
+    "id": "control-charged-en-fail",
+    "lang": "en",
+    "category": "charged",
+    "expected": "fail",
+    "candidate": "Payment confirmed. Your card is saved and won't be charged unless this campaign reaches its funding goal. Thank you for helping make this project happen!",
+    "requirements": {
+      "charged": "Confirms payment was successfully charged, rather than merely saving a pledge."
+    }
+  },
+  {
+    "id": "control-charged-es-pass",
+    "lang": "es",
+    "category": "charged",
+    "expected": "pass",
+    "candidate": "Pago confirmado. Tu aporte se ha cobrado correctamente. ¡Gracias por ayudar a que este proyecto sea posible!",
+    "requirements": {
+      "charged": "Confirms payment was successfully charged, rather than merely saving a pledge."
+    }
+  },
+  {
+    "id": "control-charged-es-fail",
+    "lang": "es",
+    "category": "charged",
+    "expected": "fail",
+    "candidate": "Pago confirmado. Tu tarjeta está guardada y no se cobrará a menos que esta campaña alcance su meta. ¡Gracias por ayudar a que este proyecto sea posible!",
+    "requirements": {
+      "charged": "Confirms payment was successfully charged, rather than merely saving a pledge."
+    }
   }
 ]
