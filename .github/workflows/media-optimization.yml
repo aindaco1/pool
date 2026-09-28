@@ -4,16 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: 'Media scope to optimize'
+        description: Image scope to optimize (changed includes pending uploads)
         required: true
         default: changed
         type: choice
-        options:
-          - changed
-          - all
+        options: [changed, all]
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'assets/images/**'
       - 'assets/videos/**'
@@ -22,71 +19,150 @@ on:
       - '_campaigns/**'
       - '_config.yml'
       - 'scripts/optimize-media.mjs'
+      - 'scripts/validate-media-optimization.mjs'
+      - 'scripts/publish-media-optimization.sh'
       - '.github/workflows/media-optimization.yml'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
+# One active run and the most recent pending upload; never interrupt validation.
 concurrency:
   group: media-optimization-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   optimize:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    outputs:
+      base: ${{ steps.prepare.outputs.base }}
+      changed: ${{ steps.prepare.outputs.changed }}
+      branch: ${{ steps.prepare.outputs.branch }}
+      commit: ${{ steps.prepare.outputs.commit }}
     steps:
-      - name: Check out repository
+      - name: Check out current sources
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          # Feature dispatches exercise the pipeline but cannot publish.
+          ref: ${{ github.ref == 'refs/heads/main' && 'main' || github.sha }}
           fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
 
       - name: Install media tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg optipng libjpeg-turbo-progs gifsicle webp
 
-      - name: Optimize media
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "all" ]; then
-            node ./scripts/optimize-media.mjs --write
-          else
-            node ./scripts/optimize-media.mjs --write --changed
-          fi
-
-      - name: Open media optimization pull request
+      - name: Optimize and validate image output
+        id: prepare
         env:
-          GH_TOKEN: ${{ github.token }}
+          MEDIA_SCOPE: ${{ inputs.scope || 'changed' }}
         run: |
-          if git diff --quiet; then
-            echo "No media optimization changes."
+          base="$(git rev-parse HEAD)"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          if [ "$MEDIA_SCOPE" = all ]; then
+            node scripts/optimize-media.mjs --write --images-only > "$RUNNER_TEMP/media-optimization.json"
+          else
+            node scripts/optimize-media.mjs --write --images-only --changed > "$RUNNER_TEMP/media-optimization.json"
+          fi
+          git add -A -- assets/images _data/media-optimization-manifest.json
+          git diff --cached --binary > "$RUNNER_TEMP/media-optimization.patch"
+          node scripts/validate-media-optimization.mjs "$base" > "$RUNNER_TEMP/media-validation.json"
+          if git diff --cached --quiet; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'No image optimization changes.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          branch="bot/media-optimization-${GITHUB_RUN_ID}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          for media_path in assets/images assets/videos assets/audio _data/media-optimization-manifest.json _campaigns _config.yml; do
-            if [ -e "$media_path" ] || [ -n "$(git ls-files -- "$media_path")" ]; then
-              git add -A -- "$media_path"
-            fi
-          done
-          git commit -m "Optimize dashboard media uploads"
-          git push --set-upstream origin "$branch"
-          pr_error="$(mktemp)"
-          if ! gh pr create \
-            --base main \
-            --head "$branch" \
-            --title "Optimize dashboard media uploads" \
-            --body "Automated media optimization output from run ${GITHUB_RUN_ID}. Review the generated assets and campaign/config reference updates before merging." 2>"$pr_error"; then
-            if grep -Fq 'GitHub Actions is not permitted to create or approve pull requests' "$pr_error"; then
-              echo "::notice title=Media changes ready for review::Repository policy requires a maintainer to open the pull request: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${branch}?expand=1"
-            else
-              cat "$pr_error" >&2
-              rm -f "$pr_error"
-              exit 1
-            fi
+          branch="bot/media-optimization-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Optimize dashboard images'
+          commit="$(git rev-parse HEAD)"
+          # Record cleanup identity before pushing, including a failed push.
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          git push origin "HEAD:refs/heads/$branch"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+          echo "Image candidate: \`$commit\`. Full Merge Smoke is required before publication." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain optimizer evidence and recoverable patch
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: media-optimization-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/media-optimization.json
+            ${{ runner.temp }}/media-validation.json
+            ${{ runner.temp }}/media-optimization.patch
+          retention-days: 14
+
+  verify:
+    needs: optimize
+    if: needs.optimize.outputs.changed == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/merge-smoke.yml
+    with:
+      ref: ${{ needs.optimize.outputs.commit }}
+
+  publish:
+    needs: [optimize, verify]
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      needs.optimize.result == 'success' &&
+      (needs.optimize.outputs.changed == 'false' || needs.verify.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Check out validated output
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.optimize.outputs.commit || needs.optimize.outputs.base }}
+          fetch-depth: 2
+
+      - name: Publish tested images and refresh Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MEDIA_BASE: ${{ needs.optimize.outputs.base }}
+          MEDIA_BRANCH: ${{ needs.optimize.outputs.branch }}
+          MEDIA_COMMIT: ${{ needs.optimize.outputs.commit }}
+        run: |
+          if [ -n "$MEDIA_COMMIT" ]; then
+            bash scripts/publish-media-optimization.sh "$MEDIA_BASE" "$MEDIA_BRANCH" "$MEDIA_COMMIT"
+          else
+            # Retry a failed Pages dispatch even when no image work remains.
+            gh workflow run deploy.yml --ref main -f reason='image optimization checked; refresh current source'
           fi
-          rm -f "$pr_error"
+
+  cleanup:
+    needs: [optimize, verify, publish]
+    if: always() && needs.optimize.outputs.branch != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Remove only this run's temporary branch
+        env:
+          MEDIA_BRANCH: ${{ needs.optimize.outputs.branch }}
+          MEDIA_COMMIT: ${{ needs.optimize.outputs.commit }}
+        run: |
+          [[ "$MEDIA_BRANCH" =~ ^bot/media-optimization-[0-9]+-[0-9]+$ ]]
+          [[ "$MEDIA_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+          current="$(git ls-remote origin "refs/heads/$MEDIA_BRANCH" | cut -f1)"
+          if [ -n "$current" ]; then
+            git push --force-with-lease="refs/heads/$MEDIA_BRANCH:$MEDIA_COMMIT" origin ":refs/heads/$MEDIA_BRANCH"
+          fi

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
@@ -46,14 +47,26 @@ describe('workflow security posture', () => {
     expect(deploy).not.toContain('CLOUDFLARE_KEY:');
   });
 
-  it('sends media optimization changes through a pull request', () => {
-    const workflow = readWorkflow('media-optimization.yml');
-
-    expect(workflow).toContain('pull-requests: write');
-    expect(workflow).toContain('gh pr create');
-    expect(workflow).toContain('bot/media-optimization-${GITHUB_RUN_ID}');
-    expect(workflow).not.toMatch(/git push\s+origin\s+main/);
-    expect(workflow).not.toMatch(/git push\s+origin\s+HEAD:main/);
+  it('requires image validation and the complete reusable gate before automatic publication', () => {
+    const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',
+      'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))', path.join(repoRoot, '.github/workflows/media-optimization.yml')
+    ], { encoding: 'utf8' }));
+    const { optimize, verify, publish, cleanup } = workflow.jobs;
+    const prepare = optimize.steps.find((step: any) => step.id === 'prepare').run;
+    expect(prepare.indexOf('validate-media-optimization.mjs')).toBeLessThan(prepare.indexOf('git push'));
+    expect(prepare).toContain('--images-only --changed');
+    expect(verify.needs).toBe('optimize');
+    expect(verify.uses).toBe('./.github/workflows/merge-smoke.yml');
+    expect(verify.with.ref).toBe('${{ needs.optimize.outputs.commit }}');
+    expect(verify.permissions).toEqual({ contents: 'read' });
+    expect(publish.needs).toEqual(['optimize', 'verify']);
+    expect(publish.if).toContain("github.ref == 'refs/heads/main'");
+    expect(publish.if).toContain("needs.verify.result == 'success'");
+    expect(publish.if).toContain("needs.optimize.outputs.changed == 'false'");
+    expect(cleanup.if).toContain('always()');
+    expect(cleanup.needs).toEqual(['optimize', 'verify', 'publish']);
+    expect(cleanup.steps.at(-1).run).toContain('--force-with-lease=');
+    expect(JSON.stringify(workflow)).not.toContain('pull_request_target');
   });
 
   it('archives campaigns with validated workflow_dispatch input and move-only filesystem operations', () => {

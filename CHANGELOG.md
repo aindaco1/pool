@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Automatically publish validated image compression and responsive WebP variants
+  after the full Merge Smoke gate, refresh Pages, and remove temporary bot
+  branches. Detect pending uploads despite later content saves, preserve
+  intentional size skips, and prevent the manifest from indexing itself.
+
+- Adopt the pending Deinonychus add-on and tier image optimizations: eight
+  responsive WebP variants and lossless compression of two JPEG sources.
+  Rebuild the media manifest from current assets, incorporating the pending
+  manifest-only branch without restoring stale campaign or configuration data.
+
 ## v1.2.21 - 2026-09-27
 
 Maintenance rollup of the work committed since v1.2.20, plus validated local
