@@ -73,10 +73,6 @@
         {
           "path": "_config.yml",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -140,10 +136,6 @@
         {
           "path": "_config.yml",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -207,10 +199,108 @@
         {
           "path": "_config.yml",
           "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d.jpg",
+      "publicPath": "/assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d.jpg",
+      "name": "add-on-dino-plushie-20260924-203913-19e1151d.jpg",
+      "label": "add on dino plushie 20260924 203913 19e1151d",
+      "type": "image",
+      "scope": "platform",
+      "campaignSlug": "",
+      "bytes": 1810073,
+      "sha256": "0bfe1d1d63037f4bef137f20b2fe24603a00f3bd2c50cc7e9a5f81995e2c587a",
+      "width": 3024,
+      "height": 4032,
+      "durationMs": 40,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-320.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-480.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-640.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-960.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-1600.webp"
+      ],
+      "missingDerivatives": [
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-320.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-480.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-640.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-960.webp",
+        "assets/images/campaign-add-ons/add-on-dino-plushie-20260924-203913-19e1151d-1600.webp"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "name": "add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f.jpg",
+      "label": "add on drawing of you as a dinosaur 20260924 203855 b40c8b8f",
+      "type": "image",
+      "scope": "platform",
+      "campaignSlug": "",
+      "bytes": 373372,
+      "sha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+      "width": 1542,
+      "height": 2048,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+        "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-320.webp",
+          "bytes": 21856,
+          "sha256": "112cc899a65dd98dd64d6468a4eecec9ca117c79149aa61e01ce9e01234f0705",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 320
         },
         {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-480.webp",
+          "bytes": 37708,
+          "sha256": "244d72fbfb3f735a59707db51d9cb449b3a5a8e29f41af8e4734e678cc45c1a8",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-640.webp",
+          "bytes": 53882,
+          "sha256": "42a7a801b98911d9c848f1b3c7803ffb11be52faa95cb62005f72bd8ada09ae8",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp",
+          "publicPath": "/assets/images/campaign-add-ons/add-on-drawing-of-you-as-a-dinosaur-20260924-203855-b40c8b8f-960.webp",
+          "bytes": 88494,
+          "sha256": "8c11b2c0b8056f03103cbc09a922194dc7e0818a945f09fbb68645a15250ac2c",
+          "sourceSha256": "a514cffecea7acc01e756cca0650f40ad83fdbeb8e8080f974115085424c4a58",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
+          "count": 1
         }
       ]
     },
@@ -274,10 +364,6 @@
         {
           "path": "_campaigns/smoke-editable.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -323,10 +409,6 @@
         {
           "path": "_campaigns/smoke-editable.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -386,12 +468,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/beneath-static/beneath-wide.png",
@@ -449,12 +526,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/common-ground/common-square.png",
@@ -512,12 +584,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/common-ground/common-wide.png",
@@ -575,12 +642,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/deinonychus/background-20260916-171555-c03b41bc.png",
@@ -642,10 +704,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -679,10 +737,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -748,10 +802,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -787,10 +837,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -856,10 +902,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -895,10 +937,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -964,10 +1002,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -999,10 +1033,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -1036,12 +1066,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/deinonychus/hero-square-20260916-170848-81935b22.jpg",
@@ -1095,10 +1120,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -1131,12 +1152,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/deinonychus/hero-wide-20260916-171135-64485b3e.png",
@@ -1198,10 +1214,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -1274,10 +1286,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -1307,10 +1315,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -1346,10 +1350,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -1387,10 +1387,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
         }
       ]
     },
@@ -1426,10 +1422,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -1469,9 +1461,69 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg",
+      "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg",
+      "name": "tier-deinonychus-antirrhopus-20260924-204350-8c13af6a.jpg",
+      "label": "tier deinonychus antirrhopus 20260924 204350 8c13af6a",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "deinonychus",
+      "bytes": 98554,
+      "sha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+      "width": 1290,
+      "height": 964,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-320.webp",
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-480.webp",
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-640.webp",
+        "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-320.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-320.webp",
+          "bytes": 6976,
+          "sha256": "bf26662acb428a6c3c523e21ec914e953dace65fcd61fca7d2fd8476ed6ca5e7",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 320
         },
         {
-          "path": "_data/media-optimization-manifest.json",
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-480.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-480.webp",
+          "bytes": 12158,
+          "sha256": "29453c8cd57a1e5f8d3f545c30723c584966977f1f72f70eba81f7c83934f97e",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-640.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-640.webp",
+          "bytes": 18050,
+          "sha256": "cf6607a8423d62d3f5edac27d3840bcfa8cca73e53a8667f32c65f37c0fe58e4",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-960.webp",
+          "publicPath": "/assets/images/campaigns/deinonychus/tier-deinonychus-antirrhopus-20260924-204350-8c13af6a-960.webp",
+          "bytes": 29004,
+          "sha256": "5fe747417b8f447f6177dad327116e2409270c5dc32b41e09418e0a1aece888b",
+          "sourceSha256": "015ee5eeb99f99d7689e34249f25c844ea3eff14bfeeb1e025a7506d7bc4f340",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/deinonychus.md",
           "count": 1
         }
       ]
@@ -1511,10 +1563,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
         }
       ]
     },
@@ -1553,10 +1601,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
         }
       ]
     },
@@ -1593,10 +1637,6 @@
         {
           "path": "_campaigns/deinonychus.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
         }
       ]
     },
@@ -1628,10 +1668,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -1705,10 +1741,6 @@
         {
           "path": "_campaigns/hand-relations.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -1782,10 +1814,6 @@
         {
           "path": "_campaigns/hand-relations.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -1850,10 +1878,6 @@
         {
           "path": "_campaigns/hand-relations.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -1887,12 +1911,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/human-error/creator-20260915-234126-ce00645e.png",
@@ -1924,12 +1943,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/night-work/night-work-square.png",
@@ -1987,12 +2001,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/night-work/night-work-wide.png",
@@ -2050,12 +2059,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/background.png",
@@ -2117,10 +2121,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2180,12 +2180,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/content-wrapped-20260603-052919.gif",
@@ -2221,10 +2216,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 2
         }
       ]
     },
@@ -2297,10 +2288,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -2364,10 +2351,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2431,10 +2414,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2507,10 +2486,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -2574,10 +2549,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2641,10 +2612,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2708,10 +2675,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2775,10 +2738,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2842,10 +2801,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2909,10 +2864,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -2976,10 +2927,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3043,10 +2990,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3106,12 +3049,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/physical-media.png",
@@ -3173,10 +3111,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3249,10 +3183,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -3312,12 +3242,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/screw-goodies.png",
@@ -3379,10 +3304,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3446,10 +3367,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3513,10 +3430,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3580,10 +3493,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3647,10 +3556,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -3723,10 +3628,6 @@
         {
           "path": "_campaigns/sunder.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -3772,10 +3673,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -3830,10 +3727,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -3880,10 +3773,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -3939,10 +3828,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -3998,10 +3883,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -4065,10 +3946,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -4123,10 +4000,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -4166,10 +4039,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 2
         }
       ]
     },
@@ -4238,12 +4107,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/tecolote/owl-sticker.png",
@@ -4278,10 +4142,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 2
         }
       ]
     },
@@ -4345,10 +4205,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -4403,10 +4259,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -4479,10 +4331,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -4555,10 +4403,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -4631,10 +4475,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -4703,12 +4543,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/tecolote/still-5.png",
@@ -4766,12 +4601,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/tecolote/still-6.png",
@@ -4842,10 +4672,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -4918,10 +4744,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -4967,10 +4789,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -5016,10 +4834,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -5074,10 +4888,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -5151,10 +4961,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -5218,10 +5024,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5285,10 +5087,6 @@
         {
           "path": "_campaigns/tecolote.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5326,10 +5124,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 2
         }
       ]
     },
@@ -5394,10 +5188,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5461,10 +5251,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 2
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5529,10 +5315,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5597,10 +5379,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5664,10 +5442,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5732,10 +5506,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5809,10 +5579,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -5877,10 +5643,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -5936,10 +5698,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -6004,10 +5762,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -6071,10 +5825,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -6147,10 +5897,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 2
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -6223,10 +5969,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 2
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -6273,10 +6015,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -6341,10 +6079,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -6408,10 +6142,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -6449,10 +6179,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 2
         }
       ]
     },
@@ -6516,10 +6242,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -6574,10 +6296,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -6650,10 +6368,6 @@
         {
           "path": "_campaigns/their-love.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -6717,10 +6431,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -6793,10 +6503,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 6
         }
       ]
     },
@@ -6851,10 +6557,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -6918,10 +6620,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -6979,10 +6677,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -7028,10 +6722,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -7086,10 +6776,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -7144,10 +6830,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -7211,10 +6893,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7278,10 +6956,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7344,12 +7018,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/worst-movie-ever/revolver.png",
@@ -7411,10 +7080,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7478,10 +7143,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7537,10 +7198,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -7604,10 +7261,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7662,10 +7315,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -7729,10 +7378,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7796,10 +7441,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7863,10 +7504,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7930,10 +7567,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -7997,10 +7630,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8064,10 +7693,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8131,10 +7756,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8198,10 +7819,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8265,10 +7882,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8332,10 +7945,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8393,10 +8002,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 4
         }
       ]
     },
@@ -8460,10 +8065,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8523,12 +8124,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/worst-movie-ever/whats-so-special.png",
@@ -8590,10 +8186,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8657,10 +8249,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8724,10 +8312,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -8760,12 +8344,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 2
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/campaign-hero-progress.png",
@@ -8805,12 +8384,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/community-decision.png",
@@ -8841,12 +8415,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 2
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/creator-facts.png",
@@ -8866,12 +8435,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/embed-builder.png",
@@ -8929,12 +8493,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/examples/creator-image-example.webp",
@@ -8954,12 +8513,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/examples/gallery-still-example.webp",
@@ -8979,12 +8533,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/examples/square-hero-example.webp",
@@ -9004,12 +8553,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/examples/tier-image-example.webp",
@@ -9029,12 +8573,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/examples/wide-hero-example.webp",
@@ -9054,12 +8593,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/checklists/creator-campaign-checklist/tier-card.png",
@@ -9079,12 +8613,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/defaults/celebration.gif",
@@ -9133,10 +8662,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -9220,10 +8745,6 @@
         {
           "path": "_config.yml",
           "count": 3
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -9270,10 +8791,6 @@
         {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -9337,10 +8854,6 @@
         {
           "path": "_config.yml",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 5
         }
       ]
     },
@@ -9389,10 +8902,6 @@
         {
           "path": "_campaigns/hand-relations.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 3
         }
       ]
     },
@@ -9417,10 +8926,6 @@
       "references": [
         {
           "path": "_campaigns/hand-relations.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]
@@ -9451,10 +8956,6 @@
         {
           "path": "_campaigns/smoke-editable.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
         }
       ]
     },
@@ -9484,10 +8985,6 @@
         {
           "path": "_campaigns/smoke-editable.md",
           "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
         }
       ]
     },
@@ -9509,12 +9006,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/share-icons/bluesky.png",
@@ -9534,12 +9026,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/share-icons/email.png",
@@ -9559,12 +9046,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/share-icons/facebook.png",
@@ -9584,12 +9066,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/share-icons/sms.png",
@@ -9609,12 +9086,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/share-icons/threads.png",
@@ -9634,12 +9106,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/share-icons/x.png",
@@ -9659,12 +9126,7 @@
       "skippedDerivatives": [],
       "derivatives": [],
       "warnings": [],
-      "references": [
-        {
-          "path": "_data/media-optimization-manifest.json",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/videos/campaigns/deinonychus/video-20260916-144404-dfbc1cf8.mp4",
@@ -9692,10 +9154,6 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
-          "count": 1
-        },
-        {
-          "path": "_data/media-optimization-manifest.json",
           "count": 1
         }
       ]

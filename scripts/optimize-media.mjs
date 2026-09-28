@@ -85,6 +85,7 @@ function parseArgs(argv = []) {
     write: false,
     check: false,
     changed: false,
+    imagesOnly: false,
     manifestOnly: false,
     files: []
   };
@@ -92,6 +93,7 @@ function parseArgs(argv = []) {
     if (arg === '--write') args.write = true;
     else if (arg === '--check') args.check = true;
     else if (arg === '--changed') args.changed = true;
+    else if (arg === '--images-only') args.imagesOnly = true;
     else if (arg === '--manifest-only') args.manifestOnly = true;
     else args.files.push(arg);
   }
@@ -204,18 +206,35 @@ function isDashboardMediaFile(repoPath) {
     (isImageFile(normalized) || isVideoSourceFile(normalized) || isAudioFile(normalized));
 }
 
-async function resolveMediaFiles(args) {
+export async function resolveMediaFiles(args) {
   if (args.files.length) {
-    return args.files.map(normalizeRepoPath).filter(isDashboardMediaFile);
+    return args.files.map(normalizeRepoPath).filter(isDashboardMediaFile)
+      .filter((file) => !args.imagesOnly || isImageFile(file));
   }
-  if (args.changed) {
+  if (args.changed && !args.imagesOnly) {
     const changed = await changedFiles();
     if (changed) return changed.map(normalizeRepoPath).filter(isDashboardMediaFile);
   }
   const roots = await Promise.all(MEDIA_ROOTS.map((root) => walkFiles(root)));
-  return roots.flat()
+  const files = roots.flat()
     .map((filePath) => normalizeRepoPath(path.relative(process.cwd(), filePath)))
     .filter(isDashboardMediaFile);
+  if (!args.imagesOnly) return files;
+  const known = new Set(files);
+  const images = files.filter((file) => isImageFile(file) && classifyMediaPath(file, known)?.role === 'source');
+  if (!args.changed) return images;
+  // Upload dispatches can arrive after a Save/content commit. Git HEAD alone
+  // misses those uploads; compare source hashes and missing sizes instead.
+  const previous = JSON.parse(await fs.readFile(MEDIA_MANIFEST_PATH, 'utf8').catch(() => '{"assets":[]}'));
+  const rows = new Map((previous.assets || []).map((asset) => [asset.path, asset]));
+  const pending = [];
+  for (const file of images) {
+    const row = rows.get(file);
+    if (!row || row.sha256 !== await sha256File(file) || (row.expectedDerivatives || []).some(
+      (derivative) => !known.has(derivative) && !(row.skippedDerivatives || []).includes(derivative)
+    )) pending.push(file);
+  }
+  return pending;
 }
 
 async function replaceIfSmaller(sourcePath, candidatePath, write) {
@@ -331,7 +350,7 @@ async function generateResponsiveWebpDerivative(repoPath, width, dimensions, arg
   const derivativePath = path.resolve(derivativeRepoPath);
   const sourceStat = await fs.stat(sourcePath).catch(() => null);
   const derivativeStat = await fs.stat(derivativePath).catch(() => null);
-  if (derivativeStat && sourceStat && derivativeStat.mtimeMs >= sourceStat.mtimeMs) {
+  if (!args.imagesOnly && derivativeStat && sourceStat && derivativeStat.mtimeMs >= sourceStat.mtimeMs) {
     return { repoPath, changed: false, derivativeRepoPath, width, skipped: 'up to date' };
   }
 
@@ -438,7 +457,7 @@ async function referenceFiles() {
   for (const file of REFERENCE_FILES) {
     if (await fileExists(file)) files.push(file);
   }
-  return files.filter((file) => /\.(md|ya?ml|json)$/i.test(file));
+  return files.filter((file) => /\.(md|ya?ml|json)$/i.test(file) && normalizeRepoPath(file) !== MEDIA_MANIFEST_PATH);
 }
 
 async function rewriteRepositoryReferences(replacements, write) {

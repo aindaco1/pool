@@ -307,6 +307,14 @@ Dashboard uploads are source-preserving. The Worker validates uploads and commit
 
 Campaign Content, diary content, and Blast email image uploads share the same campaign media upload path. Blast images therefore add no new Worker-side optimization system or KV state: they are committed under `assets/images/campaigns/<slug>/`, the existing media workflow runs with `scope=changed`, and the final site-hosted `/assets/...` path is used in the email payload. Blast video blocks remain provider links/buttons for YouTube or Vimeo instead of embedded players, keeping email HTML small and client-compatible.
 
+The workflow publishes image optimization automatically. It compresses source images losslessly, creates smaller responsive WebP sizes, and rebuilds the repository manifest. `scope=changed` finds new or changed source hashes and missing derivatives across the asset tree, so a subsequent project Save cannot hide an upload. Recorded skips remain valid while the source hash is unchanged. `scope=all` reprocesses all source images. The generated manifest never counts itself as a media reference.
+
+Each run validates that changes contain only image files and the manifest, preserve source pixels/dimensions/frame timing, and keep derivatives smaller than their source with the expected dimensions. A temporary candidate commit then runs the existing **Merge Smoke** workflow, including the full premerge gate and four dependency audits. Only that tested commit can fast-forward `main`. If campaign or configuration work advances `main` during validation, the workflow starts again from current sources rather than rebasing tested output. Feature-branch dispatches validate candidates without publishing them.
+
+After publication, the workflow explicitly requests **Refresh Production Pages** because Actions-token pushes do not trigger push workflows. Temporary candidate branches are deleted on success or failure; optimizer reports and a recoverable patch remain in the run artifacts for 14 days. A failed gate leaves `main` unchanged. Retry with `scope=changed`; Git history supports reverting a published optimization. No bot pull requests, new credentials, repository permission changes, or Worker deployment are needed.
+
+Automatic publication is image-only. Video uploads retain their original files and refresh the manifest; video transcoding and reference rewrites remain available through the local command below and require normal review before merge.
+
 Use the repository media pipeline for source media:
 
 ```bash
@@ -330,7 +338,7 @@ For deployed media-heavy regressions, manually run the **Optimize dashboard medi
 
 If PageSpeed flags oversized campaign images that already flow through `responsive-image.html`, first confirm whether the corresponding `-320.webp`, `-480.webp`, `-640.webp`, `-960.webp`, and `-1600.webp` derivatives exist. Produce missing derivatives with `npm run media:optimize` locally or with the workflow using `scope=all`, not with one-off manual image edits.
 
-The media pipeline:
+The local media command (including reviewed video work):
 
 - compresses images when the optimized result is smaller
 - generates responsive WebP variants at `320w`, `480w`, `640w`, `960w`, and `1600w` for public image templates when the source image is larger than that variant

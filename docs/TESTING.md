@@ -228,6 +228,18 @@ gateway cache/logging; they are not a provider-retention guarantee.
 See the [pilot evidence](release-evidence/2026-09-22-jev-pilot.md) for measured
 results and the [roadmap](ROADMAP.md) for conditions before adopting a gate.
 
+## Image automation checks
+
+Run focused regression checks after changing media automation:
+
+```bash
+npx vitest run tests/unit/media-automation.test.ts tests/unit/media-optimization-script.test.ts tests/unit/media-catalog-shared-contract.test.ts tests/unit/workflow-security.test.ts
+```
+
+These cover pending uploads after later saves, intentional size skips, repeatable manifests, source/derivative validation, restricted output, and concurrent main changes during publication. Validate native image output with `node scripts/validate-media-optimization.mjs <base-commit>` in a clean candidate checkout after optimization. The validator rejects unrelated working-tree changes.
+
+Before merging workflow changes, dispatch **Optimize dashboard media** on the feature branch with `scope=changed`. This exercises native optimization, candidate validation, the reusable full Merge Smoke gate, and temporary-branch cleanup without publishing main or Pages. The PR itself also requires normal Merge Smoke. After merge, verify the main optimizer run, its exact publication commit, branch cleanup, and the explicitly dispatched Pages run. See [Performance](PERFORMANCE.md#media-optimization) for failure recovery.
+
 ## Release Evidence
 
 Use the release wrapper before production sign-off:
