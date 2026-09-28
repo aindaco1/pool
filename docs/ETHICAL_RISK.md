@@ -109,4 +109,9 @@ Release-specific ethical review records belong with the corresponding
 
 ## Unassigned admin accounts — 2026-09-09
 
+**Status: Resolved.** The fix shipped on September 9, 2026 and is included in
+**v1.2.21**. The [consolidated release verification](./release-evidence/v1.2.21.md#release-verification)
+passed the admin tests covering preservation of existing unassigned users and
+rejection of new unassigned users. See the [original deployment evidence](./release-evidence/2026-09-09-admin-user-preservation.md).
+
 Saving users preserves a previously unassigned campaign account without granting campaign access. The exception comes only from stored users; browser-supplied allowlists cannot create unassigned accounts or strip an existing assignment. Super-admin, CSRF, and per-campaign authorization remain authoritative. No notification is resent for an unchanged existing user, and Store membership remains in its separate key.
