@@ -86,7 +86,8 @@ Current guardrails:
 
 - progress bars and marker positions render static width/left utility classes in Jekyll output so they do not start collapsed while JavaScript loads
 - campaign hero images are emitted with preload and high fetch priority where the layout knows the likely LCP asset
-- homepage campaign-card backgrounds use generated responsive WebP sources, lazy loading, and async decoding instead of eagerly transferring full-size PNGs
+- homepage campaign-card images use native lazy-image sizing with a grid-aware fallback; decorative backgrounds at 10% opacity use responsive WebPs capped at 640px, while meaningful card images retain the full responsive range
+- launch-reminder verification loads on form focus, pointer interaction, or input, with submission still requiring a valid Turnstile token; page load and viewport resize do not start a challenge
 - YouTube campaign hero videos render a local poster/play facade first and load the YouTube iframe only after play intent
 - common scripts use `defer` or lazy dynamic loading instead of parser-blocking script tags
 - full document layouts opt out of mobile automatic phone/date/address/email detection so iOS does not restyle operational copy or campaign text unexpectedly

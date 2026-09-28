@@ -18,6 +18,10 @@ for verification, deployment, and recovery details.
 - Detect pending uploads by source hash and missing sizes, including uploads
   followed by later content saves. Preserve intentional size skips and stop
   the generated manifest from counting itself as a source reference.
+- Keep homepage decorative backgrounds within a 640px responsive ceiling and
+  let lazy card images use their rendered width, with a grid-aware fallback.
+- Start launch-reminder Turnstile verification on form intent instead of page
+  load or resize; retain token enforcement and retry failed script loads.
 - Clarify that the previously unassigned admin-account issue was resolved and
   included in v1.2.21; campaign access rules are unchanged.
 

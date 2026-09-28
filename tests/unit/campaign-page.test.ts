@@ -214,6 +214,78 @@ describe('campaign page script', () => {
     expect((form.querySelector('[data-launch-reminder-status]') as HTMLElement).textContent).toBe("You're on the reminder list.");
   });
 
+  it('defers reminder verification until intent and never submits without a token', async () => {
+    document.body.innerHTML = `
+      <form data-launch-reminder-form data-campaign-slug="demo" data-turnstile-site-key="site-key">
+        <input name="email" type="email" value="reader@example.com">
+        <button type="submit">Remind me</button>
+        <div data-launch-reminder-turnstile></div>
+        <p data-launch-reminder-status></p>
+      </form>
+      <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+    `;
+    const form = document.querySelector('form')!;
+    // Visible forms previously rendered eagerly; jsdom has no layout by default.
+    vi.spyOn(form, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+    const render = vi.fn(() => 'widget-id');
+    const getResponse = vi.fn(() => '');
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true })));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('turnstile', { render, getResponse, reset: vi.fn() });
+
+    await import('../../assets/js/campaign-page.js');
+    window.dispatchEvent(new Event('resize'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(render).not.toHaveBeenCalled();
+
+    form.querySelector('input')!.dispatchEvent(new Event('focusin', { bubbles: true }));
+    form.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    form.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(render).toHaveBeenCalledTimes(1);
+
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(form.querySelector('[data-launch-reminder-status]')!.getAttribute('data-status')).toBe('error');
+
+    getResponse.mockReturnValue('verified-token');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ turnstileToken: 'verified-token' });
+  });
+
+  it('retries a failed challenge script on subsequent form intent', async () => {
+    document.body.innerHTML = `
+      <form data-launch-reminder-form data-turnstile-site-key="site-key">
+        <input name="email" type="email"><div data-launch-reminder-turnstile></div>
+      </form>
+      <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
+    `;
+    vi.stubGlobal('turnstile', undefined);
+    await import('../../assets/js/campaign-page.js');
+    const form = document.querySelector('form')!;
+    const selector = 'script[src*="challenges.cloudflare.com"]';
+    expect(document.querySelector(selector)).toBeNull();
+    form.dispatchEvent(new Event('input', { bubbles: true }));
+    const first = document.querySelector(selector)!;
+    expect(first).toBeTruthy();
+    first.dispatchEvent(new Event('error'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(document.querySelector(selector)).toBeNull();
+    form.dispatchEvent(new Event('focusin', { bubbles: true }));
+    const retry = document.querySelector(selector)!;
+    expect(retry).toBeTruthy();
+    expect(retry).not.toBe(first);
+    const render = vi.fn(() => 'widget-id');
+    vi.stubGlobal('turnstile', { render, getResponse: vi.fn(() => '') });
+    retry.dispatchEvent(new Event('load'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(render).toHaveBeenCalledTimes(1);
+    retry.remove();
+  });
+
   it('uses normal Turnstile sizing in the sidebar and flexible sizing in the header', async () => {
     document.body.innerHTML = `
       <section class="launch-reminder launch-reminder--sidebar">

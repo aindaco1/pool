@@ -568,7 +568,11 @@ function loadLaunchReminderTurnstile() {
     scriptNode.async = true;
     scriptNode.defer = true;
     scriptNode.onload = () => resolve();
-    scriptNode.onerror = () => reject(new Error('Turnstile failed to load'));
+    scriptNode.onerror = () => {
+      scriptNode.remove();
+      launchReminderTurnstileLoadPromise = null;
+      reject(new Error('Turnstile failed to load'));
+    };
     document.head.appendChild(scriptNode);
   });
 
@@ -635,22 +639,6 @@ function getLaunchReminderConsent(consentInput) {
   return ['1', 'true', 'yes', 'on'].includes(String(consentInput.value || '').trim().toLowerCase());
 }
 
-function isLaunchReminderFormVisible(form) {
-  if (!form?.isConnected) return false;
-  const style = window.getComputedStyle ? window.getComputedStyle(form) : null;
-  if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
-  return form.getClientRects().length > 0 || form.offsetParent !== null;
-}
-
-function renderVisibleLaunchReminderTurnstiles() {
-  document.querySelectorAll('[data-launch-reminder-form]').forEach((form) => {
-    if (!form.querySelector('[data-launch-reminder-turnstile]') || !isLaunchReminderFormVisible(form)) return;
-    loadLaunchReminderTurnstile()
-      .then(() => ensureLaunchReminderTurnstile(form))
-      .catch(() => {});
-  });
-}
-
 function initLaunchReminderForms() {
   document.querySelectorAll('[data-launch-reminder-form]').forEach((form) => {
     if (form.dataset.launchReminderReady === 'true') return;
@@ -665,6 +653,14 @@ function initLaunchReminderForms() {
       form.getAttribute('data-lang') ||
       window.POOL_CONFIG?.i18n?.currentLang ||
       'en';
+
+    // Prepare verification only after keyboard, pointer, or autofill intent.
+    const prepareTurnstile = () => {
+      ensureLaunchReminderTurnstile(form).catch(() => {});
+    };
+    form.addEventListener('focusin', prepareTurnstile);
+    form.addEventListener('pointerdown', prepareTurnstile, { passive: true });
+    form.addEventListener('input', prepareTurnstile);
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -755,8 +751,6 @@ function initLaunchReminderForms() {
 
   });
 
-  renderVisibleLaunchReminderTurnstiles();
-  window.addEventListener('resize', renderVisibleLaunchReminderTurnstiles, { passive: true });
 }
 
 function init() {
