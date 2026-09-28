@@ -62,7 +62,10 @@ intentional size skips, repeatable manifests, restricted output, source content,
 derivative geometry and animation, and main advancing before/during publication.
 Workflow changes require a feature-branch dispatch exercising native optimization,
 the full reusable gate, and cleanup without publishing. The PR also requires the
-normal complete hosted gate. Final results, exact commits, and workflow links are
+normal complete hosted gate. The first native dispatch correctly rejected a
+creator JPEG after the existing optimizer stripped its metadata. Retaining JPEG
+metadata preserved the original decoded result; local comparison verified that
+before repeating hosted validation. Final results, exact commits, and workflow links are
 recorded in the pull request; post-merge Pages publication is checked separately.
 
 Ethical review: automated write authority is limited to validated repository

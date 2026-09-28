@@ -291,7 +291,7 @@ async function optimizeImage(repoPath, args, tools) {
     return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
   } else if ((extension === '.jpg' || extension === '.jpeg') && tools.jpegtran) {
     const candidatePath = `${filePath}.optimized`;
-    await execFileAsync('jpegtran', ['-copy', 'none', '-optimize', '-progressive', '-outfile', candidatePath, filePath]);
+    await execFileAsync('jpegtran', ['-copy', 'all', '-optimize', '-progressive', '-outfile', candidatePath, filePath]);
     return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.gif' && tools.gifsicle) {
     const candidatePath = `${filePath}.optimized.gif`;

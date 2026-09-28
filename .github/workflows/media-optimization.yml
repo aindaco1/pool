@@ -73,9 +73,9 @@ jobs:
           else
             node scripts/optimize-media.mjs --write --images-only --changed > "$RUNNER_TEMP/media-optimization.json"
           fi
-          node scripts/validate-media-optimization.mjs "$base" > "$RUNNER_TEMP/media-validation.json"
           git add -A -- assets/images _data/media-optimization-manifest.json
           git diff --cached --binary > "$RUNNER_TEMP/media-optimization.patch"
+          node scripts/validate-media-optimization.mjs "$base" > "$RUNNER_TEMP/media-validation.json"
           if git diff --cached --quiet; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
             echo 'No image optimization changes.' >> "$GITHUB_STEP_SUMMARY"
