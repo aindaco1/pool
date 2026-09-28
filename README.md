@@ -2,7 +2,7 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-The current release is **v1.2.21**. Changes after that tag are recorded under
+The current release is **v1.2.22**. Changes after that tag are recorded under
 **Unreleased** in the [Changelog](CHANGELOG.md); prospective work belongs in the
 [Roadmap](docs/ROADMAP.md).
 

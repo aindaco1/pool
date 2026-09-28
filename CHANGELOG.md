@@ -2,15 +2,28 @@
 
 ## Unreleased
 
-- Automatically publish validated image compression and responsive WebP variants
-  after the full Merge Smoke gate, refresh Pages, and remove temporary bot
-  branches. Detect pending uploads despite later content saves, preserve
-  intentional size skips, and prevent the manifest from indexing itself.
+## v1.2.22 - 2026-09-27
 
-- Adopt the pending Deinonychus add-on and tier image optimizations: eight
-  responsive WebP variants and lossless compression of two JPEG sources.
-  Rebuild the media manifest from current assets, incorporating the pending
-  manifest-only branch without restoring stale campaign or configuration data.
+Image optimization now publishes automatically after validation and the full
+Merge Smoke gate. See the [release evidence](docs/release-evidence/v1.2.22.md)
+for verification, deployment, and recovery details.
+
+- Consolidate the pending media branches and process the remaining image
+  backlog: 78 new responsive WebP sizes and 1,056,560 fewer source-image bytes.
+- Validate image-only output, preserve decoded source content and JPEG metadata,
+  enforce derivative size/dimension/timing checks, and publish only the exact
+  tested child of current main. Concurrent creator saves cause a fresh run.
+- Refresh Pages explicitly after automatic publication, remove temporary
+  branches, and retain reports and a recoverable patch in workflow artifacts.
+- Detect pending uploads by source hash and missing sizes, including uploads
+  followed by later content saves. Preserve intentional size skips and stop
+  the generated manifest from counting itself as a source reference.
+- Keep homepage decorative backgrounds within a 640px responsive ceiling and
+  let lazy card images use their rendered width, with a grid-aware fallback.
+- Start launch-reminder Turnstile verification on form intent instead of page
+  load or resize; retain token enforcement and retry failed script loads.
+- Clarify that the previously unassigned admin-account issue was resolved and
+  included in v1.2.21; campaign access rules are unchanged.
 
 ## v1.2.21 - 2026-09-27
 
