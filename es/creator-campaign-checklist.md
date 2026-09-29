@@ -1,12 +1,12 @@
 ---
 layout: default
 title: Lista para creadores de campañas
-description: "Una lista práctica para preparar una campaña en The Pool: panel, vistas previas, biblioteca de media, textos, niveles, add-ons, páginas opcionales de Shopping, promoción, envío, políticas y fulfillment."
+description: "Una lista práctica para preparar una campaña en The Pool: guardar el proyecto, revisar vistas previas, publicar, preparar media y recompensas, promoción, checkout, reportes y fulfillment."
 permalink: /es/creator-campaign-checklist/
 lang: es
 indexable: false
 translation_key: creator_campaign_checklist
-last_modified_at: 2026-08-25
+last_modified_at: 2026-09-29
 ---
 
 <div class="creator-checklist-layout">
@@ -36,14 +36,18 @@ La lista cubre:
 
 ## Notas de la plataforma actual
 
-Esta lista refleja el comportamiento actual para creadores. Las bases compartidas de Platform y Jekyll no cambian que The Pool conserva el control del contenido, la publicación, el fulfillment y los accesos:
+Revisada el 29 de septiembre de 2026 con las versiones de The Pool hasta **v1.2.22**. Esta lista cubre el flujo actual para creadores:
 
 - las personas creadoras y sus equipos pueden tener acceso específico al panel para preparar campañas, editar contenido, revisar vistas previas, reportes, analytics, marketing y Blast sin acceso directo al repositorio
 - las personas superadministradoras inicializan campañas de solo preview, asignan o crean usuarios de campaña y manejan controles de plataforma; el trabajo diario de preparación queda en manos del equipo asignado
+- **Guardar**, **Vista previa** y **Publicar** en la cabecera abarcan las nueve pestañas de edición, incluso para revisar campañas ya públicas; **Guardar borrador** en Contenido sigue siendo un respaldo separado del navegador
+- las vistas previas protegidas muestran el último proyecto guardado correctamente; la página pública y el checkout usan la versión publicada
 - las personas superadministradoras pueden archivar campañas que no estén live; el source y la media de la campaña se mueven al archivo en vez de borrarse
 - la biblioteca de media permite buscar y filtrar imágenes, video y audio de la campaña; ver dimensiones, duración, peso, referencias, estado de optimización, derivados faltantes y advertencias de uso; y reemplazar de forma segura fuentes de la misma campaña sin cambiar su ruta pública
-- las imágenes con significado requieren alt text; las imágenes puramente decorativas deben marcarse de forma explícita
+- el texto alternativo se recomienda para imágenes con significado y nunca bloquea Guardar o Publicar; las imágenes puramente decorativas deben marcarse de forma explícita
+- las cargas de video aceptan MP4, WebM y MOV de hasta 100 MB; la optimización de imágenes se publica automáticamente después de validarse, mientras las conversiones de video siguen requiriendo revisión
 - los add-ons de campaña pueden pertenecer a una sola campaña y contar hacia su meta
+- dejar vacío el inventario de un producto o variante significa disponibilidad ilimitada; un `0` explícito significa agotado
 - las variantes de add-ons pueden heredar el precio base o tener un precio específico, incluso un override válido de `$0`; el Worker verifica el precio actual y conserva precios históricos válidos para selecciones guardadas que no cambian
 - los usuarios asignados reciben reportes diarios de aportes y de cumplimiento después de la fecha límite de forma predeterminada; puedes desmarcar usuarios o agregar otros destinatarios en la configuración
 - los embeds alojados dan un widget vivo para sitios web y páginas de partners que aceptan HTML
@@ -68,7 +72,7 @@ Esta lista refleja el comportamiento actual para creadores. Las bases compartida
 ### Obligatorio para lanzar
 
 - título de la campaña
-- slug
+- slug, o aprobación del que el panel deriva del título antes de compartir enlaces públicos
 - nombre público de la persona creadora
 - categoría
 - meta de financiamiento
@@ -138,7 +142,7 @@ La campaña debe explicar rápido:
 | Elemento | Obligatorio | Guía |
 |----------|-------------|------|
 | Título | Sí | 2 a 8 palabras. Corto y legible en tarjeta. |
-| Slug | Sí | Minúsculas, con guiones y estable. Ejemplo: `picnic-de-medianoche`. |
+| Slug | Sí al lanzar | El panel puede derivarlo del título. Revísalo antes de compartir enlaces; debe ser estable, en minúsculas y con guiones. Ejemplo: `picnic-de-medianoche`. |
 | Nombre de creador/a | Sí | Nombre público. |
 | Categoría | Sí | Ejemplo: `Cortometraje`, `Largometraje`, `Álbum`, `Fanzine`. |
 | Meta | Sí | Monto en dólares enteros. |
@@ -187,19 +191,42 @@ Notas operativas:
 
 - Una persona superadministradora puede crear una campaña de solo preview con un título, asignar usuarios existentes o crear usuarios nuevos. A partir de ahí, el equipo asignado puede completar la campaña desde el panel. La campaña queda oculta de rutas públicas, embeds, share cards, sitemap y prefetching hasta el lanzamiento.
 - Los IDs nuevos de niveles, artículos, add-ons, decisiones y variantes pueden derivarse del nombre o label en el panel; los IDs heredados deben mantenerse estables.
-- Los borradores del editor son locales hasta que se guarden o publiquen, así que no deben tratarse como fuente de verdad.
+- Usa **Guardar** en la cabecera para conservar todo el proyecto entre sesiones y dispositivos. **Guardar borrador** solo respalda el editor de Contenido en el navegador actual.
 - Publicar cambios de campaña o configuración pasa por el flujo de la plataforma y puede tardar en desplegarse.
 - Los enlaces de vista previa protegida expiran después de 24 horas, pueden regenerarse desde el panel por una persona autorizada de la campaña y no hacen visible una campaña de solo preview en las rutas públicas.
 - La gestión de usuarios es separada: los usuarios del panel se guardan en Worker KV y no crean commits en GitHub.
 - El sign-in del panel puede pedir un desafío de Cloudflare Turnstile antes de enviar el magic link por email.
 - Los formularios de recordatorio para campañas próximas también pueden usar Cloudflare Turnstile; las claves y secretos los configuran las personas operadoras de plataforma, no las creadoras.
 - Los analytics distinguen ingresos brutos de campaña e ingresos netos después de comisiones de procesamiento asignadas, para ayudar a reconciliar totales sin ocultar la matemática pública de financiación.
-- Las fechas de lanzamiento y cierre se interpretan en la zona horaria de plataforma configurada por una persona superadministradora, así que conviene confirmarla antes de publicar copy sensible a horario.
-- Los borradores de Marketing y Blast usan acciones explícitas para cargar, guardar y borrar la versión compartida; los borradores normales del editor siguen siendo locales al navegador.
+- El lanzamiento ocurre a medianoche de la fecha de inicio y el cierre a las 23:59:59 de la fecha límite, en la zona horaria de plataforma. El campo **Estado** del panel sigue esas fechas automáticamente. Confirma la zona horaria antes de publicar textos sensibles al horario.
+- Los borradores compartidos de Marketing y Blast usan sus propias acciones para cargar, guardar y borrar, y vencen después de siete días. Son independientes de Guardar el proyecto y del respaldo de Contenido en el navegador.
 - Las imágenes de Blast se suben al directorio de assets de la campaña antes del dry run automático, mientras YouTube y Vimeo se convierten en enlaces compatibles con email.
 - Las advertencias de la biblioteca de media son revisiones de lanzamiento. Resuelve referencias rotas y derivados faltantes, y revisa avisos de peso o proporción antes de publicar.
-- Reemplazar una fuente conserva su ruta pública, pero se limita a la misma campaña y tipo de media; una edición desactualizada falla en vez de sobrescribir un archivo nuevo.
+- Reemplazar una fuente conserva su ruta pública y puede cambiar todos los lugares publicados que la usan después del despliegue. Para preparar una revisión sin publicarla, sube un archivo nuevo desde el editor de campaña. El reemplazo en la misma ruta se limita a la campaña y al tipo de media originales y rechaza ediciones desactualizadas.
 - La publicación de Shopping falla de forma cerrada si faltan datos del nivel destacado o su fecha de disponibilidad. Mantén el switch apagado hasta confirmar todos los datos.
+
+## Guardar, revisar y publicar {#save-preview-and-publish}
+
+Abre [el panel](/es/admin/), entra a **Campañas** y selecciona tu proyecto. Las acciones de la cabecera abarcan Configuración, Contenido, Niveles, Elementos de apoyo, Complementos, Metas extendidas, Apoyo continuo, Diario y Decisiones.
+
+| Acción | Qué guarda o publica | Qué ven revisores y patrocinadores |
+|--------|----------------------|------------------------------------|
+| **Guardar borrador** en Contenido | Respalda texto y referencias de media existentes en este navegador, perfil, sitio e idioma del editor. Los archivos seleccionados aún necesitan subirse. | No cambia el proyecto guardado ni la página pública. No incluye otras pestañas de edición. |
+| **Guardar** en la cabecera | Guarda todo el proyecto como una copia de trabajo compartida, incluidas las cargas pendientes de Contenido y Diario. | Los enlaces de vista previa activos muestran esa versión. La campaña pública no cambia. |
+| **Vista previa** en la cabecera | Guarda los cambios y abre los controles para compartir la vista previa protegida. Invita revisores solo cuando quieras que reciban un enlace. | Una vista de solo lectura, sin aportes habilitados. Los enlaces vencen después de 24 horas. |
+| **Publicar** en la cabecera | Guarda los cambios y publica la copia de trabajo. | La campaña se hace pública, o se actualiza la campaña existente, después del despliegue. Los aportes siguen las fechas configuradas. |
+
+Para una campaña nueva o una revisión:
+
+1. Completa las pestañas necesarias y pulsa **Guardar**. Mantén abierto el editor hasta que terminen las cargas y el guardado; una miniatura local no confirma que el archivo se haya guardado.
+2. Abre **Vista previa** y revisa textos, media, recompensas, precios, envío y diseño móvil. Una campaña recién creada necesita que termine la primera generación del sitio para que exista su ruta de vista previa.
+3. Comparte los enlaces protegidos con las personas elegidas. Los guardados posteriores actualizan lo que ven los revisores, pero no envían invitaciones ni extienden las 24 horas de vigencia. Abrir Vista previa conserva los enlaces que siguen activos.
+4. Pulsa **Publicar** cuando esté lista. Se exige título, fechas válidas de inicio y cierre en orden, y una meta positiva; usa el resto de esta lista para revisar la preparación del lanzamiento. Una campaña con fecha futura se publica como próxima.
+5. Espera el despliegue y abre la URL pública fuera del panel autenticado. Revisa la página, la ruta del otro idioma, la reproducción de media, las recompensas disponibles, la vista social y el embed. Guardar o revisar una vista privada no confirma que la página pública se haya actualizado.
+
+Si otra persona cambió el proyecto, compara tu trabajo conservado con la versión actual antes de reintentar. Un guardado fallido conserva los cambios del editor; lo escrito después de iniciar un guardado puede requerir otro. **Publicar** puede seguir disponible después de Guardar porque la versión pública aún no se actualizó.
+
+Si falta contenido, conserva el perfil original del navegador y cualquier pestaña del editor abierta, copia el texto visible y pide ayuda al equipo de plataforma. No borres los datos del sitio ni sobrescribas el borrador durante la recuperación. Los respaldos del navegador no se comparten entre dispositivos o idiomas, y **Guardar borrador** no conserva los archivos seleccionados.
 
 ## Imágenes y video
 
@@ -235,11 +262,21 @@ El video debe construir confianza, tono y urgencia. No necesita equipo caro, per
 - **Duración ideal:** `2:00 a 3:30`
 - **Máximo recomendado:** `5:00`
 - **Formato preferido para self-hosting:** `.webm`
-- **Optimización:** las cargas del panel preservan la fuente, las cargas de imagen/video solicitan el pipeline del repositorio después de publicar, y ese pipeline puede generar imágenes comprimidas, variantes WebP responsivas y derivados WebM antes de lanzar
+- **Cargas aceptadas:** MP4, WebM o MOV, hasta `100 MB` por video en Hero, Contenido, Diario y reemplazos de media
+- **Reproducción:** usa códecs compatibles con navegadores y prueba el archivo en escritorio y móvil; aceptar un MOV no garantiza que se reproduzca en todos los navegadores
+- **Optimización:** se conserva el video original. Un WebM generado se usa después de revisarse; una conversión más grande puede omitirse. Conserva el original y no dependas de una conversión automática para poder subir un archivo demasiado pesado
+
+También puedes usar una URL compatible de YouTube o Vimeo. El reproductor hero de YouTube carga cuando la persona pulsa reproducir, así que revisa tanto el póster como el video.
+
+### Revisar la media después de guardar
+
+- Comprueba la miniatura local y el archivo desplegado. El editor puede mostrar una vista previa mientras el recurso público aún se despliega.
+- La optimización de imágenes se ejecuta después de subirlas y puede publicar fuentes más pequeñas y tamaños WebP responsivos automáticamente tras validación y las comprobaciones completas del sitio. No publica los textos o precios guardados de la campaña.
+- Las conversiones de video siguen una revisión separada. Algunos tamaños de imagen o derivados de video se omiten a propósito cuando pesarían más que el original; consulta advertencias persistentes con el equipo de plataforma antes de volver a subir el mismo archivo.
 
 El pipeline de media puede crear variantes WebP de `320w`, `480w`, `640w`, `960w` y `1600w` para páginas públicas cuando la imagen fuente es más grande. La biblioteca muestra estado de optimización, derivados faltantes, referencias conocidas, referencias rotas y advertencias de peso/proporción desde el manifest versionado. Aun así, conviene exportar las imágenes cerca de las dimensiones y recortes recomendados antes de subirlas y resolver problemas de media antes del lanzamiento.
 
-Cada imagen pública con significado necesita alt text útil. Una imagen puramente decorativa puede llevar alt vacío solo si se selecciona de forma explícita **Imagen decorativa**; no uses esa opción para evitar describir contenido importante.
+Se recomienda texto alternativo útil para cada imagen pública con significado; dejarlo vacío no bloquea Guardar ni Publicar. Una imagen puramente decorativa puede llevar alt vacío solo si se selecciona de forma explícita **Imagen decorativa**; no uses esa opción para evitar describir contenido importante.
 
 El video responde:
 
@@ -279,9 +316,11 @@ Buenas secciones:
 
 ### Bloques de contenido
 
-El cuerpo largo puede incluir texto, citas, imágenes, galerías y embeds estructurados. Cada imagen pública con significado debe traer alt text y, si ayuda, una leyenda.
+El cuerpo largo puede incluir texto, citas, imágenes, galerías y embeds estructurados. Se recomienda texto alternativo para cada imagen con significado y, si ayuda, una leyenda.
 
-Los embeds deben usar URLs `https://` de proveedores aprobados como YouTube, Vimeo, Spotify o Instagram. Cualquier proveedor nuevo debe revisarse antes de lanzar por seguridad, mobile y layout.
+El editor y las vistas públicas admiten negrita, cursiva, énfasis combinado y subrayado. Las descripciones de recompensas conservan el formato compatible en el carrito, incluso al restaurarlo. Revisa el texto en la vista móvil y en el carrito; usa los controles de formato del editor en lugar de pegar HTML o scripts.
+
+Los embeds estructurados deben usar URLs `https://` de orígenes aprobados de YouTube, Vimeo o Spotify. Instagram puede usarse como enlace social o CTA de correo cuando corresponda, pero no como embed estructurado. Cualquier proveedor nuevo debe revisarse antes de lanzar por seguridad, diseño y comportamiento móvil.
 
 ## Niveles y recompensas
 
@@ -365,6 +404,8 @@ Notas importantes:
 - los add-ons de plataforma quedan separados como merch de la plataforma
 - los add-ons físicos de campaña siguen las reglas de envío de esa campaña
 - un precio de variante vacío hereda el precio base; un override explícito de `$0` significa una variante gratis y no equivale a dejarlo en blanco
+- el inventario vacío de producto o variante significa ilimitado; usa `0` solo si debe estar agotado y una cantidad positiva para existencias limitadas
+- los usuarios asignados pueden subir fotos para add-ons de campaña nuevos o existentes, incluso en campañas publicadas; guarda, revisa y publica la revisión
 - cambiar de variante usa su precio actual de catálogo, mientras una variante sin cambios en un pledge existente puede conservar su precio unitario histórico válido
 - no uses un cambio de precio para reescribir expectativas ya guardadas; revisa copy público, inventario y fulfillment antes de publicarlo
 - los reportes separan filas de campaña y filas de plataforma
@@ -494,8 +535,11 @@ En la práctica:
 
 - el carrito puede mostrar impuesto como `--` hasta tener dirección suficiente
 - el total final se recalcula en el Worker
+- Manage Pledge y su diálogo de confirmación usan la misma cotización verificada de impuestos, incluido un resultado válido de impuesto cero
 - recompensas físicas deben pedir datos suficientes para envío e impuesto
-- los reportes incluyen impuesto y envío guardados
+- los reportes incluyen impuesto y envío guardados; revisa el estado del pago antes de tratarlos como dinero cobrado
+
+Guardar una tarjeta y confirmar un aporte son pasos separados. El checkout muestra éxito solo después de registrar el aporte. Si la confirmación sigue pendiente o no está disponible, usa la consulta de estado del intento existente o contacta a soporte con su referencia; no pidas crear otro aporte para resolver la incertidumbre. Un correo de confirmación retrasado no significa por sí solo que el aporte falló.
 
 ## Reportes y fulfillment
 
@@ -511,6 +555,10 @@ Entrega:
 
 Comportamiento:
 
+- los usuarios asignados reciben reportes por defecto; desmarca a quien no deba recibirlos en **Reportes para usuarios**, luego guarda y publica
+- usa **Correos adicionales para reportes** para otros destinatarios; estas preferencias no cambian el acceso al panel, y ser superadministrador no suscribe a todas las campañas
+- el ledger diario se envía durante campañas live y hay un reporte único de fulfillment después de la fecha límite, según el horario y la zona horaria de plataforma
+- los retrasos y fallos temporales al poner reportes en cola se reintentan durante el mismo día local; cambiar destinatarios después de completar el envío del día surte efecto el siguiente día programado
 - el reporte de pledges es historial/ledger
 - el reporte de fulfillment es vista actual por supporter y campaña
 - el panel puede previsualizar y descargar CSVs de pledges o fulfillment sin enviar correos
@@ -518,6 +566,8 @@ Comportamiento:
 - los add-ons de plataforma van al fulfillment de plataforma
 - cambios y cancelaciones pueden aparecer como filas históricas, mientras fulfillment usa el estado actual
 - las variantes y precios unitarios históricos guardados siguen en el registro de fulfillment; trabaja desde el reporte, no desde el catálogo actual
+
+Si falta un correo, descarga el CSV actual desde **Reportes** y pide al equipo de plataforma revisar destinatarios y entrega. Las fechas anteriores omitidas o un envío extra el mismo día requieren intervención del operador. Un reporte en cola no confirma su llegada al inbox, y un ledger de aportes no prueba que se hayan cobrado; revisa el estado de pago antes de entregar recompensas. Comparte los archivos solo con quienes gestionan operaciones y entregas de la campaña.
 
 ## Paquete recomendado
 
@@ -560,6 +610,9 @@ La campaña suele estar lista cuando:
 - el copy explica correctamente el cobro all-or-nothing, qué cuenta hacia la meta y la diferencia entre no cobrar comisión de plataforma y todavía tener costos de procesamiento/producción
 - reportes y fulfillment tienen responsables
 - el acceso al panel y la responsabilidad de publicación están confirmados
+- el proyecto completo está guardado, la vista previa protegida está revisada y la versión aprobada está publicada y comprobada en el sitio desplegado
+- los archivos terminaron de subirse, los videos se reproducen en escritorio y móvil y se revisó el resultado de la optimización
+- el inventario vacío/ilimitado, los valores de agotado y los límites por variante funcionan como se espera
 - el embed fue probado en destinos de promoción
 - los QR descargan correctamente y escanean al URL de campaña/referencia esperado
 - cualquier Blast de lanzamiento o empuje final tiene asunto, cuerpo conciso, CTA Button Label y CTA Button URL
@@ -578,6 +631,7 @@ La campaña suele estar lista cuando:
     <li><a href="#qu-hace-que-una-campaa-se-sienta-completa">Campaña completa</a></li>
     <li><a href="#informacin-central">Información central</a></li>
     <li><a href="#handoff-del-panel-de-administracin">Panel</a></li>
+    <li><a href="#save-preview-and-publish">Guardar, revisar y publicar</a></li>
     <li><a href="#imgenes-y-video">Imágenes y video</a></li>
     <li><a href="#niveles-y-recompensas">Niveles</a></li>
     <li><a href="#add-ons">Add-ons</a></li>
