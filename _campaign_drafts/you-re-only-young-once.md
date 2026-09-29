@@ -1,0 +1,35 @@
+---
+layout: campaign
+title: "You're Only Young Once"
+slug: you-re-only-young-once
+published: false
+preview_only: true
+preview_enabled: false
+preview_reviewer_emails: []
+state: upcoming
+start_date: 2026-09-29
+goal_deadline: 2026-09-29
+goal_amount: 0
+charged: false
+hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: /assets/images/defaults/dust-wave-square.png
+creator_image: /assets/images/defaults/dust-wave-square.png
+creator_name: "Joey Greenberg"
+category: "Other"
+short_blurb: ""
+show_ongoing: false
+single_tier_only: false
+stretch_hidden: true
+custom_late_support: false
+runner_report_emails: []
+long_content: []
+support_items: []
+campaign_add_ons: []
+tiers: []
+stretch_goals: []
+ongoing_items: []
+diary: []
+decisions: []
+_pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
+_pool_draft_saved_at: "2026-09-29T17:16:07.261Z"
+---
