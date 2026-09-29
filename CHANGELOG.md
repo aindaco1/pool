@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Refresh the English and Spanish creator checklists for campaign-wide Save,
+  protected Preview, Publish, media handling, add-on availability, pledge
+  confirmation, and campaign reports through v1.2.22.
+- Update the root and Worker development-tooling Undici overrides to 7.29.1
+  to resolve GHSA-3wwx-pv8p-q78v and keep full dependency audits passing.
+
 ## v1.2.22 - 2026-09-27
 
 Image optimization now publishes automatically after validation and the full
