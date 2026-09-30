@@ -87,14 +87,13 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
-  - id: "bts-package"
-    name: "BTS Package"
-    price: 50
-    image: "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea.png"
-    description: "Early access to:- A behind the scenes featurette by award winning filmmaker Rylee Norman- Behind the scenes photos of cast and crew\nExclusive access to:- The screenplay- The soundtrack"
-    stackable: false
+  - id: "special-thanks-in-credits"
+    name: "Special Thanks in Credits"
+    price: 10
+    description: "Your name (or any name of your choosing) will be featured in the \"special thanks\" section of our credits."
+    stackable: true
     category: "digital"
-    late_support: false
+    late_support: true
   - id: "get-a-digital-copy-of-the-film"
     name: "Get a Digital Copy of the Film"
     price: 25
@@ -103,19 +102,20 @@ tiers:
     stackable: true
     category: "digital"
     late_support: true
-  - id: "special-thanks-in-credits"
-    name: "Special Thanks in Credits"
-    price: 10
-    description: "Your name (or any name of your choosing) will be featured in the \"special thanks\" section of our credits."
-    stackable: true
+  - id: "bts-package"
+    name: "BTS Package"
+    price: 50
+    image: "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea.png"
+    description: "Early access to:- A behind the scenes featurette by award winning filmmaker Rylee Norman- Behind the scenes photos of cast and crew\nExclusive access to:- The screenplay- The soundtrack"
+    stackable: false
     category: "digital"
-    late_support: true
+    late_support: false
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T07:26:58.610Z"
+_pool_draft_saved_at: "2026-09-30T07:28:43.701Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
