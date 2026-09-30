@@ -26,6 +26,13 @@ long_content: []
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "get-a-digital-copy-of-the-film"
+    name: "Get a Digital Copy of the Film"
+    price: 25
+    description: "Get a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
+    stackable: true
+    category: "digital"
+    late_support: true
   - id: "your-name-in-the-credits"
     name: "Your Name in the Credits"
     price: 10
@@ -39,6 +46,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T03:33:33.112Z"
+_pool_draft_saved_at: "2026-09-30T03:35:37.136Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png"
 ---
