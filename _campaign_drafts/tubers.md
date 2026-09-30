@@ -32,5 +32,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T03:24:35.162Z"
+_pool_draft_saved_at: "2026-09-30T03:29:53.112Z"
+campaign_background: "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png"
 ---
