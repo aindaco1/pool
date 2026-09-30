@@ -26,6 +26,13 @@ long_content: []
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "bts-package"
+    name: "BTS Package"
+    price: 50
+    description: "Early access to:- A behind the scenes featurette by award winning filmmaker Rylee Norman- Behind the scenes photos of cast and crew\nExclusive access to:- The screenplay- The soundtrack"
+    stackable: false
+    category: "digital"
+    late_support: false
   - id: "get-a-digital-copy-of-the-film"
     name: "Get a Digital Copy of the Film"
     price: 25
@@ -46,6 +53,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T03:35:37.136Z"
+_pool_draft_saved_at: "2026-09-30T03:39:20.991Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png"
 ---
