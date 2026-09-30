@@ -11,7 +11,7 @@ start_date: "2026-10-03"
 goal_deadline: "2026-11-03"
 goal_amount: 3000
 charged: false
-hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image: "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4.png"
 hero_image_wide: "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85.png"
 creator_image: "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4.png"
 creator_name: "Anna"
@@ -116,6 +116,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T07:26:00.752Z"
-campaign_background: "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png"
+_pool_draft_saved_at: "2026-09-30T07:26:58.610Z"
+campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
