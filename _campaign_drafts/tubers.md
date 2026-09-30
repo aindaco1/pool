@@ -90,6 +90,7 @@ tiers:
   - id: "special-thanks-in-credits"
     name: "Special Thanks in Credits"
     price: 10
+    image: "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e.png"
     description: "Your name (or any name of your choosing) will be featured in the \"special thanks\" section of our credits."
     stackable: true
     category: "digital"
@@ -105,7 +106,7 @@ tiers:
   - id: "bts-package"
     name: "BTS Package"
     price: 50
-    image: "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea.png"
+    image: "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771.png"
     description: "Early access to:- A behind the scenes featurette by award winning filmmaker Rylee Norman- Behind the scenes photos of cast and crew\nExclusive access to:- The screenplay- The soundtrack"
     stackable: false
     category: "digital"
@@ -116,6 +117,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T07:28:43.701Z"
+_pool_draft_saved_at: "2026-09-30T07:32:15.183Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
