@@ -36,6 +36,7 @@ tiers:
   - id: "get-a-digital-copy-of-the-film"
     name: "Get a Digital Copy of the Film"
     price: 25
+    image: "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835.png"
     description: "Get a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
     stackable: true
     category: "digital"
@@ -53,6 +54,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T03:56:10.590Z"
+_pool_draft_saved_at: "2026-09-30T04:01:01.210Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png"
 ---
