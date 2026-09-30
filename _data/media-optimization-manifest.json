@@ -6862,6 +6862,140 @@
       ]
     },
     {
+      "path": "assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png",
+      "publicPath": "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png",
+      "name": "background-20260930-032753-a898af0c.png",
+      "label": "background 20260930 032753 a898af0c",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 838444,
+      "sha256": "6c13d2b2be2d1818c19f17ae18895b80937c339d22b50ec396a73e10ee539fc5",
+      "width": 2550,
+      "height": 3300,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-320.webp",
+        "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-480.webp",
+        "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-640.webp",
+        "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-960.webp",
+        "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c-320.webp",
+          "bytes": 11588,
+          "sha256": "706369561e328c3e6407f1c4d40a5a3be162d1100c1343629afe44c1f5c21737",
+          "sourceSha256": "6c13d2b2be2d1818c19f17ae18895b80937c339d22b50ec396a73e10ee539fc5",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c-480.webp",
+          "bytes": 52112,
+          "sha256": "5ef59fa328a39f4b7610dc6df26e3bc178331f0edc658e23b51f95d6d240446f",
+          "sourceSha256": "6c13d2b2be2d1818c19f17ae18895b80937c339d22b50ec396a73e10ee539fc5",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c-640.webp",
+          "bytes": 110454,
+          "sha256": "d7b43866388dce5db00d705ddde7c83988e18fc3a0afd87387d60eb50ea69272",
+          "sourceSha256": "6c13d2b2be2d1818c19f17ae18895b80937c339d22b50ec396a73e10ee539fc5",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c-960.webp",
+          "bytes": 262150,
+          "sha256": "53f86afb7dc2f9333c681f603df7208e913d978252558e226ffdd2c41077af95",
+          "sourceSha256": "6c13d2b2be2d1818c19f17ae18895b80937c339d22b50ec396a73e10ee539fc5",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-032753-a898af0c-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c-1600.webp",
+          "bytes": 595078,
+          "sha256": "cc3ef177394302890763beb665e93fd6e53ec43d67e01f0261345bd3888dd653",
+          "sourceSha256": "6c13d2b2be2d1818c19f17ae18895b80937c339d22b50ec396a73e10ee539fc5",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85.png",
+      "publicPath": "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85.png",
+      "name": "hero-wide-20260930-032428-ab196a85.png",
+      "label": "hero wide 20260930 032428 ab196a85",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 80387,
+      "sha256": "4edf4162a936a71327f2bd362a5526d2e961356f3bdc8f59b5cb8db01de10206",
+      "width": 3840,
+      "height": 2793,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-320.webp",
+        "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-480.webp",
+        "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-640.webp",
+        "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-960.webp",
+        "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-320.webp",
+          "bytes": 3628,
+          "sha256": "d2ecfb95727c7329c0b7d46112821711f0a70fa9da99e3ecc0acacac90a9b6cd",
+          "sourceSha256": "4edf4162a936a71327f2bd362a5526d2e961356f3bdc8f59b5cb8db01de10206",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-480.webp",
+          "bytes": 5194,
+          "sha256": "7fc5f6c79ce8cfe92708184efb957bfb5597a70ee488aece6ba5f1e0bf478f71",
+          "sourceSha256": "4edf4162a936a71327f2bd362a5526d2e961356f3bdc8f59b5cb8db01de10206",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-640.webp",
+          "bytes": 6510,
+          "sha256": "a18a72a5a4e8589d241524686853a69938d7da7e300fc0fc006d27b63dd9f942",
+          "sourceSha256": "4edf4162a936a71327f2bd362a5526d2e961356f3bdc8f59b5cb8db01de10206",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-960.webp",
+          "bytes": 9676,
+          "sha256": "f3fdda3d7eaa87f6eefe6ffb203004a6bd8f159154040a46edb267a0632e0ef7",
+          "sourceSha256": "4edf4162a936a71327f2bd362a5526d2e961356f3bdc8f59b5cb8db01de10206",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85-1600.webp",
+          "bytes": 16114,
+          "sha256": "e23e3dbd43d1bfd02e17124f5c483fd85c1dfa17f06c9c6f41493db858f07be9",
+          "sourceSha256": "4edf4162a936a71327f2bd362a5526d2e961356f3bdc8f59b5cb8db01de10206",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/worst-movie-ever/background.png",
       "publicPath": "/assets/images/campaigns/worst-movie-ever/background.png",
       "name": "background.png",
@@ -9230,6 +9364,10 @@
         },
         {
           "path": "_campaigns/tubers.md",
+          "count": 3
+        },
+        {
+          "path": "_campaigns/you-re-only-young-once.md",
           "count": 3
         },
         {
