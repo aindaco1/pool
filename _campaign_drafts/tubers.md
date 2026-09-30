@@ -25,13 +25,20 @@ runner_report_emails: []
 long_content: []
 support_items: []
 campaign_add_ons: []
-tiers: []
+tiers:
+  - id: "your-name-in-the-credits"
+    name: "Your Name in the Credits"
+    price: 10
+    description: "Your name (or any name of your choosing) will be featured in the \"special thanks\" section of our credits."
+    stackable: true
+    category: "digital"
+    late_support: true
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T03:29:53.112Z"
+_pool_draft_saved_at: "2026-09-30T03:33:33.112Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png"
 ---
