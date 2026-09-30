@@ -16,13 +16,74 @@ hero_image_wide: "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab19
 creator_image: "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4.png"
 creator_name: "Anna"
 category: "Short Film"
-short_blurb: "**After YouTube becomes monetizable in 2007, a young man and women jump at the chance for fame and fortune, no matter the cost.**"
+short_blurb: "**After YouTube becomes monetizable in 2007, a young man and woman jump at the chance for fame and fortune, no matter the cost.**"
 show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
 custom_late_support: false
 runner_report_emails: []
-long_content: []
+long_content:
+  - type: "image"
+    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702.png"
+    alt: ""
+  - type: "text"
+    body: |
+      What type of people drop everything for social media the second they learn they can make money from it?
+      
+      This short is a 2007 period piece exploring that very idea.
+      
+      "Tubers" follows two roommates who are unemployed bums -- Travis and Nora -- who are freeloading off their friends Kat and Francis. After finding out that they can make money off of YouTube, they stop at nothing to become successful.
+  - type: "image"
+    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0.png"
+    alt: ""
+  - type: "text"
+    body: |
+      [Logan bio -
+      
+      Anna bio -
+      
+      Vianne bio -
+      
+      Ratamacue bio -
+      
+      Cast bios?]
+  - type: "image"
+    src: "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43.png"
+    alt: ""
+    caption: "Our cast so far."
+  - type: "image"
+    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78.png"
+    alt: ""
+    caption: "Wouldn't you like to know..."
+  - type: "text"
+    body: |
+      [blah blah blah
+      
+      Equipment
+      
+      Food
+      
+      Art]
+  - type: "image"
+    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4.png"
+    alt: ""
+  - type: "text"
+    body: |
+      [Director's Statement]
+  - type: "image"
+    src: "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306.png"
+    alt: ""
+    caption: "Movie comps -- coincidentally all 2007 movies."
+  - type: "image"
+    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e.png"
+    alt: ""
+    caption: "AKA: rewards"
+  - type: "text"
+    body: |
+      [explain rewards here. section not technically necessary but could be nice]
+  - type: "text"
+    body: |
+      Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm/?utm_source=ig_web_button_share_sheet) Instagram page.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -55,6 +116,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T04:02:42.076Z"
+_pool_draft_saved_at: "2026-09-30T07:26:00.752Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-032753-a898af0c.png"
 ---
