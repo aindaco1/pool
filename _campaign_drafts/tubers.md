@@ -7,17 +7,17 @@ preview_only: true
 preview_enabled: false
 preview_reviewer_emails: []
 state: upcoming
-start_date: 2026-09-11
-goal_deadline: 2026-09-11
-goal_amount: 0
+start_date: "2026-10-03"
+goal_deadline: "2026-11-03"
+goal_amount: 3000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
-hero_image_wide: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85.png"
 creator_image: /assets/images/defaults/dust-wave-square.png
 creator_name: "Anna"
-category: "Other"
-short_blurb: ""
-show_ongoing: false
+category: "Short Film"
+short_blurb: "**After YouTube becomes monetizable in 2007, a young man and women jump at the chance for fame and fortune, no matter the cost.**"
+show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
 custom_late_support: false
@@ -32,5 +32,5 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-15T23:42:23.333Z"
+_pool_draft_saved_at: "2026-09-30T03:24:35.162Z"
 ---
