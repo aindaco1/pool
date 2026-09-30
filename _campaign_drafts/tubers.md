@@ -14,7 +14,7 @@ charged: false
 hero_image: "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4.png"
 hero_image_wide: "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85.png"
 creator_image: "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4.png"
-creator_name: "Anna"
+creator_name: "Anna Buan"
 category: "Short Film"
 short_blurb: "**After YouTube becomes monetizable in 2007, a young man and woman jump at the chance for fame and fortune, no matter the cost.**"
 show_ongoing: true
@@ -117,6 +117,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T07:32:15.183Z"
+_pool_draft_saved_at: "2026-09-30T07:33:30.801Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
