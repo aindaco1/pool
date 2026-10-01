@@ -107,7 +107,7 @@ tiers:
     name: "BTS Package"
     price: 50
     image: "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771.png"
-    description: "Early access to:- A behind the scenes featurette by award winning filmmaker Rylee Norman- Behind the scenes photos of cast and crew\nExclusive access to:- The screenplay- The soundtrack"
+    description: "Early access to: • A behind the scenes featurette by award winning filmmaker Rylee Norman • Behind the scenes photos of cast and crew Exclusive access to: • The screenplay • The soundtrack"
     stackable: false
     category: "digital"
     late_support: false
@@ -117,6 +117,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T07:33:30.801Z"
+_pool_draft_saved_at: "2026-10-01T21:07:27.070Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
