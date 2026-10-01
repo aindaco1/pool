@@ -22,7 +22,10 @@ single_tier_only: false
 stretch_hidden: true
 custom_late_support: false
 runner_report_emails: []
-long_content: []
+long_content:
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png"
+    alt: ""
 support_items: []
 campaign_add_ons: []
 tiers: []
@@ -31,6 +34,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-01T21:42:32.115Z"
+_pool_draft_saved_at: "2026-10-01T21:43:05.315Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
