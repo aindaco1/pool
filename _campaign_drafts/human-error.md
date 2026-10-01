@@ -12,7 +12,7 @@ goal_deadline: "2026-12-31"
 goal_amount: 5000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
-hero_image_wide: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: "/assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c.png"
 creator_image: "/assets/images/campaigns/human-error/creator-20260915-234126-ce00645e.png"
 creator_name: "Anna Buan"
 category: "Other"
@@ -31,6 +31,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-09-30T07:33:26.743Z"
+_pool_draft_saved_at: "2026-10-01T21:34:14.322Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
