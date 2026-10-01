@@ -90,7 +90,7 @@ tiers:
   - id: "collector-s-bundle"
     name: "Collector's Bundle"
     price: 100
-    description: "All previous rewards +"
+    description: "All previous rewards +\n• Exclusive \"Tubers\" art• High-res digital photoshoot/poster pack"
     stackable: true
     category: "digital"
     late_support: true
@@ -124,6 +124,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-01T21:13:45.083Z"
+_pool_draft_saved_at: "2026-10-01T21:15:30.984Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
