@@ -20,7 +20,7 @@ short_blurb: "**After YouTube becomes monetizable in 2007, a young man and woman
 show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
-custom_late_support: false
+custom_late_support: true
 runner_report_emails: []
 long_content:
   - type: "image"
@@ -125,6 +125,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-01T21:17:38.037Z"
+_pool_draft_saved_at: "2026-10-01T21:18:41.198Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
