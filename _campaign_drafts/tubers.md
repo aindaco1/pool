@@ -87,6 +87,13 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "collector-s-bundle"
+    name: "Collector's Bundle"
+    price: 100
+    description: "All previous rewards +"
+    stackable: true
+    category: "digital"
+    late_support: true
   - id: "special-thanks-in-credits"
     name: "Special Thanks in Credits"
     price: 10
@@ -99,7 +106,7 @@ tiers:
     name: "Get a Digital Copy of the Film"
     price: 25
     image: "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835.png"
-    description: "Get a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
+    description: "All previous rewards +\nGet a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
     stackable: true
     category: "digital"
     late_support: true
@@ -107,16 +114,16 @@ tiers:
     name: "BTS Package"
     price: 50
     image: "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e.png"
-    description: "Early access to: • A behind the scenes featurette by award winning filmmaker Rylee Norman • Behind the scenes photos of cast and crew \nExclusive access to: • The screenplay • The soundtrack"
-    stackable: false
+    description: "All previous rewards +\nEarly access to: • A behind the scenes featurette by award winning filmmaker Rylee Norman • Behind the scenes photos of cast and crew \nExclusive access to: • The screenplay • The soundtrack"
+    stackable: true
     category: "digital"
-    late_support: false
+    late_support: true
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-01T21:10:07.879Z"
+_pool_draft_saved_at: "2026-10-01T21:13:45.083Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
