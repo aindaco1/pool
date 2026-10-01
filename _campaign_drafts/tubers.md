@@ -107,7 +107,7 @@ tiers:
     name: "BTS Package"
     price: 50
     image: "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e.png"
-    description: "All previous rewards +\nEarly access to: • A behind the scenes featurette by award winning filmmaker Rylee Norman • Behind the scenes photos of cast and crew •••Exclusive access to: • The screenplay • The soundtrack"
+    description: "All previous rewards +\nEarly access to: • A behind the scenes featurette by award  winning filmmaker Rylee Norman • Behind the scenes photos of cast and crew •••Exclusive access to: • The screenplay • The soundtrack"
     stackable: true
     category: "digital"
     late_support: true
@@ -115,7 +115,7 @@ tiers:
     name: "Collector's Bundle"
     price: 100
     image: "/assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6.png"
-    description: "All previous rewards +\n• Exclusive \"Tubers\" art• High-res digital photoshoot/poster pack"
+    description: "All previous rewards +\n• Exclusive \"Tubers\" art • High-res digital photoshoot/poster pack"
     stackable: true
     category: "digital"
     late_support: true
@@ -125,6 +125,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-01T21:20:50.340Z"
+_pool_draft_saved_at: "2026-10-01T21:22:01.837Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
