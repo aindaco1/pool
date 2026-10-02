@@ -32,6 +32,14 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "get-a-digital-copy-of-the-film"
+    name: "Get a Digital Copy of the Film"
+    price: 25
+    image: "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png"
+    description: "All previous rewards + Get a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
+    stackable: true
+    category: "digital"
+    late_support: true
   - id: "special-thanks"
     name: "Special Thanks"
     price: 10
@@ -45,6 +53,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-02T04:57:27.969Z"
+_pool_draft_saved_at: "2026-10-02T04:58:26.177Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
