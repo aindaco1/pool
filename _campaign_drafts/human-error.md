@@ -24,7 +24,7 @@ custom_late_support: false
 runner_report_emails: []
 long_content:
   - type: "image"
-    src: "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd.png"
+    src: "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f.png"
     alt: ""
   - type: "text"
     body: |
@@ -53,6 +53,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-02T04:58:40.455Z"
+_pool_draft_saved_at: "2026-10-02T05:00:08.099Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
