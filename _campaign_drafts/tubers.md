@@ -28,7 +28,7 @@ long_content:
     alt: ""
   - type: "text"
     body: |
-      What type of people drop everything for social media the second they learn they can make money from it?
+      **What type of people** drop everything for social media the second they learn they can make money from it?
       
       This short is a 2007 period piece exploring that very idea.
       
@@ -125,6 +125,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-01T21:25:04.882Z"
+_pool_draft_saved_at: "2026-10-02T05:08:41.440Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
