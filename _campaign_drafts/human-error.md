@@ -26,6 +26,9 @@ long_content:
   - type: "image"
     src: "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f.png"
     alt: ""
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83.png"
+    alt: ""
   - type: "text"
     body: |
       **Set in the height of the Cold War**, Human Error follows the story of two officers in a remote nuclear launch site as they receive contradicting orders from command control. The two men quickly find themselves at odds with one another as they debate how to proceed with the fate of the world potentially hanging in the balance.
@@ -53,6 +56,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-02T05:00:08.099Z"
+_pool_draft_saved_at: "2026-10-02T05:02:42.231Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
