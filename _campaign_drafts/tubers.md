@@ -86,20 +86,28 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
+  - id: "executive-producer-s-credit"
+    name: "Executive Producer's Credit"
+    price: 1000
+    description: "All previous rewards + get an \"executive producer's\" credit on the film."
+    limit_total: 3
+    stackable: false
+    category: "digital"
+    late_support: false
   - id: "special-thanks-in-credits"
     name: "Special Thanks in Credits"
     price: 10
     image: "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e.png"
     description: "Your name (or any name of your choosing) will be featured in the \"special thanks\" section of our credits."
-    stackable: true
+    stackable: false
     category: "digital"
     late_support: true
   - id: "get-a-digital-copy-of-the-film"
     name: "Get a Digital Copy of the Film"
     price: 25
     image: "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835.png"
-    description: "All previous rewards +\nGet a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
-    stackable: true
+    description: "Previous reward +\nGet a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
+    stackable: false
     category: "digital"
     late_support: true
   - id: "bts-package"
@@ -107,7 +115,7 @@ tiers:
     price: 50
     image: "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e.png"
     description: "All previous rewards +\nEarly access to: • A behind the scenes featurette by award  winning filmmaker Rylee Norman • Behind the scenes photos of cast and crew  + Exclusive access to: • The screenplay • The soundtrack • Personalized \"thank you\" video from cast/crew"
-    stackable: true
+    stackable: false
     category: "digital"
     late_support: true
   - id: "collector-s-bundle"
@@ -115,7 +123,7 @@ tiers:
     price: 100
     image: "/assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6.png"
     description: "All previous rewards +\n• Exclusive digital \"Tubers\" art/ poster • High-res digital photoshoot/poster pack"
-    stackable: true
+    stackable: false
     category: "digital"
     late_support: true
 stretch_goals: []
@@ -124,6 +132,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-03T19:00:33.097Z"
+_pool_draft_saved_at: "2026-10-03T19:02:25.059Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
