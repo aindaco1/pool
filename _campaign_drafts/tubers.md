@@ -38,15 +38,14 @@ long_content:
     alt: ""
   - type: "text"
     body: |
-      [Logan bio -
+      **Logan Schreck, Director:**
       
-      Anna bio -
+      **Ratamacue, Production Company:**
       
-      Vianne bio -
+      Ratamacue is a film and media production company founded and based in Albuquerque, New Mexico. 
+      They are award-winning creators of films and video content for the new generation. Their goal is to create new exciting content and highlight the unique voices of artists.
       
-      Ratamacue bio -
-      
-      Cast bios?]
+      **Negative Dirt, Production Company:**
   - type: "image"
     src: "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43.png"
     alt: ""
@@ -125,6 +124,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-03T18:43:00.198Z"
+_pool_draft_saved_at: "2026-10-03T18:46:42.003Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
