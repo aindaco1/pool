@@ -83,7 +83,7 @@ long_content:
       [explain rewards here. section not technically necessary but could be nice]
   - type: "text"
     body: |
-      Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm/?utm_source=ig_web_button_share_sheet) Instagram page.
+      Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm/?utm_source=ig_web_button_share_sheet) Instagram page and [website](https://ratamacue.com/).
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -125,6 +125,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-02T05:08:41.440Z"
+_pool_draft_saved_at: "2026-10-03T18:43:00.198Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
