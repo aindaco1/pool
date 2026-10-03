@@ -13,7 +13,7 @@ goal_amount: 5000
 charged: false
 hero_image: "/assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d.png"
 hero_image_wide: "/assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4.png"
-creator_image: "/assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6.png"
+creator_image: "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241.png"
 creator_name: "Anna Buan"
 category: "Short Film"
 short_blurb: "*How does one accept a world pressed under the thumb of potential armageddon?*"
@@ -53,6 +53,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-03T22:34:06.796Z"
+_pool_draft_saved_at: "2026-10-03T23:34:09.313Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
