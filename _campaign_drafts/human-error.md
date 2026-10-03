@@ -35,7 +35,7 @@ tiers:
   - id: "special-thanks"
     name: "Special Thanks"
     price: 10
-    image: "/assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387.png"
+    image: "/assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff.png"
     description: "Your name (or any name of your choosing) will be featured in the \"special thanks\" section of our credits."
     stackable: true
     category: "digital"
@@ -53,6 +53,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-02T05:04:07.089Z"
+_pool_draft_saved_at: "2026-10-03T22:34:06.796Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
