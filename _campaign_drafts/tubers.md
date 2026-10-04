@@ -20,7 +20,7 @@ short_blurb: "**After YouTube becomes monetizable in 2007, a young man and woman
 show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
-custom_late_support: false
+custom_late_support: true
 runner_report_emails: []
 long_content:
   - type: "image"
@@ -28,7 +28,7 @@ long_content:
     alt: ""
   - type: "text"
     body: |
-      What type of people drop everything for social media the second they learn they can make money from it?
+      **What type of people** drop everything for social media the second they learn they can make money from it?
       
       This short is a 2007 period piece exploring that very idea.
       
@@ -38,15 +38,14 @@ long_content:
     alt: ""
   - type: "text"
     body: |
-      [Logan bio -
+      **Logan Schreck, Director:**
       
-      Anna bio -
+      **Ratamacue, Production Company:**
       
-      Vianne bio -
+      Ratamacue is a film and media production company founded and based in Albuquerque, New Mexico. 
+      They are award-winning creators of films and video content for the new generation. Their goal is to create new exciting content and highlight the unique voices of artists.
       
-      Ratamacue bio -
-      
-      Cast bios?]
+      **Negative Dirt, Production Company:**
   - type: "image"
     src: "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43.png"
     alt: ""
@@ -83,7 +82,7 @@ long_content:
       [explain rewards here. section not technically necessary but could be nice]
   - type: "text"
     body: |
-      Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm/?utm_source=ig_web_button_share_sheet) Instagram page.
+      Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm/?utm_source=ig_web_button_share_sheet) Instagram page and [website](https://ratamacue.com/).
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -92,22 +91,38 @@ tiers:
     price: 10
     image: "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e.png"
     description: "Your name (or any name of your choosing) will be featured in the \"special thanks\" section of our credits."
-    stackable: true
+    stackable: false
     category: "digital"
     late_support: true
   - id: "get-a-digital-copy-of-the-film"
     name: "Get a Digital Copy of the Film"
     price: 25
     image: "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835.png"
-    description: "Get a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
-    stackable: true
+    description: "Previous reward +\nGet a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
+    stackable: false
     category: "digital"
     late_support: true
   - id: "bts-package"
     name: "BTS Package"
     price: 50
-    image: "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771.png"
-    description: "Early access to:- A behind the scenes featurette by award winning filmmaker Rylee Norman- Behind the scenes photos of cast and crew\nExclusive access to:- The screenplay- The soundtrack"
+    image: "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e.png"
+    description: "All previous rewards +\nEarly access to: • A behind the scenes featurette by award  winning filmmaker Rylee Norman • Behind the scenes photos of cast and crew  + Exclusive access to: • The screenplay • The soundtrack • Personalized \"thank you\" video from cast/crew"
+    stackable: false
+    category: "digital"
+    late_support: true
+  - id: "collector-s-bundle"
+    name: "Collector's Bundle"
+    price: 100
+    image: "/assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6.png"
+    description: "All previous rewards +\n• Exclusive digital \"Tubers\" art/ poster • High-res digital photoshoot/poster pack"
+    stackable: false
+    category: "digital"
+    late_support: true
+  - id: "producer-credit"
+    name: "Producer Credit"
+    price: 1000
+    description: "All previous rewards + get a producer credit on the film."
+    limit_total: 3
     stackable: false
     category: "digital"
     late_support: false
@@ -117,6 +132,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-09-30T07:33:30.801Z"
+_pool_draft_saved_at: "2026-10-03T19:04:03.545Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
