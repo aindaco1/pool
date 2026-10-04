@@ -100,7 +100,8 @@ The removal control uses existing admin permissions, local draft recovery,
 and explicit Save/Publish boundaries. It does not add a new data store,
 notification, payment operation, or publication action. These checks use local
 or hosted test fixtures; they do not establish live provider delivery or a
-production deployment. Both implementation PRs remain unmerged.
+production deployment. Both implementation PRs were unmerged at the end of
+the initial investigation; subsequent release evidence is in [v1.2.23](v1.2.23.md).
 
 ## Historical failure inventory
 
