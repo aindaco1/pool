@@ -14034,10 +14034,10 @@ async function handleAdminSettings(request, env) {
     ? addOns.products.filter((product) => String(product?.scope || 'platform') === 'platform')
     : [];
   const seoSameAs = parseAdminDelimitedList(env.SEO_SAME_AS);
-  const platformLogoPath = env.EMAIL_LOGO_PATH || '/assets/images/defaults/dust-wave-square.png';
-  const platformFooterLogoPath = env.PLATFORM_FOOTER_LOGO_PATH || platformLogoPath;
-  const platformFaviconPath = env.PLATFORM_FAVICON_PATH || '/assets/images/defaults/favicon.png';
-  const platformDefaultSocialImagePath = env.PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH || platformLogoPath;
+  const platformLogoPath = env.EMAIL_LOGO_PATH ?? '/assets/images/defaults/dust-wave-square.png';
+  const platformFooterLogoPath = env.PLATFORM_FOOTER_LOGO_PATH ?? platformLogoPath;
+  const platformFaviconPath = env.PLATFORM_FAVICON_PATH ?? '/assets/images/defaults/favicon.png';
+  const platformDefaultSocialImagePath = env.PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH ?? platformLogoPath;
   const seoReturnPolicyCountry = env.SEO_RETURN_POLICY_APPLICABLE_COUNTRY || env.SHIPPING_ORIGIN_COUNTRY || 'US';
   const seoReturnPolicyCategory = env.SEO_RETURN_POLICY_CATEGORY || 'https://schema.org/MerchantReturnNotPermitted';
   const seoReturnPolicyLabel = seoReturnPolicyCategory === 'https://schema.org/MerchantReturnNotPermitted'

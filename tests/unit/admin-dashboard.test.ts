@@ -1982,6 +1982,21 @@ campaign_add_ons:
     });
   });
 
+  it('keeps explicitly cleared brand image fields empty when settings reload', async () => {
+    const env = createEnv();
+    Object.assign(env, { EMAIL_LOGO_PATH: '', PLATFORM_FOOTER_LOGO_PATH: '', PLATFORM_FAVICON_PATH: '', PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH: '' });
+    const { ctx, cookie } = await signInAdmin(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/settings', {
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const rows = body.sections.find((section: any) => section.title === 'Brand & SEO').rows;
+    for (const path of ['platform.logo_path', 'platform.footer_logo_path', 'platform.favicon_path', 'platform.default_social_image_path']) {
+      expect(rows.find((row: any) => row.path === path)).toMatchObject({ rawValue: '', value: 'Not configured' });
+    }
+  });
+
   it('returns role-scoped admin settings without KV writes', async () => {
     const env = createEnv();
     const { ctx, cookie } = await signInAdmin(env);
