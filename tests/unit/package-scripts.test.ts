@@ -55,6 +55,20 @@ describe('package release scripts', () => {
     expect(lock.packages['node_modules/@vitest/coverage-v8'].version).toBe(lock.packages['node_modules/vitest'].version);
   });
 
+  it('assigns Vitest and coverage exclusively to their paired update group', () => {
+    const dependabot = JSON.parse(execFileSync('ruby', [
+      '-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))',
+      join(repoRoot, '.github', 'dependabot.yml')
+    ], { encoding: 'utf8' }));
+    const rootUpdates = dependabot.updates.find((update: Record<string, unknown>) =>
+      update['package-ecosystem'] === 'npm' && update.directory === '/'
+    );
+    expect(rootUpdates.groups.vitest.patterns).toEqual(['vitest', '@vitest/*']);
+    expect(rootUpdates.groups.vitest['update-types']).toBeUndefined();
+    expect(rootUpdates.groups['root-development-dependencies']['exclude-patterns'])
+      .toEqual(['vitest', '@vitest/*']);
+  });
+
   it('keeps the supported Node runtime explicit and consistent', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
     const rootNodeVersion = readFileSync(join(repoRoot, '.nvmrc'), 'utf8').trim();

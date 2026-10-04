@@ -32,6 +32,10 @@ updates:
           - "@vitest/*"
       root-development-dependencies:
         dependency-type: development
+        # Keep the exact-version test runner pair out of this catch-all group.
+        exclude-patterns:
+          - vitest
+          - "@vitest/*"
         update-types:
           - minor
           - patch
