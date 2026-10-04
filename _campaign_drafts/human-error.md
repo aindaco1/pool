@@ -16,19 +16,13 @@ hero_image_wide: "/assets/images/campaigns/human-error/hero-wide-20261001-214059
 creator_image: "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241.png"
 creator_name: "Anna Buan"
 category: "Short Film"
-short_blurb: "*How does one accept a world pressed under the thumb of potential armageddon?*"
+short_blurb: "Set during the height of the cold war, **Human Error** follows two officers within a remote nuclear launch site as they receive contradicting orders from command control."
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
 custom_late_support: false
 runner_report_emails: []
-long_content:
-  - type: "image"
-    src: "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83.png"
-    alt: ""
-  - type: "text"
-    body: |
-      **Set in the height of the Cold War**, Human Error follows the story of two officers in a remote nuclear launch site as they receive contradicting orders from command control. The two men quickly find themselves at odds with one another as they debate how to proceed with the fate of the world potentially hanging in the balance.
+long_content: []
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -53,6 +47,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-03T23:34:09.313Z"
+_pool_draft_saved_at: "2026-10-04T18:21:28.719Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
