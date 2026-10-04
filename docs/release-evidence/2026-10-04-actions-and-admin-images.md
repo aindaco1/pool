@@ -36,14 +36,20 @@ GitHub no longer serves cannot establish an exact historical cause.
 ## Shared package adoption
 
 [Platform PR #53](https://github.com/aindaco1/dust-wave-platform/pull/53) adds
-`@dustwave/media-core/frame-hash` in media-core 0.5.0 / workspace 0.43.0.
-Pool pins commit `012a7d6df337f2b371db958ca9df83f9314c8c0e`, upgrading from
+`@dustwave/media-core/frame-hash` in media-core 0.5.0 and reusable
+`createMediaRemovalControl` in admin-shell 0.13.0 / workspace 0.43.0.
+Pool uses the shared removal control for scalar fields and Content/Diary/Blast
+blocks, including gallery items and posters. The control owns button state and
+upload invalidation; Pool adapters retain labels, field updates, pending-preview
+cleanup, undo history, focus, and Save/Publish. Existing consumers opt in without
+changing their editor or storage contracts.
+Pool pins commit `e28d2773f3060700f9483a44705038fc436570d1`, upgrading from
 `60d439b887f1244f82ff232c849d74152b28c776` (workspace 0.40.0). Other projects
 can import the same bounded, dependency-free normalizer. Source inspection,
 Git publication, and Pool's validation decisions remain consumer-owned.
 The shared Node 22/24, Jekyll, native, desktop, and Qt CI matrix passes.
 
-Rollback the gitlink, validator import/call, and pin/version assertions together;
+Rollback the gitlink, validator and admin adapters, and pin/version assertions together;
 restoring just the old gitlink leaves an unresolved import. No storage or content
 migration is introduced. This is a source review, not production acceptance.
 

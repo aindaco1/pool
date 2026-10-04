@@ -2487,7 +2487,6 @@
     var root = document.createElement('div');
     root.className = options?.className || 'admin-settings__image-field';
     var currentPath = String(options?.value ?? '');
-    var valueRevision = 0;
     root.value = currentPath;
     if (options?.dataset) {
       Object.entries(options.dataset).forEach(function(entry) {
@@ -2552,31 +2551,33 @@
     uploadStatus.className = 'admin-settings__image-status';
     uploadStatus.setAttribute('role', 'status');
     fileInput.setAttribute('aria-describedby', uploadStatus.id);
-    var removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.className = 'btn btn--secondary';
-    removeButton.dataset.settingsMediaRemove = 'true';
-    removeButton.textContent = options?.previewType === 'video'
-      ? t('settings_video_remove', 'Remove video')
-      : t('settings_image_remove', 'Remove image');
-    removeButton.addEventListener('click', function() {
-      fileInput.value = '';
-      setValue('', 'change');
-      setText(uploadStatus, t('settings_media_removed', 'Media removed. Save or publish to apply.'));
+    var removeControl = window.DustWaveAdminShellEditorMedia.createMediaRemovalControl({
+      label: options?.previewType === 'video'
+        ? t('settings_video_remove', 'Remove video')
+        : t('settings_image_remove', 'Remove image'),
+      className: 'btn btn--secondary',
+      hasSelection: function() { return Boolean(String(root.value || '').trim()); },
+      clearSelection: function() {
+        fileInput.value = '';
+        setValue('', 'change');
+        setText(uploadStatus, t('settings_media_removed', 'Media removed. Save or publish to apply.'));
+      }
     });
+    var removeButton = removeControl.button;
+    removeButton.dataset.settingsMediaRemove = 'true';
     uploadRow.append(fileLabel, removeButton, uploadStatus);
 
     function setValue(value, eventType) {
-      valueRevision += 1;
       root.value = String(value || '');
       if (urlInput && urlInput.value !== root.value) urlInput.value = root.value;
       updatePreview(root.value);
+      removeControl.changed();
       root.dispatchEvent(new Event(eventType || 'change', { bubbles: true }));
     }
 
     function updatePreview(value) {
       var path = String(value || '').trim();
-      removeButton.disabled = !path;
+      removeControl.refresh();
       if (!path) {
         preview.removeAttribute('src');
         if (preview instanceof HTMLVideoElement) preview.replaceChildren();
@@ -2663,8 +2664,7 @@
         return;
       }
       setText(uploadStatus, options?.uploadingText || t('settings_image_uploading', 'Uploading image...'));
-      var uploadRevision = valueRevision;
-      removeButton.disabled = false;
+      var uploadTicket = removeControl.beginUpload();
       var uploadPreviewUrl = preview instanceof HTMLImageElement ? URL.createObjectURL(file) : '';
       if (uploadPreviewUrl) {
         preview.src = uploadPreviewUrl;
@@ -2686,14 +2686,15 @@
         });
         // Clearing/changing a field while the request is pending wins over its
         // late result. The asset commit never restores a removed selection.
-        if (uploadRevision === valueRevision) {
+        if (removeControl.isCurrentUpload(uploadTicket)) {
           setValue(result.path || '', 'change');
           setText(uploadStatus, options?.uploadedText || t('settings_image_uploaded', 'Image uploaded. Publish settings to use it.'));
         }
       } catch (error) {
         logger.error('Failed to upload admin image', error);
-        if (uploadRevision === valueRevision) {
+        if (removeControl.isCurrentUpload(uploadTicket)) {
           updatePreview(root.value);
+          removeControl.changed();
           setText(uploadStatus, error?.data?.error || error?.message || t('settings_image_upload_failed', 'Unable to upload image.'));
         }
       } finally {
@@ -7787,15 +7788,21 @@
     }
     uploadRow.append(fileLabel, status);
     if (kind === 'image' && options?.action !== 'add-gallery-image-upload') {
-      var removeButton = document.createElement('button');
-      removeButton.type = 'button';
-      removeButton.className = 'btn btn--secondary btn--small';
+      var editorRoot = contentBlocksRoot;
+      var editorField = activeDiaryContentField;
+      var removeControl = window.DustWaveAdminShellEditorMedia.createMediaRemovalControl({
+        label: t('settings_image_remove', 'Remove image'),
+        className: 'btn btn--secondary btn--small',
+        hasSelection: function() { return Boolean(contentMediaPreviewSource(target, options?.field || 'src')); },
+        clearSelection: function() {
+          runContentEditorAction(editorRoot, editorField, function() { removeContentMediaReference(removeControl.button); });
+        }
+      });
+      var removeButton = removeControl.button;
       removeButton.dataset.contentAction = 'remove-media';
       removeButton.dataset.contentIndex = String(index);
       removeButton.dataset.contentMediaField = options?.field || 'src';
       if (options?.imageIndex !== undefined) removeButton.dataset.contentImageIndex = String(options.imageIndex);
-      removeButton.textContent = t('settings_image_remove', 'Remove image');
-      removeButton.disabled = !contentMediaPreviewSource(target, options?.field || 'src');
       uploadRow.insertBefore(removeButton, status);
     }
     if (!options?.hideLabel) {
@@ -8798,6 +8805,23 @@
       return { block: block, target: block.images[imageIndex], index: index, imageIndex: imageIndex, field: 'src' };
     }
     return { block: block, target: block, index: index, field: field };
+  }
+
+  function removeContentMediaReference(button) {
+    var index = Number(button.dataset.contentIndex);
+    var resolved = contentMediaUploadTarget(button);
+    if (resolved) {
+      pushContentHistory();
+      clearPendingContentUpload(resolved.target, resolved.field);
+      resolved.target[resolved.field] = '';
+      lastContentMutation = 'block';
+      renderContentBlocks();
+      var selector = '[data-content-action="' + (resolved.imageIndex === undefined ? 'toggle-media-settings' : 'toggle-gallery-image-settings') + '"][data-content-index="' + index + '"]';
+      if (resolved.imageIndex !== undefined) selector += '[data-content-image-index="' + resolved.imageIndex + '"]';
+      contentBlocksRoot.querySelector(selector)?.focus();
+      setText(contentEditorStatusTarget(), t('settings_media_removed', 'Media removed. Save or publish to apply.'));
+    }
+    writeContentDraft();
   }
 
   function contentUploadFilenameBase(block, meta, file) {
@@ -11286,18 +11310,7 @@
         } else if (action === 'choose-media-library') {
           openContentMediaLibrary(button);
         } else if (action === 'remove-media') {
-          var resolved = contentMediaUploadTarget(button);
-          if (resolved) {
-            pushContentHistory();
-            clearPendingContentUpload(resolved.target, resolved.field);
-            resolved.target[resolved.field] = '';
-            lastContentMutation = 'block';
-            renderContentBlocks();
-            var selector = '[data-content-action="' + (resolved.imageIndex === undefined ? 'toggle-media-settings' : 'toggle-gallery-image-settings') + '"][data-content-index="' + index + '"]';
-            if (resolved.imageIndex !== undefined) selector += '[data-content-image-index="' + resolved.imageIndex + '"]';
-            contentBlocksRoot.querySelector(selector)?.focus();
-            setText(contentEditorStatusTarget(), t('settings_media_removed', 'Media removed. Save or publish to apply.'));
-          }
+          return; // The shared removal control handles this button.
         } else if (action === 'toggle-media-settings') {
           toggleMediaSettings(button);
         } else if (action === 'toggle-gallery-image-settings') {

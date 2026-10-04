@@ -3234,6 +3234,35 @@ test.describe('Admin Dashboard', () => {
     expect(value.map((product: any) => product.id)).toEqual(['dust-wave-sticker', 'dust-wave-shirt']);
   });
 
+  test('shared image removal keeps Diary and Blast editor contexts separate', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.route('**/admin/marketing/announcements**', route => route.fulfill({ status: 200, headers: JSON_HEADERS, body: JSON.stringify({ announcements: [] }) }));
+    await page.goto('/admin/?admin_login=admin-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await page.locator('#admin-tab-campaigns').click();
+    const campaign = page.locator('[data-campaign-settings-panel="hand-relations"]');
+    for (const tab of ['diary', 'blast']) {
+      await campaign.locator(`[data-campaign-settings-subtab="${tab}"]`).click();
+      const editor = campaign.locator(tab === 'diary' ? '[data-diary-content-editor]' : '[data-marketing-announcement-content-editor]').first();
+      await editor.locator('select[data-content-action="type"]').first().selectOption('image');
+      const block = editor.locator('.content-block--image').first();
+      await block.locator('[data-content-action="toggle-media-settings"]').click();
+      await block.locator('[data-content-field="alt"]').fill(`${tab} description`);
+      await block.locator('input[type="file"]').setInputFiles({ name: `${tab}.png`, mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgo=', 'base64') });
+      await block.locator('[data-content-action="toggle-media-settings"]').click();
+      await block.locator('[data-content-action="remove-media"]').click();
+      await expect(block.locator('img')).toHaveCount(0);
+      const state = await editor.evaluate((element: any) => element.__contentBlocks);
+      expect(state[0]).toMatchObject({ type: 'image', src: '', alt: `${tab} description` });
+      expect(state[0]._pendingUpload).toBeUndefined();
+    }
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    const diary = JSON.parse(calls.projectSave[0].changes.find((change: any) => change.path === 'diary').value);
+    expect(diary[0].content[0]).toMatchObject({ src: '', alt: 'diary description' });
+    expect(calls.imageUpload).toHaveLength(0);
+  });
+
   test('removing an image wins over a late upload response', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     let finishUpload: () => void = () => {};

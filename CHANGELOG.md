@@ -5,6 +5,7 @@
 - Let admins remove images from every upload field, preserving empty fields,
   descriptions, and collection entries through Save, Preview, and Publish.
   Clearing a staged or in-flight replacement prevents it from restoring the image.
+  Scalar and block editors reuse the admin-shell 0.13.0 removal control.
 - Adopt dust-wave-platform 0.43.0 media frame-hash normalization to accept
   lossless PNG optimization when equivalent aspect ratios have different notation.
 - Make the physical-shipping browser fixture independent of tax-provider settings

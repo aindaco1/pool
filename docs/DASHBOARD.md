@@ -644,7 +644,7 @@ Images and videos uploaded through the dashboard are validated before persistenc
 - Campaign audio: `assets/audio/campaigns/<campaign-slug>/`
 - Platform/default videos: `assets/videos/defaults/`
 
-**Remove image** clears the image reference and any staged replacement while preserving the field, captions, descriptions, and collection entries. It is available for brand images, campaign images and backgrounds, tiers, add-ons, decision options, Content/Diary/Blast images, gallery items, and video posters. Save the campaign or publish platform settings to persist the empty field. A late upload response cannot restore a removed image. Existing repository assets remain available for reuse; removing a reference does not delete the file. Existing public fallback rules still apply to branding and hero selection. Empty content images and gallery slots are omitted from published and protected preview output.
+**Remove image** uses the shared `@dustwave/admin-shell/editor-media` control. It clears the image reference and any staged replacement while preserving the field, captions, descriptions, and collection entries. It is available for brand images, campaign images and backgrounds, tiers, add-ons, decision options, Content/Diary/Blast images, gallery items, and video posters. Save the campaign or publish platform settings to persist the empty field. A late upload response cannot restore a removed image. Existing repository assets remain available for reuse; removing a reference does not delete the file. Existing public fallback rules still apply to branding and hero selection. Empty content images and gallery slots are omitted from published and protected preview output.
 
 Recommended campaign media:
 
