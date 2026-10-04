@@ -50,7 +50,9 @@ describe('package release scripts', () => {
   it('keeps coverage reproducible from declared dependencies', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
     expect(packageJson.scripts['test:unit:coverage']).toBe('vitest run --coverage');
-    expect(packageJson.devDependencies['@vitest/coverage-v8']).toBeTruthy();
+    expect(packageJson.devDependencies['@vitest/coverage-v8']).toBe(packageJson.devDependencies.vitest);
+    const lock = JSON.parse(readFileSync(join(repoRoot, 'package-lock.json'), 'utf8'));
+    expect(lock.packages['node_modules/@vitest/coverage-v8'].version).toBe(lock.packages['node_modules/vitest'].version);
   });
 
   it('keeps the supported Node runtime explicit and consistent', () => {
