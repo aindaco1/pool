@@ -40,10 +40,11 @@ long_content:
     body: |
       **Logan Schreck, Director:**
       
+      Logan Schreck is a young filmmaker out of Albuquerque, New Mexico who loves to bring joy into his art anyway he can. Traditionally an Editor of Cameraman, this New Mexico PBS faculty member has enjoyed dipping his toe into Directing and looks forward to so much more!
+      
       **Ratamacue, Production Company:**
       
-      Ratamacue is a film and media production company founded and based in Albuquerque, New Mexico. 
-      They are award-winning creators of films and video content for the new generation. Their goal is to create new exciting content and highlight the unique voices of artists.
+      Ratamacue is a film and media production company founded and based in Albuquerque, New Mexico. They are award-winning creators of films and video content for the new generation. Their goal is to create new exciting content and highlight the unique voices of artists.
       
       **Negative Dirt, Production Company:**
   - type: "image"
@@ -56,19 +57,17 @@ long_content:
     caption: "Wouldn't you like to know..."
   - type: "text"
     body: |
-      [blah blah blah
+      Being a micro budget film means this is made out of love. And donations! Food is expensive. If we can’t pay our crew, the least we can do is offer a couple warm meals and Red Bulls. A fed crew is a happy crew, and a happy crew means a fun production for all!
       
-      Equipment
-      
-      Food
-      
-      Art]
+      It’s not just food though. The film taking place in 2007 means we need to meticulously craft a world from nearly 20 years ago (oof). That means that your generous donations go to period accurate Costumes, creative set decor, and equipment to capture the charm of the early 21st century. Every cent of this project will be spent to craft the highest quality film about Youtubers to date!
   - type: "image"
     src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4.png"
     alt: ""
   - type: "text"
     body: |
-      [Director's Statement]
+      **Director's Statement:**
+      
+      2026 sometimes feels like wandering through a circus. There are wars over by the Lion Tamers, a clown car of leaders, and inflation rising as high as the tight rope walkers. It might seem like the world is falling apart (and it very well may be), but comedy is the one thing that has always brought people together. Setting a film in the early 21st century allows us to poke fun at where we are now by examining how we got to this circus. Looking at the people that ran head first into social media fame without worrying about the consequences may sound like a modern ideal, but it all became mainstream when YouTube became monetizable. It’s time we looked at our past in a humorous light, so we aren’t doomed to repeat it. Our cast and crew are graciously spending their time and energy because they believe in the project and we hope you do too!
   - type: "image"
     src: "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306.png"
     alt: ""
@@ -132,6 +131,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-03T19:04:03.545Z"
+_pool_draft_saved_at: "2026-10-04T22:53:19.283Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
