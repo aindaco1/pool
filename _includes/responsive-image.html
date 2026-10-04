@@ -1,4 +1,5 @@
 {%- assign image_src = include.src | default: "" -%}
+{%- if image_src != "" -%}
 {%- assign image_alt = include.alt | default: "" -%}
 {%- assign image_class = include.class | default: "" -%}
 {%- assign image_picture_class = include.picture_class | default: "" -%}
@@ -55,4 +56,5 @@
 </picture>
 {%- else -%}
 <img src="{{ image_src | escape }}" alt="{{ image_alt | escape }}"{% if image_class != "" %} class="{{ image_class | escape }}"{% endif %}{% if include.aria_hidden %} aria-hidden="true"{% endif %}{% if image_loading != "" %} loading="{{ image_loading | escape }}"{% endif %} decoding="{{ image_decoding | escape }}"{% if image_fetchpriority != "" %} fetchpriority="{{ image_fetchpriority | escape }}"{% endif %}{{ image_dimension_attrs }}>
+{%- endif -%}
 {%- endif -%}

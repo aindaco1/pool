@@ -44,7 +44,7 @@
                       {% when 'video' %}
                         {% include blocks/video.html block=block %}
                       {% when 'image' %}
-                        {% include blocks/image.html block=block %}
+                        {% if block.src and block.src != empty %}{% include blocks/image.html block=block %}{% endif %}
                       {% when 'gallery' %}
                         {% include blocks/gallery.html block=block %}
                       {% when 'audio' %}
