@@ -16,6 +16,8 @@
 - Pair Vitest 5.0.2 with its coverage provider and group future updates; align
   Playwright 1.63.0 with its container. Update the other reviewed development
   tools and the Ruby setup action.
+- Publish the recovered, validated optimization backlog: 192 image changes
+  plus the rebuilt manifest, preserving decoded source content.
 - Allow 45 minutes for native image repair after the 37-source backlog took
   29m54s while preserving all validation and publication gates.
 
