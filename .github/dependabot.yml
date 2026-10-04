@@ -25,6 +25,11 @@ updates:
           - version-update:semver-minor
           - version-update:semver-patch
     groups:
+      # Vitest requires its coverage provider at the exact same version.
+      vitest:
+        patterns:
+          - vitest
+          - "@vitest/*"
       root-development-dependencies:
         dependency-type: development
         update-types:
