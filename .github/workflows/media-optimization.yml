@@ -34,7 +34,8 @@ concurrency:
 jobs:
   optimize:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The 37-source repair backlog took 29m54s including validation.
+    timeout-minutes: 45
     permissions:
       contents: write
     outputs:

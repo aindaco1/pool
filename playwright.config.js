@@ -18,7 +18,7 @@ module.exports = defineConfig({
   webServer: useExternalServer
     ? undefined
     : {
-        command: "bash -c 'rm -rf _site .jekyll-cache && bundle exec jekyll build --config _config.yml,_config.local.yml --quiet && exec python3 -m http.server 4000 --bind 127.0.0.1 --directory _site'",
+        command: "bash -c 'rm -rf _site .jekyll-cache && exec bundle exec jekyll serve --config _config.yml,_config.local.yml --host 127.0.0.1 --port 4000 --no-watch --quiet'",
         port: 4000,
         timeout: 120_000,
         reuseExistingServer: true,

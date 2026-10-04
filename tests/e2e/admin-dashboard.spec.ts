@@ -3152,6 +3152,145 @@ test.describe('Admin Dashboard', () => {
     });
   }
 
+  for (const lang of ['en', 'es']) test(`${lang}: removes saved and staged images without deleting their fields`, async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.goto(`${lang === 'es' ? '/es' : ''}/admin/?admin_login=admin-token`);
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await page.locator('#admin-tab-campaigns').click();
+    const campaign = page.locator('[data-campaign-settings-panel="hand-relations"]');
+    for (const path of ['hero_image', 'hero_image_wide', 'creator_image', 'campaign_background', 'progress_background']) {
+      const field = campaign.locator(`[data-settings-path="${path}"]`);
+      await field.getByRole('button', { name: lang === 'es' ? 'Quitar imagen' : 'Remove image', exact: true }).click();
+      await expect(field.locator('img')).not.toHaveAttribute('src', /.+/);
+      expect(await field.evaluate((element: any) => element.value)).toBe('');
+    }
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    for (const path of ['hero_image', 'hero_image_wide', 'creator_image', 'campaign_background', 'progress_background']) {
+      expect(calls.projectSave[0].changes).toContainEqual(expect.objectContaining({ path, value: '' }));
+    }
+    await campaign.locator('[data-campaign-settings-subtab="content"]').click();
+    const json = page.locator('#admin-content-long-content');
+    await json.evaluate((textarea: HTMLTextAreaElement) => {
+      textarea.value = JSON.stringify([
+        { type: 'image', src: '/assets/images/old.png', alt: 'Keep description', caption: 'Keep caption' },
+        { type: 'gallery', images: [{ src: '/assets/images/gallery.png', alt: 'Gallery' }] },
+        { type: 'video', provider: 'local', src: '/assets/videos/clip.mp4', poster: '/assets/images/poster.png' }
+      ]);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const blocks = page.locator('#admin-content-blocks');
+    const image = blocks.locator('.content-block--image');
+    await image.locator('[data-content-action="toggle-media-settings"]').click();
+    await image.locator('input[type="file"]').setInputFiles({ name: 'replacement.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgo=', 'base64') });
+    await image.locator('[data-content-action="toggle-media-settings"]').click();
+    await image.locator('[data-content-action="remove-media"]').click();
+    await expect(image.locator('img')).toHaveCount(0);
+    const gallery = blocks.locator('.content-block--gallery');
+    await gallery.locator('[data-content-action="toggle-gallery-image-settings"]').click();
+    await gallery.locator('[data-content-action="remove-media"]').click();
+    await expect(gallery.locator('img')).toHaveCount(0);
+    const video = blocks.locator('.content-block--video');
+    await video.locator('[data-content-action="toggle-media-settings"]').click();
+    await video.locator('[data-content-action="remove-media"]').click();
+    const value = JSON.parse(await json.inputValue());
+    expect(value[0]).toMatchObject({ src: '', alt: 'Keep description', caption: 'Keep caption' });
+    expect(value[1].images[0].src).toBe('');
+    expect(value[2]).toMatchObject({ src: '/assets/videos/clip.mp4', poster: '' });
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(2);
+    expect(calls.projectSave[1].draft.longContent[0].src).toBe('');
+    expect(calls.imageUpload).toHaveLength(0);
+  });
+
+  test('removes tier, product, and decision images while preserving their entries', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.goto('/admin/?admin_login=admin-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await page.locator('#admin-tab-campaigns').click();
+    const campaign = page.locator('[data-campaign-settings-panel="hand-relations"]');
+    for (const [tab, path] of [['tiers', 'tiers'], ['campaign_add_ons', 'campaign_add_ons'], ['decisions', 'decisions']]) {
+      await campaign.locator(`[data-campaign-settings-subtab="${tab}"]`).click();
+      const editor = campaign.locator(`[data-settings-path="${path}"]`);
+      for (const remove of await editor.locator('[data-settings-media-remove]').all()) {
+        await remove.click();
+        await expect(remove).toBeDisabled();
+      }
+    }
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    const changes = calls.projectSave[0].changes;
+    expect(JSON.parse(changes.find((change: any) => change.path === 'tiers').value)[0]).toMatchObject({ id: 'frame-slot', image: '' });
+    expect(JSON.parse(changes.find((change: any) => change.path === 'campaign_add_ons').value)[0]).toMatchObject({ id: 'poster-pack', image_url: '' });
+    expect(JSON.parse(changes.find((change: any) => change.path === 'decisions').value)[0].options).toEqual([{ label: 'A', image: '' }, { label: 'B', image: '' }]);
+    await selectAdminSection(page, 'Add-ons');
+    const products = page.locator('[data-settings-path="add_ons.products"]');
+    for (const remove of await products.locator('[data-settings-media-remove]').all()) await remove.click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-addons-publish').click();
+    await expect.poll(() => calls.settingsPublish.length).toBe(1);
+    const value = JSON.parse(calls.settingsPublish[0].changes.find((change: any) => change.path === 'add_ons.products').value);
+    expect(value.map((product: any) => product.image_url)).toEqual(['', '']);
+    expect(value.map((product: any) => product.id)).toEqual(['dust-wave-sticker', 'dust-wave-shirt']);
+  });
+
+  test('shared image removal keeps Diary and Blast editor contexts separate', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.route('**/admin/marketing/announcements**', route => route.fulfill({ status: 200, headers: JSON_HEADERS, body: JSON.stringify({ announcements: [] }) }));
+    await page.goto('/admin/?admin_login=admin-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await page.locator('#admin-tab-campaigns').click();
+    const campaign = page.locator('[data-campaign-settings-panel="hand-relations"]');
+    for (const tab of ['diary', 'blast']) {
+      await campaign.locator(`[data-campaign-settings-subtab="${tab}"]`).click();
+      const editor = campaign.locator(tab === 'diary' ? '[data-diary-content-editor]' : '[data-marketing-announcement-content-editor]').first();
+      await editor.locator('select[data-content-action="type"]').first().selectOption('image');
+      const block = editor.locator('.content-block--image').first();
+      await block.locator('[data-content-action="toggle-media-settings"]').click();
+      await block.locator('[data-content-field="alt"]').fill(`${tab} description`);
+      await block.locator('input[type="file"]').setInputFiles({ name: `${tab}.png`, mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgo=', 'base64') });
+      await block.locator('[data-content-action="toggle-media-settings"]').click();
+      await block.locator('[data-content-action="remove-media"]').click();
+      await expect(block.locator('img')).toHaveCount(0);
+      const state = await editor.evaluate((element: any) => element.__contentBlocks);
+      expect(state[0]).toMatchObject({ type: 'image', src: '', alt: `${tab} description` });
+      expect(state[0]._pendingUpload).toBeUndefined();
+    }
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    const diary = JSON.parse(calls.projectSave[0].changes.find((change: any) => change.path === 'diary').value);
+    expect(diary[0].content[0]).toMatchObject({ src: '', alt: 'diary description' });
+    expect(calls.imageUpload).toHaveLength(0);
+  });
+
+  test('removing an image wins over a late upload response', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    let finishUpload: () => void = () => {};
+    const pending = new Promise<void>(resolve => { finishUpload = resolve; });
+    let requested = false;
+    await page.route('**/admin/settings/logo-upload', async route => {
+      requested = true;
+      await pending;
+      await route.fulfill({ status: 200, headers: JSON_HEADERS, body: JSON.stringify({ path: '/assets/images/late.png' }) });
+    });
+    await page.goto('/admin/?admin_login=admin-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Settings');
+    await selectSettingsSection(page, 'Design');
+    const field = page.locator('[data-settings-path="platform.logo_path"]');
+    await field.locator('input[type="file"]').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgo=', 'base64') });
+    await expect.poll(() => requested).toBe(true);
+    await field.getByRole('button', { name: 'Remove image', exact: true }).click();
+    finishUpload();
+    await expect(field.locator('input[type="file"]')).toBeEnabled();
+    await expect(field.locator('img')).not.toHaveAttribute('src', /.+/);
+    expect(await field.evaluate((element: any) => element.value)).toBe('');
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-settings-publish').click();
+    await expect.poll(() => calls.settingsPublish.length).toBe(1);
+    expect(calls.settingsPublish[0].changes).toContainEqual(expect.objectContaining({ path: 'platform.logo_path', value: '' }));
+  });
+
   for (const lang of ['en', 'es']) test(`${lang}: keeps media panels contained and previews selected images before upload`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
     const calls = await routeAdminWorker(page);
@@ -3216,8 +3355,8 @@ test.describe('Admin Dashboard', () => {
     const previewImage = frame.locator('img').first();
     await expect(previewImage).toHaveAttribute('src', /^data:image\//);
     await expect.poll(() => previewImage.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(960);
-    expect(await previewImage.evaluate(image => image.getBoundingClientRect().width <= document.documentElement.clientWidth)).toBe(true);
-    expect(await previewImage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await expect.poll(() => previewImage.evaluate(image => image.getBoundingClientRect().width <= document.documentElement.clientWidth)).toBe(true);
+    await expect.poll(() => previewImage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     expect(calls.imageUpload).toHaveLength(0);
     expect(await page.locator('#admin-content-long-content').inputValue()).not.toContain('preview-');
     expect(JSON.stringify(calls.contentPreview)).not.toContain('data:image');

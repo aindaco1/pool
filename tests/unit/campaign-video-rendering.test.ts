@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = path.resolve(__dirname, '..', '..');
 
 describe('campaign video source rendering', () => {
-  it('renders matching source types for hero and content videos in both locales', () => {
+  it('renders matching video types and omits cleared images in both locales', () => {
     const script = String.raw`
 require 'jekyll'
 require 'fileutils'
@@ -37,10 +37,31 @@ Dir.mktmpdir('pool-video-source') do |source|
       goal_deadline: 2099-02-01
       tiers: []
       hero_video: "#{url}"
+      hero_image: ""
+      hero_image_wide: ""
+      creator_image: ""
+      diary:
+        - title: Update
+          date: 2026-01-01
+          content:
+            - type: image
+              src: ""
+              caption: Cleared diary caption
       long_content:
         - type: video
           provider: local
           src: "#{url}"
+        - type: image
+          src: ""
+          caption: Cleared content caption
+        - type: image
+          src: /assets/images/retained.png
+          caption: Retained caption
+        - type: gallery
+          images:
+            - src: ""
+              caption: Cleared gallery caption
+            - src: /assets/images/retained-gallery.png
       ---
     YAML
   end
@@ -73,6 +94,14 @@ end
     expect(results).toHaveLength(10);
     for (const result of results) {
       const document = new DOMParser().parseFromString(result.html, 'text/html');
+      expect(document.querySelectorAll('img[src=""]')).toHaveLength(0);
+      expect(document.querySelector('#hero-video')?.hasAttribute('poster')).toBe(false);
+      expect(document.querySelectorAll('.content-block--image')).toHaveLength(1);
+      expect(document.querySelector('.content-block--image img')?.getAttribute('src')).toBe('/assets/images/retained.png');
+      expect(document.querySelectorAll('.gallery__item')).toHaveLength(1);
+      expect(document.body.textContent).not.toContain('Cleared content caption');
+      expect(document.body.textContent).not.toContain('Cleared diary caption');
+      expect(document.body.textContent).not.toContain('Cleared gallery caption');
       for (const selector of ['#hero-video source', '.content-block--video video source']) {
         const sources = document.querySelectorAll(selector);
         const context = `${result.locale}${result.slug}: ${selector}`;
