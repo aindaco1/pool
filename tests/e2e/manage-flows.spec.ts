@@ -139,6 +139,15 @@ async function routeManageWorker(page: any, options?: {
     });
   });
 
+  // Keep mocked pledge totals independent of the local Worker's tax provider.
+  await page.route('**/tax/quote', async (route: any) => {
+    const body = route.request().postDataJSON();
+    await route.fulfill({ status: 200, headers: JSON_HEADERS, body: JSON.stringify({
+      taxCents: Math.round(body.subtotalCents * 0.07625),
+      taxDetails: { effectiveRate: 0.07625, destination: body.billingAddress || body.shippingAddress }
+    }) });
+  });
+
   await page.route('**/shipping/quote', async (route: any) => {
     shippingQuoteBodies.push(JSON.parse(route.request().postData() || '{}'));
     await route.fulfill({

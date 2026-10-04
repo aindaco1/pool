@@ -17,12 +17,14 @@
       aria-label="{% include t.html key='runtime.campaign.image_gallery' lang=current_lang %}"
     {% endif %}>
     {% for img in block.images %}
+      {% if img.src and img.src != empty %}
       <div class="gallery__item"{% if caption_style == 'overlay' and img.caption %} tabindex="0"{% endif %}>
         {% include responsive-image.html src=img.src alt=img.alt loading="lazy" decoding="async" sizes="(min-width: 900px) 360px, (min-width: 700px) 44vw, calc(100vw - 88px)" %}
         {% if img.caption %}
           <span class="gallery__item-caption"><span class="gallery__item-caption-text">{{ img.caption | safe_rich_text }}</span></span>
         {% endif %}
       </div>
+      {% endif %}
     {% endfor %}
   </div>
   {% if block.caption %}

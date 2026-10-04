@@ -375,7 +375,7 @@ dispatch paths with a simulated login-shell path reset:
 npx vitest run tests/unit/premerge-toolchain.test.ts
 ```
 Both Jekyll helpers fail immediately when their build command fails, so minification and artifact validation cannot accidentally reuse stale `_site` output.
-For headless browser runs, Playwright builds a static `_site` and serves that output with a lightweight HTTP server instead of using `jekyll serve`, which keeps automated browser checks closer to the real published asset layout.
+For direct headless browser runs, Playwright uses `jekyll serve --no-watch` with the same combined configuration. This builds the static `_site` once and serves it through the same Jekyll server as the pre-merge and Podman paths. The prior Python HTTP server intermittently reset asset connections during concurrent browser requests.
 
 The repository defaults to the first-party cart/runtime path in both `_config.yml` and `_config.local.yml`; the browser path does not support the old hosted-cart runtime.
 

@@ -2302,6 +2302,238 @@
       ]
     },
     {
+      "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
+      "publicPath": "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
+      "name": "content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
+      "label": "content landscapetitlecard resized 20261001 214300 858cd5ba",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1183972,
+      "sha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+      "width": 1000,
+      "height": 563,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-320.webp",
+        "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-480.webp",
+        "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-640.webp",
+        "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-320.webp",
+          "bytes": 9802,
+          "sha256": "2b5b7afb64b70e58cdee0f442a6453f99993c42571585ed58a284b033e91636c",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-480.webp",
+          "bytes": 25190,
+          "sha256": "ba2518688410cd421209b1f0ff4e52b384d9fb8ce1929ecde5ae3629d4a4292e",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-640.webp",
+          "bytes": 49596,
+          "sha256": "594e68e97e0cc1c039c9cb84bf76f8d2195bf22738dd5f85cfc72575cfe249ea",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba-960.webp",
+          "bytes": 116264,
+          "sha256": "93f919553d73f772b72d91268e1dd139c13113def75869759b49d1e77359e6af",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd.png",
+      "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd.png",
+      "name": "content-whatishumanerror-20261002-045724-07100ddd.png",
+      "label": "content whatishumanerror 20261002 045724 07100ddd",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1094166,
+      "sha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+      "width": 1280,
+      "height": 427,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-320.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-480.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-640.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-320.webp",
+          "bytes": 7494,
+          "sha256": "c37e845b9a44fa21ce06a4015ef36f824a1f41e82a0e31eb97fe8a1992220954",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-480.webp",
+          "bytes": 17268,
+          "sha256": "09e685cf5eff85a9c96ccdfece1698eff53d8130fd225baa2e0851a410147fd0",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-640.webp",
+          "bytes": 35526,
+          "sha256": "3f991c66f5ba19dcf65e5c01b2d9bb6e3eab26ec8fa335f1763d0821b77174bc",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd-960.webp",
+          "bytes": 76356,
+          "sha256": "e54082c15cbcdc7cbb878e1b5bc9ac73fc98a9baf5bd702cfcc67c1fe8500d84",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f.png",
+      "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f.png",
+      "name": "content-whatishumanerror-20261002-050003-7497583f.png",
+      "label": "content whatishumanerror 20261002 050003 7497583f",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1094166,
+      "sha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+      "width": 1280,
+      "height": 427,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-320.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-480.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-640.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-320.webp",
+          "bytes": 7494,
+          "sha256": "c37e845b9a44fa21ce06a4015ef36f824a1f41e82a0e31eb97fe8a1992220954",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-480.webp",
+          "bytes": 17268,
+          "sha256": "09e685cf5eff85a9c96ccdfece1698eff53d8130fd225baa2e0851a410147fd0",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-640.webp",
+          "bytes": 35526,
+          "sha256": "3f991c66f5ba19dcf65e5c01b2d9bb6e3eab26ec8fa335f1763d0821b77174bc",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050003-7497583f-960.webp",
+          "bytes": 76356,
+          "sha256": "e54082c15cbcdc7cbb878e1b5bc9ac73fc98a9baf5bd702cfcc67c1fe8500d84",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83.png",
+      "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83.png",
+      "name": "content-whatishumanerror-20261002-050237-5a400b83.png",
+      "label": "content whatishumanerror 20261002 050237 5a400b83",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1094166,
+      "sha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+      "width": 1280,
+      "height": 427,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-320.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-480.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-640.webp",
+        "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-320.webp",
+          "bytes": 7494,
+          "sha256": "c37e845b9a44fa21ce06a4015ef36f824a1f41e82a0e31eb97fe8a1992220954",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-480.webp",
+          "bytes": 17268,
+          "sha256": "09e685cf5eff85a9c96ccdfece1698eff53d8130fd225baa2e0851a410147fd0",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-640.webp",
+          "bytes": 35526,
+          "sha256": "3f991c66f5ba19dcf65e5c01b2d9bb6e3eab26ec8fa335f1763d0821b77174bc",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-whatishumanerror-20261002-050237-5a400b83-960.webp",
+          "bytes": 76356,
+          "sha256": "e54082c15cbcdc7cbb878e1b5bc9ac73fc98a9baf5bd702cfcc67c1fe8500d84",
+          "sourceSha256": "3446e7e7e861e70184e6169b7bdb327b365aaca5ef4a88eb4bbaf70a07d179f7",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a.png",
       "publicPath": "/assets/images/campaigns/human-error/creator-20260915-233116-106a3d8a.png",
       "name": "creator-20260915-233116-106a3d8a.png",
@@ -2430,6 +2662,650 @@
           "sha256": "a2e3cd1e767ab5d09d9d2d8abc92d775890764954361e0c5939b618d0b64b747",
           "sourceSha256": "030d11d0cdb4684c9436a3a95e67eab2ce12262f67ddea89dc3c9ca5c99c11be",
           "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6.png",
+      "publicPath": "/assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6.png",
+      "name": "creator-20261002-043126-b5da68f6.png",
+      "label": "creator 20261002 043126 b5da68f6",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 55143,
+      "sha256": "5ac3bf02c2498edea4631439b3216ccf6c0657ad39f10c85f29f3d50258334ea",
+      "width": 3000,
+      "height": 3000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-320.webp",
+        "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-480.webp",
+        "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-640.webp",
+        "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-960.webp",
+        "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-320.webp",
+          "bytes": 4840,
+          "sha256": "1ad3aade52e69dd60fdaa95718683845255415143931bca43b226f9883f330d4",
+          "sourceSha256": "5ac3bf02c2498edea4631439b3216ccf6c0657ad39f10c85f29f3d50258334ea",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-480.webp",
+          "bytes": 7570,
+          "sha256": "54cbfeacc0c95bd9fd4a1549371296b3f06d884894e91fe0609221fb3208f04b",
+          "sourceSha256": "5ac3bf02c2498edea4631439b3216ccf6c0657ad39f10c85f29f3d50258334ea",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-640.webp",
+          "bytes": 10196,
+          "sha256": "52fceee15d9ec995235588016c338acc8ceda3c21f2c71992b7344ddcf5299a6",
+          "sourceSha256": "5ac3bf02c2498edea4631439b3216ccf6c0657ad39f10c85f29f3d50258334ea",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-960.webp",
+          "bytes": 15376,
+          "sha256": "f2ff515465fcb5f6f58dcdb4be88c0cd6c89f6c6c67912821ba4ffffbbbe63e7",
+          "sourceSha256": "5ac3bf02c2498edea4631439b3216ccf6c0657ad39f10c85f29f3d50258334ea",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261002-043126-b5da68f6-1600.webp",
+          "bytes": 27184,
+          "sha256": "e405b85ba040020a40870b88b8a28a9499289f210bc958a95242ee44665e2346",
+          "sourceSha256": "5ac3bf02c2498edea4631439b3216ccf6c0657ad39f10c85f29f3d50258334ea",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/creator-20261003-233404-a4598241.png",
+      "publicPath": "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241.png",
+      "name": "creator-20261003-233404-a4598241.png",
+      "label": "creator 20261003 233404 a4598241",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 55136,
+      "sha256": "6b2e5b0137bbc460cb41b6c34dfcfd71870d94e4d60718a276ccbbdd7417ce56",
+      "width": 3000,
+      "height": 3000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-320.webp",
+        "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-480.webp",
+        "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-640.webp",
+        "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-960.webp",
+        "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241-320.webp",
+          "bytes": 4750,
+          "sha256": "a76ef2b0ceca6510a893797b0cfff670fcc93be170ae9835f447f0537c10d51c",
+          "sourceSha256": "6b2e5b0137bbc460cb41b6c34dfcfd71870d94e4d60718a276ccbbdd7417ce56",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241-480.webp",
+          "bytes": 7572,
+          "sha256": "9eb2249a26c7bf18e4fe6b5df5cf8ebac6dfc0e7e52ecd30d632e5a8717bc268",
+          "sourceSha256": "6b2e5b0137bbc460cb41b6c34dfcfd71870d94e4d60718a276ccbbdd7417ce56",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241-640.webp",
+          "bytes": 10210,
+          "sha256": "06dc84d6f58bc8489dc86f73cf9524239f5b8623577559b455a6453a994992c2",
+          "sourceSha256": "6b2e5b0137bbc460cb41b6c34dfcfd71870d94e4d60718a276ccbbdd7417ce56",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241-960.webp",
+          "bytes": 15432,
+          "sha256": "8335497bd51fa5e0439ab7ba6a9500a4f55d2456efb5092158f2815b60b6cb6b",
+          "sourceSha256": "6b2e5b0137bbc460cb41b6c34dfcfd71870d94e4d60718a276ccbbdd7417ce56",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/creator-20261003-233404-a4598241-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241-1600.webp",
+          "bytes": 27226,
+          "sha256": "40413a17fe61e16607490bdd4311c4a6ea86dee8aebb00afe241c0e32849b862",
+          "sourceSha256": "6b2e5b0137bbc460cb41b6c34dfcfd71870d94e4d60718a276ccbbdd7417ce56",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba.png",
+      "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba.png",
+      "name": "hero-square-20261001-213911-925398ba.png",
+      "label": "hero square 20261001 213911 925398ba",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 954087,
+      "sha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+      "width": 900,
+      "height": 506,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-320.webp",
+        "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-480.webp",
+        "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-320.webp",
+          "bytes": 9720,
+          "sha256": "6c72c07947da2806cf6bbb9f679d039d6c328d0d96f2a433bf9d617db07a264c",
+          "sourceSha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-480.webp",
+          "bytes": 24792,
+          "sha256": "2295a6e96be8ee0d5cafd8132bded2689639adcab9310bcbe9e3709e98cfea3c",
+          "sourceSha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba-640.webp",
+          "bytes": 48418,
+          "sha256": "f57c7b17432ed32ef697e875222abd2aeaa3995c4cfa5290abd7e0a1a388f33e",
+          "sourceSha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d.png",
+      "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d.png",
+      "name": "hero-square-20261001-214226-c299d41d.png",
+      "label": "hero square 20261001 214226 c299d41d",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1183972,
+      "sha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+      "width": 1000,
+      "height": 563,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-320.webp",
+        "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-480.webp",
+        "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-640.webp",
+        "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-320.webp",
+          "bytes": 9802,
+          "sha256": "2b5b7afb64b70e58cdee0f442a6453f99993c42571585ed58a284b033e91636c",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-480.webp",
+          "bytes": 25190,
+          "sha256": "ba2518688410cd421209b1f0ff4e52b384d9fb8ce1929ecde5ae3629d4a4292e",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-640.webp",
+          "bytes": 49596,
+          "sha256": "594e68e97e0cc1c039c9cb84bf76f8d2195bf22738dd5f85cfc72575cfe249ea",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d-960.webp",
+          "bytes": 116264,
+          "sha256": "93f919553d73f772b72d91268e1dd139c13113def75869759b49d1e77359e6af",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c.png",
+      "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c.png",
+      "name": "hero-wide-20261001-213405-37fb7d8c.png",
+      "label": "hero wide 20261001 213405 37fb7d8c",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1183972,
+      "sha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+      "width": 1000,
+      "height": 563,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-320.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-480.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-640.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-320.webp",
+          "bytes": 9802,
+          "sha256": "2b5b7afb64b70e58cdee0f442a6453f99993c42571585ed58a284b033e91636c",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-480.webp",
+          "bytes": 25190,
+          "sha256": "ba2518688410cd421209b1f0ff4e52b384d9fb8ce1929ecde5ae3629d4a4292e",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-640.webp",
+          "bytes": 49596,
+          "sha256": "594e68e97e0cc1c039c9cb84bf76f8d2195bf22738dd5f85cfc72575cfe249ea",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c-960.webp",
+          "bytes": 116264,
+          "sha256": "93f919553d73f772b72d91268e1dd139c13113def75869759b49d1e77359e6af",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876.png",
+      "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876.png",
+      "name": "hero-wide-20261001-213618-d5c0b876.png",
+      "label": "hero wide 20261001 213618 d5c0b876",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1183972,
+      "sha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+      "width": 1000,
+      "height": 563,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-320.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-480.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-640.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-320.webp",
+          "bytes": 9802,
+          "sha256": "2b5b7afb64b70e58cdee0f442a6453f99993c42571585ed58a284b033e91636c",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-480.webp",
+          "bytes": 25190,
+          "sha256": "ba2518688410cd421209b1f0ff4e52b384d9fb8ce1929ecde5ae3629d4a4292e",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-640.webp",
+          "bytes": 49596,
+          "sha256": "594e68e97e0cc1c039c9cb84bf76f8d2195bf22738dd5f85cfc72575cfe249ea",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213618-d5c0b876-960.webp",
+          "bytes": 116264,
+          "sha256": "93f919553d73f772b72d91268e1dd139c13113def75869759b49d1e77359e6af",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160.png",
+      "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160.png",
+      "name": "hero-wide-20261001-213829-d73cb160.png",
+      "label": "hero wide 20261001 213829 d73cb160",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 954087,
+      "sha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+      "width": 900,
+      "height": 506,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-320.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-480.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-320.webp",
+          "bytes": 9720,
+          "sha256": "6c72c07947da2806cf6bbb9f679d039d6c328d0d96f2a433bf9d617db07a264c",
+          "sourceSha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-480.webp",
+          "bytes": 24792,
+          "sha256": "2295a6e96be8ee0d5cafd8132bded2689639adcab9310bcbe9e3709e98cfea3c",
+          "sourceSha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-213829-d73cb160-640.webp",
+          "bytes": 48418,
+          "sha256": "f57c7b17432ed32ef697e875222abd2aeaa3995c4cfa5290abd7e0a1a388f33e",
+          "sourceSha256": "76bf5400b2d1ed315566b765d082e0d32d52209fc561dbd05fc4dd6a6f4c933e",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4.png",
+      "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4.png",
+      "name": "hero-wide-20261001-214059-6cad1bd4.png",
+      "label": "hero wide 20261001 214059 6cad1bd4",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1183972,
+      "sha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+      "width": 1000,
+      "height": 563,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-320.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-480.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-640.webp",
+        "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-320.webp",
+          "bytes": 9802,
+          "sha256": "2b5b7afb64b70e58cdee0f442a6453f99993c42571585ed58a284b033e91636c",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-480.webp",
+          "bytes": 25190,
+          "sha256": "ba2518688410cd421209b1f0ff4e52b384d9fb8ce1929ecde5ae3629d4a4292e",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-640.webp",
+          "bytes": 49596,
+          "sha256": "594e68e97e0cc1c039c9cb84bf76f8d2195bf22738dd5f85cfc72575cfe249ea",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4-960.webp",
+          "bytes": 116264,
+          "sha256": "93f919553d73f772b72d91268e1dd139c13113def75869759b49d1e77359e6af",
+          "sourceSha256": "559a5063ac39a9d24c510bcf250b439415cf0d157d03d8df862ca7800fb015a1",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png",
+      "name": "tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png",
+      "label": "tier get a digital copy of the film 20261002 045816 274fbc29",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3681,
+      "sha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+      "width": 5400,
+      "height": 5400,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-320.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-480.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-640.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-960.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-1600.webp"
+      ],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-320.webp",
+          "bytes": 274,
+          "sha256": "0e7779b331895be8f658200fd59c888f1e1a35815259aa53ff74be3036b7c56a",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-480.webp",
+          "bytes": 502,
+          "sha256": "c4dcedfa8d82e3b076cb7db309117fe698cb054e97b709bcd2753cb395978213",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-640.webp",
+          "bytes": 820,
+          "sha256": "a9836f918d99cfb085ec55d99756b4108c885fef22f0eb31e5011b8418b0b7e2",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29-960.webp",
+          "bytes": 1730,
+          "sha256": "2f072cb9828469aa0af264c604f1c9a10ae9bdb170f6aa04cddb8e26860fc8fd",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387.png",
+      "name": "tier-special-thanks-20261002-045650-388ba387.png",
+      "label": "tier special thanks 20261002 045650 388ba387",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3681,
+      "sha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+      "width": 5400,
+      "height": 5400,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-320.webp",
+        "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-480.webp",
+        "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-640.webp",
+        "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-960.webp",
+        "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [
+        "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-1600.webp"
+      ],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-320.webp",
+          "bytes": 274,
+          "sha256": "0e7779b331895be8f658200fd59c888f1e1a35815259aa53ff74be3036b7c56a",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-480.webp",
+          "bytes": 502,
+          "sha256": "c4dcedfa8d82e3b076cb7db309117fe698cb054e97b709bcd2753cb395978213",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-640.webp",
+          "bytes": 820,
+          "sha256": "a9836f918d99cfb085ec55d99756b4108c885fef22f0eb31e5011b8418b0b7e2",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387-960.webp",
+          "bytes": 1730,
+          "sha256": "2f072cb9828469aa0af264c604f1c9a10ae9bdb170f6aa04cddb8e26860fc8fd",
+          "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff.png",
+      "name": "tier-special-thanks-20261003-223342-d21c86ff.png",
+      "label": "tier special thanks 20261003 223342 d21c86ff",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 931014,
+      "sha256": "9053ae05022f9549c7d2c50f09e7aaaf3637ad067ad4eb063d1c95bf8a72726c",
+      "width": 1000,
+      "height": 1000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-320.webp",
+        "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-480.webp",
+        "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-640.webp",
+        "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-320.webp",
+          "bytes": 26348,
+          "sha256": "be5996610b57ea360768f518f98d5174009dd33e6252016ba8f50ca8bf848972",
+          "sourceSha256": "9053ae05022f9549c7d2c50f09e7aaaf3637ad067ad4eb063d1c95bf8a72726c",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-480.webp",
+          "bytes": 58654,
+          "sha256": "d029fc123c3ac26ec8086eff63e9d6c68f7c990a5ef736c00e0784efdada737c",
+          "sourceSha256": "9053ae05022f9549c7d2c50f09e7aaaf3637ad067ad4eb063d1c95bf8a72726c",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-640.webp",
+          "bytes": 101202,
+          "sha256": "59465a804daf31854f827408f77f2cbbf8bc94491e554ed0f9211ea3a8871bc7",
+          "sourceSha256": "9053ae05022f9549c7d2c50f09e7aaaf3637ad067ad4eb063d1c95bf8a72726c",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-special-thanks-20261003-223342-d21c86ff-960.webp",
+          "bytes": 208384,
+          "sha256": "bda63af3f50a29cb2e5baeb7a1a151c2a992b074a6dc12bf51c67d1e3d269f81",
+          "sourceSha256": "9053ae05022f9549c7d2c50f09e7aaaf3637ad067ad4eb063d1c95bf8a72726c",
+          "width": 960
         }
       ],
       "warnings": [],
@@ -6929,6 +7805,881 @@
       "references": []
     },
     {
+      "path": "assets/images/campaigns/tubers/background-20260930-065455-2efc8837.png",
+      "publicPath": "/assets/images/campaigns/tubers/background-20260930-065455-2efc8837.png",
+      "name": "background-20260930-065455-2efc8837.png",
+      "label": "background 20260930 065455 2efc8837",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 1269148,
+      "sha256": "bec2c50681f0dbf908da53176f0ee60552ab1fa3e2f0dd9372ac30119527ab94",
+      "width": 1000,
+      "height": 1294,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-320.webp",
+        "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-480.webp",
+        "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-640.webp",
+        "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-065455-2efc8837-320.webp",
+          "bytes": 8852,
+          "sha256": "d1899e22cace5dde732607c13d700e5dfa7eb79e44878e7ca8e22706d6bc05b2",
+          "sourceSha256": "bec2c50681f0dbf908da53176f0ee60552ab1fa3e2f0dd9372ac30119527ab94",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-065455-2efc8837-480.webp",
+          "bytes": 16020,
+          "sha256": "e91fa7c893da4457df7a3748a236be1bcfd1a0ca0588a24731efaf94fab79aae",
+          "sourceSha256": "bec2c50681f0dbf908da53176f0ee60552ab1fa3e2f0dd9372ac30119527ab94",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-065455-2efc8837-640.webp",
+          "bytes": 26390,
+          "sha256": "1535541932d2dde90363930d8c20f551befb6902d9219c2ea2cb76160dcf869b",
+          "sourceSha256": "bec2c50681f0dbf908da53176f0ee60552ab1fa3e2f0dd9372ac30119527ab94",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-065455-2efc8837-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-065455-2efc8837-960.webp",
+          "bytes": 55438,
+          "sha256": "af6e05710a2f1e0bb113121fdda3b97d244066d225fd87a46bd9606a184ed100",
+          "sourceSha256": "bec2c50681f0dbf908da53176f0ee60552ab1fa3e2f0dd9372ac30119527ab94",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/background-20260930-070351-55968ce3.png",
+      "publicPath": "/assets/images/campaigns/tubers/background-20260930-070351-55968ce3.png",
+      "name": "background-20260930-070351-55968ce3.png",
+      "label": "background 20260930 070351 55968ce3",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 974884,
+      "sha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+      "width": 1000,
+      "height": 1294,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-320.webp",
+        "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-480.webp",
+        "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-640.webp",
+        "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-070351-55968ce3-320.webp",
+          "bytes": 5198,
+          "sha256": "339c2b63df064ea46e9453224e16439179bbcf198100560102d464caa12c3dfe",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-070351-55968ce3-480.webp",
+          "bytes": 9118,
+          "sha256": "8448f7a7b03deecb514bed96e19dbbc412fc5e207bc31bffaeb813066de09d79",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-070351-55968ce3-640.webp",
+          "bytes": 14668,
+          "sha256": "8257e33c0e17e477660d6114a26164f64016e73c4942a762bc30ee95a03694c6",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-070351-55968ce3-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-070351-55968ce3-960.webp",
+          "bytes": 29368,
+          "sha256": "1c3ee86c069a3cf4c8b242079f9138591279984e92633763a828d51c8a1d5eec",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png",
+      "publicPath": "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png",
+      "name": "background-20260930-072631-ab2b0d68.png",
+      "label": "background 20260930 072631 ab2b0d68",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 974884,
+      "sha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+      "width": 1000,
+      "height": 1294,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-320.webp",
+        "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-480.webp",
+        "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-640.webp",
+        "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-320.webp",
+          "bytes": 5198,
+          "sha256": "339c2b63df064ea46e9453224e16439179bbcf198100560102d464caa12c3dfe",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-480.webp",
+          "bytes": 9118,
+          "sha256": "8448f7a7b03deecb514bed96e19dbbc412fc5e207bc31bffaeb813066de09d79",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-640.webp",
+          "bytes": 14668,
+          "sha256": "8257e33c0e17e477660d6114a26164f64016e73c4942a762bc30ee95a03694c6",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68-960.webp",
+          "bytes": 29368,
+          "sha256": "1c3ee86c069a3cf4c8b242079f9138591279984e92633763a828d51c8a1d5eec",
+          "sourceSha256": "f886020b825f87ec3d1c6d4836ea29359b7fb9a48c5f03c803fd1b463e4547c2",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43.png",
+      "name": "content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43.png",
+      "label": "content tubers 12x8 5 cast resize 20260930 072502 b2df9d43",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 620023,
+      "sha256": "9ff536637370faf83fa1bfe5702519b0cdca41b89429f606fd7753fb78f51f8b",
+      "width": 1000,
+      "height": 654,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-320.webp",
+          "bytes": 14128,
+          "sha256": "575d161a60bc1a08d68d6add63da2054830defc377d2d6d6b1766f64dd32a780",
+          "sourceSha256": "9ff536637370faf83fa1bfe5702519b0cdca41b89429f606fd7753fb78f51f8b",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-480.webp",
+          "bytes": 24708,
+          "sha256": "cecf4e544bc5ea96f072890e1909027068f3b7088d882d583f3c38e740b1a993",
+          "sourceSha256": "9ff536637370faf83fa1bfe5702519b0cdca41b89429f606fd7753fb78f51f8b",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-640.webp",
+          "bytes": 35324,
+          "sha256": "9e39c1e6e2312478a905f77dc3f0df8d8a93511fa0b35b96d64a02f066898fc4",
+          "sourceSha256": "9ff536637370faf83fa1bfe5702519b0cdca41b89429f606fd7753fb78f51f8b",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43-960.webp",
+          "bytes": 58176,
+          "sha256": "433f436cf650985fde7e89a313dc554684532695145c245c89493137aee7dfe8",
+          "sourceSha256": "9ff536637370faf83fa1bfe5702519b0cdca41b89429f606fd7753fb78f51f8b",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306.png",
+      "name": "content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306.png",
+      "label": "content tubers 12x8 5 comps resize 20260930 072544 7bfbe306",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 555541,
+      "sha256": "cc07b32c931386348b7b7ca2da00bd0d35015f1e129cef7ed26a04d1039ff74f",
+      "width": 1000,
+      "height": 654,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-320.webp",
+          "bytes": 11514,
+          "sha256": "a73e052c4d515c1e1ca464bfb5e6a3d1f5c3bea167f54718811ca62e47d3301c",
+          "sourceSha256": "cc07b32c931386348b7b7ca2da00bd0d35015f1e129cef7ed26a04d1039ff74f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-480.webp",
+          "bytes": 21688,
+          "sha256": "aa168d33babb77147a2e1562ec9a0819b26ce037dfb4504b39580cc33e567d57",
+          "sourceSha256": "cc07b32c931386348b7b7ca2da00bd0d35015f1e129cef7ed26a04d1039ff74f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-640.webp",
+          "bytes": 32936,
+          "sha256": "eb718601da4421754a2865b9a348d643d320eac5a24c15aa60b29928970448e5",
+          "sourceSha256": "cc07b32c931386348b7b7ca2da00bd0d35015f1e129cef7ed26a04d1039ff74f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306-960.webp",
+          "bytes": 57564,
+          "sha256": "140b6886005d3c2d56208fd31ee3250f709b1657e14e54d3ec2647c213b3c2f9",
+          "sourceSha256": "cc07b32c931386348b7b7ca2da00bd0d35015f1e129cef7ed26a04d1039ff74f",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760.png",
+      "name": "content-tubers-logo-2-20260930-050122-af62b760.png",
+      "label": "content tubers logo 2 20260930 050122 af62b760",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 39965,
+      "sha256": "271fa04f28733aa59800bcd5776341d2477da5697700c4fbb31a08c3b80e8a7f",
+      "width": 3840,
+      "height": 2160,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-960.webp",
+        "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-320.webp",
+          "bytes": 5066,
+          "sha256": "4af31f3490f4ca8cf874dc65f05d9a47f85900112ac67fc85463557791650727",
+          "sourceSha256": "271fa04f28733aa59800bcd5776341d2477da5697700c4fbb31a08c3b80e8a7f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-480.webp",
+          "bytes": 8596,
+          "sha256": "3d815b961f67c6879295edb339d9fead65b48b75d91a6f8b2bed6ed0b7875667",
+          "sourceSha256": "271fa04f28733aa59800bcd5776341d2477da5697700c4fbb31a08c3b80e8a7f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-640.webp",
+          "bytes": 11402,
+          "sha256": "dba10e6808368498e82396222887b09749becf9bf25be433fb58f5dfd32c94da",
+          "sourceSha256": "271fa04f28733aa59800bcd5776341d2477da5697700c4fbb31a08c3b80e8a7f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-960.webp",
+          "bytes": 17062,
+          "sha256": "6cc2043acba8d51dbbc0632385f0e42cff086d9f724b38fa45cd846e3a567a58",
+          "sourceSha256": "271fa04f28733aa59800bcd5776341d2477da5697700c4fbb31a08c3b80e8a7f",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-logo-2-20260930-050122-af62b760-1600.webp",
+          "bytes": 26922,
+          "sha256": "1d51a5686aa8bdbefab04dd4adac30fda67757c0d9ff24734d16b785dd029e2f",
+          "sourceSha256": "271fa04f28733aa59800bcd5776341d2477da5697700c4fbb31a08c3b80e8a7f",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78.png",
+      "name": "content-tubers-pool-headers-budget-20260930-072511-9a37de78.png",
+      "label": "content tubers pool headers budget 20260930 072511 9a37de78",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 464470,
+      "sha256": "fcb5e4a5f9f4a69eb673612888e2dcba8dcef3f2ce7233ba5ba734342fcc2cef",
+      "width": 3000,
+      "height": 1200,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-960.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-320.webp",
+          "bytes": 7184,
+          "sha256": "4876213e28ffdfa06ee641449f62ee8380b9972e3f4eeaae51d1b45e3f89b7ca",
+          "sourceSha256": "fcb5e4a5f9f4a69eb673612888e2dcba8dcef3f2ce7233ba5ba734342fcc2cef",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-480.webp",
+          "bytes": 17766,
+          "sha256": "db50f3c9292f5fa23c93c3ef7a0e7d34e5b4e8139d4e46e2f6c4d3840c169aae",
+          "sourceSha256": "fcb5e4a5f9f4a69eb673612888e2dcba8dcef3f2ce7233ba5ba734342fcc2cef",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-640.webp",
+          "bytes": 37594,
+          "sha256": "8a19fe63de31d48982da21458170f384fa1c3cd2896189561f1ecddb16eac151",
+          "sourceSha256": "fcb5e4a5f9f4a69eb673612888e2dcba8dcef3f2ce7233ba5ba734342fcc2cef",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-960.webp",
+          "bytes": 90486,
+          "sha256": "012dfc93f704767e805d0b45ed2846c309b2db1772b518278058688b941329ee",
+          "sourceSha256": "fcb5e4a5f9f4a69eb673612888e2dcba8dcef3f2ce7233ba5ba734342fcc2cef",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78-1600.webp",
+          "bytes": 187028,
+          "sha256": "69fea762adbb3a9a29216da6b400e52c3fc088d78684fadf66fc7e00568f57b9",
+          "sourceSha256": "fcb5e4a5f9f4a69eb673612888e2dcba8dcef3f2ce7233ba5ba734342fcc2cef",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e.png",
+      "name": "content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e.png",
+      "label": "content tubers pool headers rewards 20260930 072556 c2f3dd7e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 470215,
+      "sha256": "c2d2c9102ceebb0bb4500c023f2da7fa94e76d12db5217c2c7a14e63288750d8",
+      "width": 3000,
+      "height": 1200,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-960.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-320.webp",
+          "bytes": 7896,
+          "sha256": "0effb93b8b1f7e21c5808efb8900077a1446ffee828ef8a18ed05674010c190f",
+          "sourceSha256": "c2d2c9102ceebb0bb4500c023f2da7fa94e76d12db5217c2c7a14e63288750d8",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-480.webp",
+          "bytes": 18136,
+          "sha256": "8ccbc5f94bf144a964e85eef4caa0a016ccb27b60cd5e6a82fb54bb20bc55b21",
+          "sourceSha256": "c2d2c9102ceebb0bb4500c023f2da7fa94e76d12db5217c2c7a14e63288750d8",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-640.webp",
+          "bytes": 38514,
+          "sha256": "0882289827ec5162d8a7b04b40d20b653d53478bbf76b229fc34d1d134de2a70",
+          "sourceSha256": "c2d2c9102ceebb0bb4500c023f2da7fa94e76d12db5217c2c7a14e63288750d8",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-960.webp",
+          "bytes": 93076,
+          "sha256": "da59c1c69338733d40b67b452c118d91d19fbae60177768eb84e20438749406b",
+          "sourceSha256": "c2d2c9102ceebb0bb4500c023f2da7fa94e76d12db5217c2c7a14e63288750d8",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e-1600.webp",
+          "bytes": 193122,
+          "sha256": "199b42dfcf339c3fe2867a8b4714df1e3c64f146811f3859abf3c4e766b37460",
+          "sourceSha256": "c2d2c9102ceebb0bb4500c023f2da7fa94e76d12db5217c2c7a14e63288750d8",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0.png",
+      "name": "content-tubers-pool-headers-team-20260930-060350-8b681da0.png",
+      "label": "content tubers pool headers team 20260930 060350 8b681da0",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 448301,
+      "sha256": "0a51ab8c3739fe1ee107b3625e3a406d4a5d1da429eddc7301730a067db6507e",
+      "width": 3000,
+      "height": 1200,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-960.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-320.webp",
+          "bytes": 4896,
+          "sha256": "931fd68604fc28051d68590b43eaf9ce56d15580ba02a38fbd805061f9dcc1da",
+          "sourceSha256": "0a51ab8c3739fe1ee107b3625e3a406d4a5d1da429eddc7301730a067db6507e",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-480.webp",
+          "bytes": 15594,
+          "sha256": "d2956d344a5f13f5d51fe14b6bbea4397b7067e49679361b439dd3cc5e3283ea",
+          "sourceSha256": "0a51ab8c3739fe1ee107b3625e3a406d4a5d1da429eddc7301730a067db6507e",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-640.webp",
+          "bytes": 34892,
+          "sha256": "8b53250e41c8a408507b63cf0aed5708a44bc663ea59c31fc49b8b9925b17481",
+          "sourceSha256": "0a51ab8c3739fe1ee107b3625e3a406d4a5d1da429eddc7301730a067db6507e",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-960.webp",
+          "bytes": 86102,
+          "sha256": "90abc1bbac5c67e488ea4aa81d9eba1ba8f8fe78c495f3c2b19227b549a409b9",
+          "sourceSha256": "0a51ab8c3739fe1ee107b3625e3a406d4a5d1da429eddc7301730a067db6507e",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0-1600.webp",
+          "bytes": 182238,
+          "sha256": "e11716b0dfe98cb00f414b04f8d6fc4eca7c10be3657966701292dc95ce46128",
+          "sourceSha256": "0a51ab8c3739fe1ee107b3625e3a406d4a5d1da429eddc7301730a067db6507e",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702.png",
+      "name": "content-tubers-pool-headers-tubers-20260930-061506-2303c702.png",
+      "label": "content tubers pool headers tubers 20260930 061506 2303c702",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 465536,
+      "sha256": "08e9eedee46977d00f9e6e09092dec4d454e445834c549c72b1ed499d1a42f85",
+      "width": 3000,
+      "height": 1200,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-960.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-320.webp",
+          "bytes": 5940,
+          "sha256": "7eccfb0b651db46939c6b829cb790ef84c817e5302b8b20b41d94f71e9f1afae",
+          "sourceSha256": "08e9eedee46977d00f9e6e09092dec4d454e445834c549c72b1ed499d1a42f85",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-480.webp",
+          "bytes": 15934,
+          "sha256": "e01397223a9af2c4e2f35d437604d337945cd431d3387acdd22e7bb0f5f48103",
+          "sourceSha256": "08e9eedee46977d00f9e6e09092dec4d454e445834c549c72b1ed499d1a42f85",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-640.webp",
+          "bytes": 36168,
+          "sha256": "ce9a28e87a2c452c0c1062d19f5840a497026ed02ee9a811397c5e52abd8598b",
+          "sourceSha256": "08e9eedee46977d00f9e6e09092dec4d454e445834c549c72b1ed499d1a42f85",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-960.webp",
+          "bytes": 87864,
+          "sha256": "7410cb10c0b5efbae71932663bff1df60f73f2d24720a0ab711116d5ce42a175",
+          "sourceSha256": "08e9eedee46977d00f9e6e09092dec4d454e445834c549c72b1ed499d1a42f85",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-tubers-20260930-061506-2303c702-1600.webp",
+          "bytes": 185900,
+          "sha256": "8a8ed07e216c12c58973bd4a61b8d9d9448575e3ceda53bd98f26d0166560154",
+          "sourceSha256": "08e9eedee46977d00f9e6e09092dec4d454e445834c549c72b1ed499d1a42f85",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4.png",
+      "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4.png",
+      "name": "content-tubers-pool-headers-why-20260930-072521-de9dd7a4.png",
+      "label": "content tubers pool headers why 20260930 072521 de9dd7a4",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 461971,
+      "sha256": "4faa2cf6d96c69d4a7bed2e026fb3d0ae4251ba9ded5bf64c4ba8cec7b3c9653",
+      "width": 3000,
+      "height": 1200,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-320.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-480.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-640.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-960.webp",
+        "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-320.webp",
+          "bytes": 5304,
+          "sha256": "185f6d0bbf33a36914cc667f7cb2c883fd401b256f94fc04ba105dab5ed1d516",
+          "sourceSha256": "4faa2cf6d96c69d4a7bed2e026fb3d0ae4251ba9ded5bf64c4ba8cec7b3c9653",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-480.webp",
+          "bytes": 15932,
+          "sha256": "9d949338b33ffe8f6120ba66a0ef1a887182f9b2882a916515b71feb5fdf689f",
+          "sourceSha256": "4faa2cf6d96c69d4a7bed2e026fb3d0ae4251ba9ded5bf64c4ba8cec7b3c9653",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-640.webp",
+          "bytes": 35832,
+          "sha256": "541fac5aa6c3f5d737d31d8c11b9268c9ebd4ae6bd3bf7ba7127aad4a3cb4afd",
+          "sourceSha256": "4faa2cf6d96c69d4a7bed2e026fb3d0ae4251ba9ded5bf64c4ba8cec7b3c9653",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-960.webp",
+          "bytes": 86562,
+          "sha256": "e8904d3d21f1eaee1f175740cac802f7a873f87bb1b40fd2a342007a069f36ad",
+          "sourceSha256": "4faa2cf6d96c69d4a7bed2e026fb3d0ae4251ba9ded5bf64c4ba8cec7b3c9653",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4-1600.webp",
+          "bytes": 183996,
+          "sha256": "e645f4b867d786f99dd3c6c4980605f577f2ce761c97f20848dadc173c40fc96",
+          "sourceSha256": "4faa2cf6d96c69d4a7bed2e026fb3d0ae4251ba9ded5bf64c4ba8cec7b3c9653",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/creator-20260930-040217-935325a4.png",
+      "publicPath": "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4.png",
+      "name": "creator-20260930-040217-935325a4.png",
+      "label": "creator 20260930 040217 935325a4",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 78981,
+      "sha256": "91fec6e3e3807a8b1ed9ae41dcfb3e5333d476a12062a2865a007b78e745e165",
+      "width": 812,
+      "height": 886,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/creator-20260930-040217-935325a4-320.webp",
+        "assets/images/campaigns/tubers/creator-20260930-040217-935325a4-480.webp",
+        "assets/images/campaigns/tubers/creator-20260930-040217-935325a4-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/creator-20260930-040217-935325a4-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4-320.webp",
+          "bytes": 7982,
+          "sha256": "394d40fdf544c8ad5b601d6e643f9d29dbf0623c530ebaba896b4d84859a1a84",
+          "sourceSha256": "91fec6e3e3807a8b1ed9ae41dcfb3e5333d476a12062a2865a007b78e745e165",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/creator-20260930-040217-935325a4-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4-480.webp",
+          "bytes": 12676,
+          "sha256": "5780230a31695b146c4a996d98dc96e04359700dc7ec9b84f6a989494bec4f4d",
+          "sourceSha256": "91fec6e3e3807a8b1ed9ae41dcfb3e5333d476a12062a2865a007b78e745e165",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/creator-20260930-040217-935325a4-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4-640.webp",
+          "bytes": 16660,
+          "sha256": "ee084bc426120368d435503f68247eb052559f970a6e3a297b2877d6e101b9eb",
+          "sourceSha256": "91fec6e3e3807a8b1ed9ae41dcfb3e5333d476a12062a2865a007b78e745e165",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035.png",
+      "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035.png",
+      "name": "hero-square-20260930-040237-de55c035.png",
+      "label": "hero square 20260930 040237 de55c035",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 115616,
+      "sha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+      "width": 3840,
+      "height": 3840,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-320.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-480.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-640.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-960.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-320.webp",
+          "bytes": 4724,
+          "sha256": "25c19325b9ec4e9fe3204f232e0894adf6b73cf90ae6a5f7ffd7fcb7c92a15df",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-480.webp",
+          "bytes": 6804,
+          "sha256": "85287dce9f955654830412d39ee6b4891f03b794f82e716dcace1b62b26ad821",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-640.webp",
+          "bytes": 8660,
+          "sha256": "16126b9feae0762510af05c2e3c38ba0f643d4a4f38bd828410862335986c913",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-960.webp",
+          "bytes": 12366,
+          "sha256": "c0a17135a94fd0368162273a7d3354c56310612043ad82cc207852067cf80e75",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-040237-de55c035-1600.webp",
+          "bytes": 20438,
+          "sha256": "83e5590be65cce70b1344c88d892c8a8d4c007f28eb66c7e81c58309bbca213f",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4.png",
+      "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4.png",
+      "name": "hero-square-20260930-072652-9a4e4ce4.png",
+      "label": "hero square 20260930 072652 9a4e4ce4",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 115616,
+      "sha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+      "width": 3840,
+      "height": 3840,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-320.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-480.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-640.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-960.webp",
+        "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-320.webp",
+          "bytes": 4724,
+          "sha256": "25c19325b9ec4e9fe3204f232e0894adf6b73cf90ae6a5f7ffd7fcb7c92a15df",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-480.webp",
+          "bytes": 6804,
+          "sha256": "85287dce9f955654830412d39ee6b4891f03b794f82e716dcace1b62b26ad821",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-640.webp",
+          "bytes": 8660,
+          "sha256": "16126b9feae0762510af05c2e3c38ba0f643d4a4f38bd828410862335986c913",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-960.webp",
+          "bytes": 12366,
+          "sha256": "c0a17135a94fd0368162273a7d3354c56310612043ad82cc207852067cf80e75",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20260930-072652-9a4e4ce4-1600.webp",
+          "bytes": 20438,
+          "sha256": "83e5590be65cce70b1344c88d892c8a8d4c007f28eb66c7e81c58309bbca213f",
+          "sourceSha256": "93eecfaf53423fba012efd97299b541f7dd433f67eb8ef07f229b5f8a8854ce9",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85.png",
       "publicPath": "/assets/images/campaigns/tubers/hero-wide-20260930-032428-ab196a85.png",
       "name": "hero-wide-20260930-032428-ab196a85.png",
@@ -6990,6 +8741,487 @@
           "sha256": "e23e3dbd43d1bfd02e17124f5c483fd85c1dfa17f06c9c6f41493db858f07be9",
           "sourceSha256": "4edf4162a936a71327f2bd362a5526d2e961356f3bdc8f59b5cb8db01de10206",
           "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea.png",
+      "name": "tier-bts-package-20260930-040117-dbbea8ea.png",
+      "label": "tier bts package 20260930 040117 dbbea8ea",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 962155,
+      "sha256": "7d1b1aa88e8b073e17c2f8313d9bcfc925ea14f62366e90740a0eb289847c91d",
+      "width": 2550,
+      "height": 2550,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-320.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-480.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-640.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-960.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-320.webp",
+          "bytes": 15270,
+          "sha256": "0a44d22615eb8860e830de9e45d2cb7b4e09a1dc302ceeec2edac01a956b4001",
+          "sourceSha256": "7d1b1aa88e8b073e17c2f8313d9bcfc925ea14f62366e90740a0eb289847c91d",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-480.webp",
+          "bytes": 47354,
+          "sha256": "b94da7480b31dcfd1fa0dc4e9f01b090d01929f68d8e6ea86245029011d5d9a3",
+          "sourceSha256": "7d1b1aa88e8b073e17c2f8313d9bcfc925ea14f62366e90740a0eb289847c91d",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-640.webp",
+          "bytes": 89798,
+          "sha256": "87b319c81051a86242d2af8b103bff53ae6c3b021e8604b8124bd6d6f7021391",
+          "sourceSha256": "7d1b1aa88e8b073e17c2f8313d9bcfc925ea14f62366e90740a0eb289847c91d",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-960.webp",
+          "bytes": 201420,
+          "sha256": "1c2ddcaa6e25c89fca9472ab05dd53be49ab222d52de849c818c8038be949134",
+          "sourceSha256": "7d1b1aa88e8b073e17c2f8313d9bcfc925ea14f62366e90740a0eb289847c91d",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-040117-dbbea8ea-1600.webp",
+          "bytes": 456386,
+          "sha256": "7af07f9fb3510b7be84ab1f86f6b906bd45f5b1873e2090eb822db49c95bdcbf",
+          "sourceSha256": "7d1b1aa88e8b073e17c2f8313d9bcfc925ea14f62366e90740a0eb289847c91d",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710.png",
+      "name": "tier-bts-package-20260930-071126-6fbfc710.png",
+      "label": "tier bts package 20260930 071126 6fbfc710",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 886385,
+      "sha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+      "width": 2550,
+      "height": 2550,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-320.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-480.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-640.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-960.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-320.webp",
+          "bytes": 14922,
+          "sha256": "16bce38154bf34b6719e032b4d7510c8d3087adae6c5e17e0df79dbca2422ce2",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-480.webp",
+          "bytes": 46984,
+          "sha256": "656e86a3c286fbd1d0c930190b5952e4de1d9bc48f457b68118ea49ba4ae9a00",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-640.webp",
+          "bytes": 89720,
+          "sha256": "df9d384122737367aee833a6db5ccd8bd0428dd2b733fc896b89ca254583afa3",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-960.webp",
+          "bytes": 201130,
+          "sha256": "a46d6b42db74269767b8017865fb31c1b684c76588d8e5ef95d964f9dd968ff7",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-071126-6fbfc710-1600.webp",
+          "bytes": 456352,
+          "sha256": "6c7e8f6a785fda99fd9e37661ae4d88bc45986571301132bb976b619dbf9b43b",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771.png",
+      "name": "tier-bts-package-20260930-072841-50e86771.png",
+      "label": "tier bts package 20260930 072841 50e86771",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 886385,
+      "sha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+      "width": 2550,
+      "height": 2550,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-320.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-480.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-640.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-960.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-320.webp",
+          "bytes": 14922,
+          "sha256": "16bce38154bf34b6719e032b4d7510c8d3087adae6c5e17e0df79dbca2422ce2",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-480.webp",
+          "bytes": 46984,
+          "sha256": "656e86a3c286fbd1d0c930190b5952e4de1d9bc48f457b68118ea49ba4ae9a00",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-640.webp",
+          "bytes": 89720,
+          "sha256": "df9d384122737367aee833a6db5ccd8bd0428dd2b733fc896b89ca254583afa3",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-960.webp",
+          "bytes": 201130,
+          "sha256": "a46d6b42db74269767b8017865fb31c1b684c76588d8e5ef95d964f9dd968ff7",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20260930-072841-50e86771-1600.webp",
+          "bytes": 456352,
+          "sha256": "6c7e8f6a785fda99fd9e37661ae4d88bc45986571301132bb976b619dbf9b43b",
+          "sourceSha256": "24f5e6db246d84fc2b0c9e87c243df53fb2ec5b7372bfd594649a6ffbe48bd6b",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e.png",
+      "name": "tier-bts-package-20261001-210959-8af9661e.png",
+      "label": "tier bts package 20261001 210959 8af9661e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 203567,
+      "sha256": "32b0bf548fd49dcc2ae17a86ee4df87ff5e98c898d504aa4ce398b952038cda5",
+      "width": 2550,
+      "height": 2550,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-320.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-480.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-640.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-960.webp",
+        "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-320.webp",
+          "bytes": 5590,
+          "sha256": "97b5aa1e3ce9febb407eab3ac730068ac70891f35cf12da84f64d743de5acbf2",
+          "sourceSha256": "32b0bf548fd49dcc2ae17a86ee4df87ff5e98c898d504aa4ce398b952038cda5",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-480.webp",
+          "bytes": 9918,
+          "sha256": "66ecea3ed78a2a45738d20bfe7401a3aa451f23b8941d1df403ee2d80c0bfa27",
+          "sourceSha256": "32b0bf548fd49dcc2ae17a86ee4df87ff5e98c898d504aa4ce398b952038cda5",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-640.webp",
+          "bytes": 14122,
+          "sha256": "2f78a34c2c5f6ab542b8d83288cd1847ca4ccb4cd7ecf2e4ea2e2197ddec9ac3",
+          "sourceSha256": "32b0bf548fd49dcc2ae17a86ee4df87ff5e98c898d504aa4ce398b952038cda5",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-960.webp",
+          "bytes": 24294,
+          "sha256": "3e7e2ec406ea61a7ee7246121758244772a0c5c5647784ed7d2abb487ea20517",
+          "sourceSha256": "32b0bf548fd49dcc2ae17a86ee4df87ff5e98c898d504aa4ce398b952038cda5",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-bts-package-20261001-210959-8af9661e-1600.webp",
+          "bytes": 54060,
+          "sha256": "7803c74ca5bfa86e96baf8d16dd1d7f3b30fe03ba3caad4586dbb00689853c53",
+          "sourceSha256": "32b0bf548fd49dcc2ae17a86ee4df87ff5e98c898d504aa4ce398b952038cda5",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6.png",
+      "name": "tier-collector-s-bundle-20261001-211730-c25174a6.png",
+      "label": "tier collector s bundle 20261001 211730 c25174a6",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 20158,
+      "sha256": "53d37287453224da9cff058976cef038c70e81b63d63a35df54ae942e96d0fa5",
+      "width": 1296,
+      "height": 1296,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-320.webp",
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-480.webp",
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-640.webp",
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-320.webp",
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-480.webp",
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-640.webp",
+        "assets/images/campaigns/tubers/tier-collector-s-bundle-20261001-211730-c25174a6-960.webp"
+      ],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835.png",
+      "name": "tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835.png",
+      "label": "tier get a digital copy of the film 20260930 040032 b66a3835",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 105288,
+      "sha256": "cb19a8f60e6786ad3b37f745534190afbd5f1734561668fa1643460e0866ef0e",
+      "width": 2400,
+      "height": 2400,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-320.webp",
+        "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-480.webp",
+        "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-640.webp",
+        "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-960.webp",
+        "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-320.webp",
+          "bytes": 3876,
+          "sha256": "de423ca4a383cdd5a487b70d0a19584e3af10e429dd9247486f32ab7f19a9bda",
+          "sourceSha256": "cb19a8f60e6786ad3b37f745534190afbd5f1734561668fa1643460e0866ef0e",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-480.webp",
+          "bytes": 5624,
+          "sha256": "6221c19635db50300902778e54f4def92d15d6f70b885f7d6cad3aa56ca7aa65",
+          "sourceSha256": "cb19a8f60e6786ad3b37f745534190afbd5f1734561668fa1643460e0866ef0e",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-640.webp",
+          "bytes": 7396,
+          "sha256": "54ed4a5457a7785d3bcac41d5d2d9e817154c84cd2603b9d6d2c78595e864220",
+          "sourceSha256": "cb19a8f60e6786ad3b37f745534190afbd5f1734561668fa1643460e0866ef0e",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-960.webp",
+          "bytes": 11148,
+          "sha256": "608e3876834f94d0726cfb03234d7fdc3ae582c2c56c4d005025d8946e73041c",
+          "sourceSha256": "cb19a8f60e6786ad3b37f745534190afbd5f1734561668fa1643460e0866ef0e",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-get-a-digital-copy-of-the-film-20260930-040032-b66a3835-1600.webp",
+          "bytes": 19592,
+          "sha256": "6d4f9971c242b6d4c8184b0d4148c6ce176c4df8b2d94272a3bce007fc47fbb4",
+          "sourceSha256": "cb19a8f60e6786ad3b37f745534190afbd5f1734561668fa1643460e0866ef0e",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636.png",
+      "name": "tier-special-thanks-in-credits-20260930-043757-e45a9636.png",
+      "label": "tier special thanks in credits 20260930 043757 e45a9636",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 1589414,
+      "sha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+      "width": 1500,
+      "height": 1500,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-320.webp",
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-480.webp",
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-640.webp",
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-320.webp",
+          "bytes": 8344,
+          "sha256": "e5ad0daed81c99c943377fcb1ad45dbe52885bc0da94fab77c7d6783f969c436",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-480.webp",
+          "bytes": 14104,
+          "sha256": "efa071645c949388fcea2d73dc12e4fd3e25baf7bb7a115a4b85741c4bac8396",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-640.webp",
+          "bytes": 19800,
+          "sha256": "c97f8e13dfbe0aa6afde530a3213a9a77d510ebdf456affa591f972ff3fa591f",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-043757-e45a9636-960.webp",
+          "bytes": 32700,
+          "sha256": "6196147e19c166b47e0cc7d2092cba52381dbf3e44a98c903f97cf2487b81fb9",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e.png",
+      "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e.png",
+      "name": "tier-special-thanks-in-credits-20260930-072922-2e9bee2e.png",
+      "label": "tier special thanks in credits 20260930 072922 2e9bee2e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 1589414,
+      "sha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+      "width": 1500,
+      "height": 1500,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-320.webp",
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-480.webp",
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-640.webp",
+        "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-320.webp",
+          "bytes": 8344,
+          "sha256": "e5ad0daed81c99c943377fcb1ad45dbe52885bc0da94fab77c7d6783f969c436",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-480.webp",
+          "bytes": 14104,
+          "sha256": "efa071645c949388fcea2d73dc12e4fd3e25baf7bb7a115a4b85741c4bac8396",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-640.webp",
+          "bytes": 19800,
+          "sha256": "c97f8e13dfbe0aa6afde530a3213a9a77d510ebdf456affa591f972ff3fa591f",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/tier-special-thanks-in-credits-20260930-072922-2e9bee2e-960.webp",
+          "bytes": 32700,
+          "sha256": "6196147e19c166b47e0cc7d2092cba52381dbf3e44a98c903f97cf2487b81fb9",
+          "sourceSha256": "bc0d8b3c057aa093f77d5a68cf2ec1178e61f19bbdc9498c3df7602ec981daa8",
+          "width": 960
         }
       ],
       "warnings": [],

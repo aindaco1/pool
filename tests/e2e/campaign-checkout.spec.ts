@@ -10,6 +10,7 @@ const FEATURED_CARD_BUTTON_SELECTOR = '.campaign-card__featured-tier.poolcart-ad
 const CART_ROOT_SELECTOR = '[data-pool-cart-root]';
 
 async function getCartSnapshot(page: any) {
+  await page.waitForFunction(() => Boolean((window as any).PoolCartRuntime?.load));
   return page.evaluate(async () => {
     if ((window as any).PoolCartRuntime?.load) {
       await (window as any).PoolCartRuntime.load('e2e-cart-snapshot');
@@ -508,6 +509,7 @@ test.describe('Cart Integration', () => {
   for (const locale of ['', '/es']) {
     test(`renders tier Markdown after adding and restoring a cart (${locale || 'en'})`, async ({ page }) => {
       await page.goto(`${locale}/campaigns/smoke-editable/`);
+      await getCartSnapshot(page);
       await page.locator('[data-item-id="smoke-editable__standard-pass"]').click();
       const description = page.locator('.pool-first-party-cart__item-description');
       await expect(description.locator('strong em')).toHaveText('digital');
@@ -1640,6 +1642,7 @@ test.describe('Checkout Flow', () => {
         products: { 'unlimited-campaign-print': { remaining: null, available: true, variants: { open: { remaining: null, available: true } } }, 'sold-out-print': { remaining: 0, available: false } }
       } }));
       await page.goto(`${locale}/campaigns/smoke-editable/`);
+      await page.waitForFunction(() => Boolean((window as any).POOL_CONFIG?.addOns?.products));
       await page.evaluate((withVariants) => {
         const config = (window as any).POOL_CONFIG;
         // Match published Jekyll JSON: optional inventory is serialized as null.
@@ -1649,6 +1652,7 @@ test.describe('Checkout Flow', () => {
         );
         localStorage.setItem('pool_add_on_inventory', JSON.stringify({ savedAt: Date.now(), data: { products: { 'unlimited-campaign-print': { remaining: 0 } } } }));
       }, variants);
+      await getCartSnapshot(page);
       await page.locator('[data-item-id="smoke-editable__standard-pass"]').first().click();
       const card = page.locator('[data-cart-addon-product="unlimited-campaign-print"]');
       await expect(card).toBeVisible();

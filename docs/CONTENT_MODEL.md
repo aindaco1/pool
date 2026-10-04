@@ -27,7 +27,6 @@ goal_amount: 25000
 goal_deadline: 2025-12-20  # Campaign ends at 11:59:59 PM in the platform timezone
 charged: false
 # pledged_amount not needed - live-stats.js fetches from KV and enables late support dynamically
-hero_image: /assets/images/hero.jpg
 short_blurb: "Brief description"
 long_content:
   - type: text
@@ -80,11 +79,13 @@ runtime resolution and scheduling.
 
 ### Media Fields
 
+Image references may be empty, including image blocks, gallery items, and video posters. The dashboard retains the editable field and its description or caption after removal; public and protected preview rendering omits empty images.
+
 Image alt text is optional. Missing descriptions remain an accessibility
 recommendation and do not prevent saving or publishing. Decorative state is
 explicit; leaving a description empty does not mark the image decorative.
 
-- **`hero_image`** (required): Square/vertical image for home page card previews
+- **`hero_image`** (optional): Square/vertical image for home page card previews
 - **`hero_image_wide`** (optional): Wide image for campaign detail page (falls back to `hero_image`)
 - **`hero_video`** (optional): Uploaded MP4, WebM, or MOV path, or supported video-provider URL, for campaign detail (local video uses `hero_image_wide` or `hero_image` as its poster)
 - **`creator_image`** (optional): Square image for creator (48px circle in sidebar)

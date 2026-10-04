@@ -61,7 +61,7 @@
           <h2>{% include t.html key="community.active_decisions" lang=current_lang %}</h2>
           <div class="decisions-grid" id="decisions-grid">
             {% for decision in open_decisions %}
-            <div class="decision-card{% if decision.options.first.image %} decision-card--has-images{% endif %}" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.deadline %} data-deadline="{{ decision.deadline }}"{% endif %}>
+            <div class="decision-card{% if decision.options.first.image and decision.options.first.image != empty %} decision-card--has-images{% endif %}" data-decision-id="{{ decision.id }}" data-status="{{ decision.status }}"{% if decision.deadline %} data-deadline="{{ decision.deadline }}"{% endif %}>
               <div class="decision-card__header">
                 <h3>{{ decision.title | escape }}</h3>
                 <div class="decision-card__meta">
@@ -76,12 +76,12 @@
               
               <!-- Voting form (shown when not yet voted) -->
               <div class="decision-voting" data-view="voting">
-                <div class="decision-options{% if decision.options.first.image %} decision-options--images{% endif %}">
+                <div class="decision-options{% if decision.options.first.image and decision.options.first.image != empty %} decision-options--images{% endif %}">
                   {% for option in decision.options %}
                   {% if option.label %}
-                  <label class="decision-option{% if option.image %} decision-option--has-image{% endif %}">
+                  <label class="decision-option{% if option.image and option.image != empty %} decision-option--has-image{% endif %}">
                     <input type="radio" name="decision-{{ decision.id }}" value="{{ option.label | escape }}">
-                    {% if option.image %}
+                    {% if option.image and option.image != empty %}
                     <img src="{{ option.image }}" alt="{{ option.label | escape }}" class="decision-option__image">
                     {% endif %}
                     <span class="decision-option__label">{{ option.label | escape }}</span>
@@ -104,11 +104,11 @@
               
               <!-- Results view (shown after voting) -->
               <div class="decision-results" data-view="results" hidden>
-                <div class="results-bars{% if decision.options.first.image %} results-bars--images{% endif %}">
+                <div class="results-bars{% if decision.options.first.image and decision.options.first.image != empty %} results-bars--images{% endif %}">
                   {% for option in decision.options %}
                   {% assign option_value = option.label | default: option %}
                   <div class="result-bar" data-option="{{ option_value | escape }}">
-                    {% if option.image %}
+                    {% if option.image and option.image != empty %}
                     <img src="{{ option.image }}" alt="{{ option_value | escape }}" class="result-bar__image">
                     {% endif %}
                     <div class="result-bar__label">

@@ -243,7 +243,7 @@
             </div>
           {% else %}
             <div class="hero__video-wrapper" id="hero-video-wrapper" role="group" aria-label="{% include t.html key='campaign.video_embed_title' lang=current_lang title=page.title %}" aria-busy="false">
-              <video class="hero__video" id="hero-video" controls preload="none" playsinline poster="{% if page.hero_image_wide %}{{ page.hero_image_wide }}{% else %}{{ page.hero_image }}{% endif %}">
+              <video class="hero__video" id="hero-video" controls preload="none" playsinline {% assign hero_poster = page.hero_image_wide | default: page.hero_image %}{% if hero_poster and hero_poster != empty %}poster="{{ hero_poster | escape }}"{% endif %}>
                 {% include video-source.html src=page.hero_video %}
                 {% include t.html key="misc.video_not_supported" lang=current_lang %}
               </video>
@@ -261,9 +261,9 @@
               </div>
             </div>
           {% endif %}
-        {% elsif page.hero_image_wide %}
+        {% elsif page.hero_image_wide and page.hero_image_wide != empty %}
         {% include responsive-image.html src=page.hero_image_wide alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, calc(100vw - 40px)" %}
-        {% elsif page.hero_image %}
+        {% elsif page.hero_image and page.hero_image != empty %}
         {% include responsive-image.html src=page.hero_image alt=page.title fetchpriority="high" decoding="async" sizes="(min-width: 900px) 760px, calc(100vw - 40px)" %}
         {% endif %}
         {% assign progress_pledged = page.pledged_amount | default: 0 | plus: 0 %}
@@ -272,7 +272,8 @@
 
       <section class="content">
         {% if page.long_content %}
-          {% include long-content.html blocks=page.long_content lang=current_lang %}
+          {% assign visible_content = page.long_content | where_exp: "block", "block.type != 'image' or block.src != empty and block.src != nil" %}
+          {% include long-content.html blocks=visible_content lang=current_lang %}
         {% endif %}
       </section>
 
@@ -309,7 +310,7 @@
 
     <aside class="campaign-sidebar">
       <div class="campaign-facts">
-        {% if page.creator_image %}
+        {% if page.creator_image and page.creator_image != empty %}
           <div class="campaign-facts__creator">
             {% assign campaign_creator_image_alt = page.creator_name | default: 'Creator' %}
             {% include responsive-image.html src=page.creator_image alt=campaign_creator_image_alt loading="lazy" decoding="async" sizes="48px" widths="320,480" %}
@@ -317,7 +318,7 @@
           </div>
         {% endif %}
         <dl>
-          {% unless page.creator_image %}
+          {% unless page.creator_image and page.creator_image != empty %}
           <dt>{% include t.html key="campaign.creator" lang=current_lang %}</dt>
           <dd>{{ page.creator_name | default: site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}</dd>
           {% endunless %}

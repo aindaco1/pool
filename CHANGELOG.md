@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## v1.2.23 - 2026-10-04
+
+- Let admins remove images from every upload field, preserving empty fields,
+  descriptions, and collection entries through Save, Preview, and Publish.
+  Clearing a staged or in-flight replacement prevents it from restoring the image.
+  Scalar and block editors reuse the admin-shell 0.13.0 removal control.
+- Adopt dust-wave-platform 0.43.0 media frame-hash normalization to accept
+  lossless PNG optimization when equivalent aspect ratios have different notation.
+- Make the physical-shipping browser fixture independent of tax-provider settings,
+  wait for preview layout and cart fixtures to settle, and use Jekyll for direct
+  browser tests to avoid dropped asset connections.
+- Pair Vitest 5.0.2 with its coverage provider and group future updates; align
+  Playwright 1.63.0 with its container. Update the other reviewed development
+  tools and the Ruby setup action.
+- Publish the recovered, validated optimization backlog: 192 image changes
+  plus the rebuilt manifest, preserving decoded source content.
+- Allow 45 minutes for native image repair after the 37-source backlog took
+  29m54s while preserving all validation and publication gates.
+
 - Refresh the English and Spanish creator checklists for campaign-wide Save,
   protected Preview, Publish, media handling, add-on availability, pledge
   confirmation, and campaign reports through v1.2.22.
