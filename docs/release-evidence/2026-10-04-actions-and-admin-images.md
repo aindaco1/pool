@@ -35,7 +35,8 @@ GitHub no longer serves cannot establish an exact historical cause.
   scalar upload responses cannot restore removed images. Content and gallery
   fields can remain empty through Save/Preview/Publish. Captions and entries
   survive; empty image elements are omitted from public and protected output.
-  The source assets are retained. English and Spanish labels are included.
+  The control does not delete repository files; existing publication cleanup
+  policies remain in effect. English and Spanish labels are included.
 
 ## Shared package adoption
 
@@ -59,13 +60,44 @@ migration is introduced. This is a source review, not production acceptance.
 
 ## Validation
 
-- Focused Worker regression: empty image references persist through Git-backed
-  Save, reload, protected Preview, and Publish.
-- Browser regression: campaign scalar images, staged Content images, gallery
-  images, posters, and removal during a delayed platform-logo upload.
-- Shared unit suite and actual PNG optimization preserve decoded frames.
-- Full Pool gate and feature-branch media/Podman workflow results are recorded
-  after those runs complete.
+- `npm run test:premerge` passes at Pool `debf852302accfef64b142dabe8810bd0a730f97`
+  in a fresh managed checkout: 1,075 unit tests pass (one skipped), all 127
+  security tests pass, and 143 browser tests pass (three skipped). Secret audit,
+  shared-template drift, syntax, focused regressions, release-command sanity,
+  build artifacts, host Worker smoke, and Podman mutable-pledge smoke pass.
+  The latter proves create/modify/cancel totals and inventory coherence.
+- The original CloudDocs checkout encountered `pread: Input/output error` and
+  stale-file-handle errors in local Wrangler state. No existing state was
+  deleted. Repeating the entire gate with fresh state outside iCloud passes.
+- Focused Worker regressions prove empty image references survive Git-backed
+  Save, reload, protected Preview, and Publish. Browser cases cover English and
+  Spanish scalar fields, tiers, products, decisions, staged Content images,
+  gallery slots, posters, Diary and Blast editor state, and clearing during a
+  delayed logo upload. Blast tests use mocked requests and send no email.
+- All 18 repeated Markdown/cart inventory browser cases pass without retries
+  after the fixture/server correction.
+- Shared package tests and the [platform CI matrix](https://github.com/aindaco1/dust-wave-platform/actions/runs/37215618677)
+  pass at `e28d2773f3060700f9483a44705038fc436570d1`.
+- Pool [Merge Smoke and four dependency audits](https://github.com/aindaco1/pool/actions/runs/37215926824)
+  pass with the shared control adopted. Root/Worker production and full audits
+  also pass on `debf8523` in [37216628939](https://github.com/aindaco1/pool/actions/runs/37216628939).
+- [Feature Podman dispatch](https://github.com/aindaco1/pool/actions/runs/37215028533)
+  passes; its one retried cart fixture prompted the additional correction.
+  [37216643670](https://github.com/aindaco1/pool/actions/runs/37216643670) reruns
+  the complete Podman suite with that correction and the final shared control.
+- [Feature media dispatch](https://github.com/aindaco1/pool/actions/runs/37214980809)
+  passes optimization and image validation: 37 sources checked and 192 image
+  changes validated, plus the manifest. The artifact preserves the JSON reports
+  and binary patch. This dispatch uses `5203c2a`, with the same media validator
+  and shared framehash implementation as the final Pool branch. The generated
+  candidate runs the full merge gate; feature dispatches skip production
+  publication and clean up their temporary branch.
+
+The removal control uses existing admin permissions, local draft recovery,
+and explicit Save/Publish boundaries. It does not add a new data store,
+notification, payment operation, or publication action. These checks use local
+or hosted test fixtures; they do not establish live provider delivery or a
+production deployment. Both implementation PRs remain unmerged.
 
 ## Historical failure inventory
 
