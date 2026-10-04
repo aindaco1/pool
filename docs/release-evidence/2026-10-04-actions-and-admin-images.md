@@ -87,7 +87,10 @@ migration is introduced. This is a source review, not production acceptance.
   the complete Podman suite with that correction and the final shared control.
 - [Feature media dispatch](https://github.com/aindaco1/pool/actions/runs/37214980809)
   passes optimization and image validation: 37 sources checked and 192 image
-  changes validated, plus the manifest. The artifact preserves the JSON reports
+  changes validated, plus the manifest. The complete optimize job took 29m54s,
+  within the former 30-minute limit; the limit is now 45 minutes to leave room
+  for runner variation during backlog repair, with all image checks retained.
+  The artifact preserves the JSON reports
   and binary patch. This dispatch uses `5203c2a`, with the same media validator
   and shared framehash implementation as the final Pool branch. The generated
   candidate runs the full merge gate; feature dispatches skip production
