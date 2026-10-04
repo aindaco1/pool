@@ -7191,6 +7191,42 @@ Preserved Markdown body.
     expect(source).not.toContain('Unused description');
   });
 
+  it('saves, reloads, previews, and publishes empty campaign image fields', async () => {
+    const w = await workspace();
+    const initial = await w.request();
+    const image = { type: 'image', src: '', alt: 'Preserved description', caption: 'Preserved caption' };
+    const gallery = { type: 'gallery', images: [{ src: '', alt: '', caption: 'Gallery caption' }] };
+    const fields = {
+      hero_image: '', hero_image_wide: '', creator_image: '', campaign_background: '', progress_background: '',
+      tiers: [{ id: 'tier', name: 'Tier', price: 10, category: 'digital', image: '' }],
+      campaign_add_ons: [{ id: 'extra', name: 'Extra', price: 5, category: 'digital', image_url: '' }],
+      decisions: [{ id: 'choice', type: 'vote', title: 'Choose', deadline: '2099-12-31', eligible: 'backers',
+        options: [{ label: 'A', image: '' }, { label: 'B', image: '' }] }],
+      diary: [{ title: 'Update', content: [image, gallery] }]
+    };
+    const changes = Object.entries(fields).map(([path, value]) => ({
+      path, campaignSlug: 'hand-relations', value: typeof value === 'object' ? JSON.stringify(value) : value
+    }));
+    const saved = await w.request({ intent: 'save', campaignSlug: 'hand-relations',
+      baseRevision: initial.body.campaign.baseRevision, settingsRevision: initial.body.campaign.baseRevision,
+      draft: { title: 'Hand Relations', shortBlurb: 'Original blurb', longContent: [image, gallery,
+        { type: 'video', provider: 'local', src: '/assets/videos/campaigns/hand-relations/clip.mp4', poster: '' }] }, changes });
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const reloaded = await w.request();
+    expect(reloaded.body.campaign.longContent[0]).toMatchObject(image);
+    expect(reloaded.body.campaign.longContent[1].images[0].src).toBe('');
+    const preview = await w.request(undefined, '/admin/campaign-preview/hand-relations');
+    expect(preview.status).toBe(200);
+    expect(preview.body.preview.html).not.toContain('src=""');
+    expect(preview.body.preview.html).not.toContain('poster=""');
+    const published = await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision });
+    expect(published.status, JSON.stringify(published.body)).toBe(200);
+    const source = w.files.get('_campaigns/hand-relations.md')!.content;
+    expect(source).toContain('Preserved caption');
+    expect(source).toMatch(/hero_image: ['"]{2}/);
+    expect(source).toMatch(/image_url: ['"]{2}/);
+  });
+
   it('keeps reviewer links valid across saves and renders the latest saved revision', async () => {
     const w = await workspace();
     const initial = await w.request();

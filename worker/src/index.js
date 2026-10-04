@@ -19134,7 +19134,7 @@ function validateAdminContentBlock(block, index, errors, warnings) {
   }
 
   if (type === 'image') {
-    const src = normalizeAdminContentAsset(block.src || '', `${path}.src`, errors, { required: true });
+    const src = normalizeAdminContentAsset(block.src || '', `${path}.src`, errors);
     return {
       type,
       src,
@@ -19155,7 +19155,7 @@ function validateAdminContentBlock(block, index, errors, warnings) {
       images: images.map((image, imageIndex) => {
         const imagePath = `${path}.images[${imageIndex}]`;
         return {
-          src: normalizeAdminContentAsset(image?.src || '', `${imagePath}.src`, errors, { required: true }),
+          src: normalizeAdminContentAsset(image?.src || '', `${imagePath}.src`, errors),
           ...normalizeAdminImageAccessibility(image, imagePath, warnings),
           caption: normalizeAdminContentRichText(image?.caption || '', `${imagePath}.caption`, errors, { maxLength: 1000 }),
           _fieldName: imagePath
@@ -19267,6 +19267,7 @@ function renderAdminContentBlock(block, index, errors) {
   }
 
   if (block.type === 'image') {
+    if (!block.src) return '';
     return `<figure class="admin-content-preview__block admin-content-preview__block--image${adminContentAlignClass(block)}"><img src="${escapeAdminPreviewAttribute(block.src)}" alt="${escapeAdminPreviewAttribute(block.alt)}">${block.caption ? `<figcaption class="admin-content-preview__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
 
@@ -19275,6 +19276,7 @@ function renderAdminContentBlock(block, index, errors) {
     const captionStyle = normalizeAdminContentGalleryCaptionStyle(block.caption_style);
     const containerAttrs = layout === 'carousel' ? ' tabindex="0" aria-label="Image gallery"' : '';
     const images = block.images.map((image, imageIndex) => {
+      if (!image.src) return '';
       const itemAttrs = captionStyle === 'overlay' && image.caption ? ' tabindex="0"' : '';
       const caption = image.caption
         ? `<span class="gallery__item-caption"><span class="gallery__item-caption-text">${renderAdminPreviewInlineMarkdown(image.caption, errors, `${path}.images[${imageIndex}].caption`)}</span></span>`
@@ -19512,6 +19514,7 @@ function renderAdminCampaignPreviewContentBlock(block, index, errors, env = {}) 
   }
 
   if (block.type === 'image') {
+    if (!block.src) return '';
     const src = adminPreviewAsset(block.src, env) || block.src || '';
     return `<figure class="content-block content-block--image content-block--align-${escapeAdminPreviewAttribute(align)}"><img src="${escapeAdminPreviewAttribute(src)}" alt="${escapeAdminPreviewAttribute(block.alt)}" loading="lazy" decoding="async">${block.caption ? `<figcaption class="content-block__caption">${renderAdminPreviewInlineMarkdown(block.caption, errors, `${path}.caption`)}</figcaption>` : ''}</figure>`;
   }
@@ -19521,6 +19524,7 @@ function renderAdminCampaignPreviewContentBlock(block, index, errors, env = {}) 
     const captionStyle = normalizeAdminContentGalleryCaptionStyle(block.caption_style);
     const containerAttrs = layout === 'carousel' ? ' tabindex="0" aria-label="Image gallery"' : '';
     const images = block.images.map((image, imageIndex) => {
+      if (!image.src) return '';
       const itemAttrs = captionStyle === 'overlay' && image.caption ? ' tabindex="0"' : '';
       const caption = image.caption
         ? `<span class="gallery__item-caption"><span class="gallery__item-caption-text">${renderAdminPreviewInlineMarkdown(image.caption, errors, `${path}.images[${imageIndex}].caption`)}</span></span>`

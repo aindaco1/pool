@@ -5,6 +5,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
+import { normalizeFrameHashAspectRatios } from '../shared/dust-wave-platform/packages/media-core/src/frame-hash.js';
 import { buildMediaOptimizationManifest } from './optimize-media.mjs';
 import { MEDIA_MANIFEST_PATH, MEDIA_RESPONSIVE_WIDTHS } from '../worker/src/media-catalog.js';
 
@@ -22,7 +23,7 @@ export function inspectImage(file) {
     '-v', 'error', '-i', file, '-map', '0:v:0', '-fps_mode', 'passthrough',
     '-pix_fmt', 'rgba', '-f', 'framehash', '-hash', 'sha256', '-'
   ], { timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
-  const frameText = frames.toString();
+  const frameText = normalizeFrameHashAspectRatios(frames.toString());
   const timeBase = frameText.match(/^#tb 0: (\d+)\/(\d+)$/m);
   if (!timeBase) throw new Error(`Image frame timing is unavailable: ${file}`);
   const seconds = Number(timeBase[1]) / Number(timeBase[2]);
@@ -31,7 +32,7 @@ export function inspectImage(file) {
     return [Math.round(Number(fields[2]) * seconds * 1e6), Math.round(Number(fields[3]) * seconds * 1e6)];
   });
   if (!timeline.length || timeline.some((row) => row.some((value) => !Number.isFinite(value)))) throw new Error(`Invalid image frames: ${file}`);
-  return { width, height, frames: createHash('sha256').update(frames).digest('hex'), timeline };
+  return { width, height, frames: createHash('sha256').update(frameText).digest('hex'), timeline };
 }
 
 export async function validateImageChanges(root, base, { inspect = inspectImage } = {}) {
