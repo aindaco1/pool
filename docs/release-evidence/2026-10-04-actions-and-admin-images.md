@@ -18,6 +18,10 @@ GitHub no longer serves cannot establish an exact historical cause.
   real Worker despite mocking pledge/shipping data. It now supplies a matching
   deterministic tax quote. The admin mobile-preview containment assertion waits
   for the iframe stylesheet to settle while retaining the same size bounds.
+  Fixture-driven cart tests initialize the runtime before inspecting content.
+  Direct Playwright startup now uses Jekyll without watching; the prior Python
+  server reproduced intermittent `ERR_CONNECTION_RESET` for cart scripts in both
+  the primary and a fresh checkout.
 - **Dependency PRs:** [#72](https://github.com/aindaco1/pool/pull/72) now pairs
   Playwright 1.63 with its container image. [#73](https://github.com/aindaco1/pool/pull/73)
   and [#74](https://github.com/aindaco1/pool/pull/74) each update Vitest and its
