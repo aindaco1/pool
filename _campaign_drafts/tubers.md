@@ -34,7 +34,7 @@ long_content:
       
       "Tubers" follows two roommates who are unemployed bums -- Travis and Nora -- who are freeloading off their friends Kat and Francis. After finding out that they can make money off of YouTube, they stop at nothing to become successful.
   - type: "image"
-    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20260930-060350-8b681da0.png"
+    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-team-20261005-071310-80b36214.png"
     alt: ""
   - type: "text"
     body: |
@@ -67,7 +67,7 @@ long_content:
       
       It’s not just food though. The film taking place in 2007 means we need to meticulously craft a world from nearly 20 years ago (oof). That means that your generous donations go to period accurate Costumes, creative set decor, and equipment to capture the charm of the early 21st century. Every cent of this project will be spent to craft the highest quality film about Youtubers to date!
   - type: "image"
-    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-why-20260930-072521-de9dd7a4.png"
+    src: "/assets/images/campaigns/tubers/content-tubers-pool-why-20261005-071314-aba30783.png"
     alt: ""
   - type: "text"
     body: |
@@ -131,6 +131,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-05T07:08:29.766Z"
+_pool_draft_saved_at: "2026-10-05T07:13:18.535Z"
 campaign_background: ""
 ---
