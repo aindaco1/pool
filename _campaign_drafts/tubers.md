@@ -47,6 +47,8 @@ long_content:
       Ratamacue is a film and media production company founded and based in Albuquerque, New Mexico. They are award-winning creators of films and video content for the new generation. Their goal is to create new exciting content and highlight the unique voices of artists.
       
       **Negative Dirt, Production Company:**
+      
+      Negative Dirt is an independent film production company founded by Rylee Norman and Marissa Carmenaty. Located in Albuquerque, New Mexico, we are dedicated to supporting the local film community by creating films we are passionate about and hosting screenings that show local talent.
   - type: "image"
     src: "/assets/images/campaigns/tubers/content-tubers-12x8-5-cast-resize-20260930-072502-b2df9d43.png"
     alt: ""
@@ -124,6 +126,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-05T03:25:30.095Z"
+_pool_draft_saved_at: "2026-10-05T03:27:12.889Z"
 campaign_background: ""
 ---
