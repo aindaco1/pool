@@ -32,6 +32,16 @@ long_content:
   - type: "text"
     body: |
       [Meet the Team]
+      
+      - Ben
+      
+      - Chance
+      
+      - Will Frankenstein
+      
+      - A. M. Cinematics
+      
+      - Dust Wave
   - type: "text"
     body: |
       [What will the budget go to?]
@@ -59,6 +69,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-05T03:21:27.798Z"
+_pool_draft_saved_at: "2026-10-05T03:23:21.795Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
