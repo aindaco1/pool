@@ -72,13 +72,6 @@ long_content:
     src: "/assets/images/campaigns/tubers/content-tubers-12x8-5-comps-resize-20260930-072544-7bfbe306.png"
     alt: ""
     caption: "Movie comps -- coincidentally all 2007 movies."
-  - type: "image"
-    src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-rewards-20260930-072556-c2f3dd7e.png"
-    alt: ""
-    caption: "AKA: rewards"
-  - type: "text"
-    body: |
-      [explain rewards here. section not technically necessary but could be nice]
   - type: "text"
     body: |
       Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm/?utm_source=ig_web_button_share_sheet) Instagram page and [website](https://ratamacue.com/).
@@ -131,6 +124,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-04T22:53:19.283Z"
+_pool_draft_saved_at: "2026-10-05T03:10:57.526Z"
 campaign_background: "/assets/images/campaigns/tubers/background-20260930-072631-ab2b0d68.png"
 ---
