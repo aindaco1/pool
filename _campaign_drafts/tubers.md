@@ -115,6 +115,7 @@ tiers:
   - id: "producer-credit"
     name: "Producer Credit"
     price: 1000
+    image: "/assets/images/campaigns/tubers/tier-producer-credit-20261005-070248-add10b4b.png"
     description: "All previous rewards + get a producer credit on the film."
     limit_total: 3
     stackable: false
@@ -126,6 +127,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-05T03:43:02.035Z"
+_pool_draft_saved_at: "2026-10-05T07:02:54.413Z"
 campaign_background: ""
 ---
