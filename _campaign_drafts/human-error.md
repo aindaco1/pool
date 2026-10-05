@@ -45,6 +45,9 @@ long_content:
   - type: "text"
     body: |
       [What will the budget go to?]
+  - type: "text"
+    body: |
+      Follow along and see updates on the [A.M. Cinematics](https://www.instagram.com/a.m._cinematics_?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw==) Instagram or the [Dust Wave](https://dustwave.xyz/) website.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -69,6 +72,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-05T03:23:21.795Z"
+_pool_draft_saved_at: "2026-10-05T03:24:49.270Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
