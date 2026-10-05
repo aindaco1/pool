@@ -22,7 +22,19 @@ single_tier_only: false
 stretch_hidden: true
 custom_late_support: false
 runner_report_emails: []
-long_content: []
+long_content:
+  - type: "text"
+    body: |
+      [What is "Human Error"?]
+  - type: "text"
+    body: |
+      [Director's Statement]
+  - type: "text"
+    body: |
+      [Meet the Team]
+  - type: "text"
+    body: |
+      [What will the budget go to?]
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -47,6 +59,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-04T18:21:28.719Z"
+_pool_draft_saved_at: "2026-10-05T03:21:27.798Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
