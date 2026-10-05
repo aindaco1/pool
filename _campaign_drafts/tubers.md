@@ -40,7 +40,7 @@ long_content:
     body: |
       **Logan Schreck, Director:**
       
-      Logan Schreck is a young filmmaker out of Albuquerque, New Mexico who loves to bring joy into his art anyway he can. Traditionally an Editor of Cameraman, this New Mexico PBS faculty member has enjoyed dipping his toe into Directing and looks forward to so much more!
+      Logan Schreck is a young filmmaker out of Albuquerque, New Mexico who loves to bring joy into his art anyway he can. Traditionally an editor and cameraman, this New Mexico PBS faculty member has enjoyed dipping his toe into directing and looks forward to so much more!
       
       **Ratamacue, Production Company:**
       
@@ -126,6 +126,6 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-05T03:27:12.889Z"
+_pool_draft_saved_at: "2026-10-05T03:43:02.035Z"
 campaign_background: ""
 ---
