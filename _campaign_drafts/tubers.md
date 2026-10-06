@@ -118,10 +118,10 @@ tiers:
     late_support: true
   - id: "producer-credit"
     name: "Executive Producer Credit"
-    price: 1000
+    price: 450
     image: "/assets/images/campaigns/tubers/tier-producer-credit-20261005-070248-add10b4b.png"
     description: "All previous rewards + get an executive producer credit on the film."
-    limit_total: 3
+    limit_total: 5
     stackable: false
     category: "digital"
     late_support: false
@@ -131,7 +131,7 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-06T00:37:00.820Z"
+_pool_draft_saved_at: "2026-10-06T00:53:49.512Z"
 campaign_background: ""
 hero_video: "https://youtu.be/p6jQjvYDcBQ?si=jIW-1ppcLqv5k-Pi"
 ---
