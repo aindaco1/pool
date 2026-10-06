@@ -790,13 +790,13 @@
   function externalVideoThumbnailUrl(provider, videoId) {
     var id = String(videoId || '').trim();
     if (!id || provider === 'vimeo') return '';
-    return 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/maxres1.jpg';
+    return 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/maxresdefault.jpg';
   }
 
   function externalVideoThumbnailFallbackUrl(provider, videoId) {
     var id = String(videoId || '').trim();
     if (!id || provider === 'vimeo') return '';
-    return 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/hq1.jpg';
+    return 'https://i.ytimg.com/vi/' + encodeURIComponent(id) + '/hqdefault.jpg';
   }
 
   function attachExternalVideoThumbnailFallback(image, fallback) {
@@ -808,7 +808,12 @@
       image.src = fallback;
     };
     image.addEventListener('error', useFallback, { once: true });
-    if (image.complete && image.naturalWidth === 0) useFallback();
+    // Match the public and protected previews when YouTube returns a placeholder.
+    var checkThumbnail = function() {
+      if (image.naturalWidth <= 120) useFallback();
+    };
+    image.addEventListener('load', checkThumbnail, { once: true });
+    if (image.complete) checkThumbnail();
   }
 
   function createExternalMediaLink(href, label, className) {

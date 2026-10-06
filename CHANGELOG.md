@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Use the main YouTube thumbnail for campaign hero posters in the dashboard,
+  protected preview, and published page, with a lower-resolution thumbnail fallback.
+  Detect YouTube's small missing-image placeholder so all three surfaces fall back.
+
 - Play YouTube videos in place within protected campaign previews, matching
   the published project's video position and size through scrolling and resizing,
   with working thumbnail fallback and keyboard activation. Preserve the campaign sandbox, strict script CSP, and

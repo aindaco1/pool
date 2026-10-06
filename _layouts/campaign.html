@@ -212,8 +212,8 @@
             {% assign yt_poster = "" %}
             {% assign yt_poster_fallback = "" %}
             {% if yt_id != "" %}
-              {% assign yt_poster = "https://i.ytimg.com/vi/" | append: yt_id | append: "/maxres1.jpg" %}
-              {% assign yt_poster_fallback = "https://i.ytimg.com/vi/" | append: yt_id | append: "/hq1.jpg" %}
+              {% assign yt_poster = "https://i.ytimg.com/vi/" | append: yt_id | append: "/maxresdefault.jpg" %}
+              {% assign yt_poster_fallback = "https://i.ytimg.com/vi/" | append: yt_id | append: "/hqdefault.jpg" %}
             {% endif %}
             <div class="hero__video hero__video--youtube hero__video--youtube-facade" data-youtube-embed data-youtube-src="https://www.youtube-nocookie.com/embed/{{ yt_id }}?autoplay=1&amp;rel=0" data-youtube-title="{{ yt_embed_title | escape }}">
               {% if yt_poster %}

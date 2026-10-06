@@ -64,7 +64,7 @@ function renderCampaignPageWithVideo() {
 function renderCampaignPageWithYoutubeFacade() {
   document.body.innerHTML = `
     <div class="hero__video hero__video--youtube hero__video--youtube-facade" data-youtube-embed data-youtube-src="https://www.youtube-nocookie.com/embed/demo-video?autoplay=1&amp;rel=0" data-youtube-title="Demo video">
-      <img class="hero__video-poster" src="/poster.jpg" alt="Demo">
+      <img class="hero__video-poster" src="https://i.ytimg.com/vi/demo-video/maxresdefault.jpg" data-youtube-poster-fallback="https://i.ytimg.com/vi/demo-video/hqdefault.jpg" alt="Demo">
       <button class="hero__video-play hero__video-play--youtube" type="button" data-youtube-play aria-label="Play video"></button>
     </div>
     <script data-campaign-page-script="true" data-campaign-slug="demo"></script>
@@ -461,6 +461,24 @@ describe('campaign page script', () => {
     expect(iframe.getAttribute('referrerpolicy')).toBe('strict-origin-when-cross-origin');
     expect(iframe.allowFullscreen).toBe(true);
     expect(facade.classList.contains('hero__video--youtube-loaded')).toBe(true);
+  });
+
+  it.each([
+    { event: 'load', width: 1280, complete: false, expected: 'maxresdefault.jpg' },
+    { event: 'load', width: 120, complete: false, expected: 'hqdefault.jpg' },
+    { event: 'error', width: 0, complete: false, expected: 'hqdefault.jpg' },
+    { event: '', width: 120, complete: true, expected: 'hqdefault.jpg' }
+  ])('selects the main YouTube thumbnail after $event (width $width, complete $complete)', async ({ event, width, complete, expected }) => {
+    renderCampaignPageWithYoutubeFacade();
+    const image = document.querySelector('.hero__video-poster') as HTMLImageElement;
+    Object.defineProperty(image, 'naturalWidth', { value: width });
+    Object.defineProperty(image, 'complete', { value: complete });
+
+    await import('../../assets/js/campaign-page.js');
+    if (event) image.dispatchEvent(new Event(event));
+
+    expect(image.src).toBe(`https://i.ytimg.com/vi/demo-video/${expected}`);
+    expect(document.querySelector('[data-youtube-embed] iframe')).toBeNull();
   });
 
   it('uses a smaller value style when the days countdown has three or more digits', async () => {

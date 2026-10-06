@@ -5953,8 +5953,8 @@ diary:
     expect(preview.preview.html).toContain('hero__video hero__video--youtube hero__video--youtube-facade');
     expect(preview.preview.html).toContain('hero__video-poster');
     expect(preview.preview.html).toContain('hero__video-play hero__video-play--youtube');
-    expect(preview.preview.html).toContain('https://i.ytimg.com/vi/video-demo/maxres1.jpg');
-    expect(preview.preview.html).toContain('data-youtube-poster-fallback="https://i.ytimg.com/vi/video-demo/hq1.jpg"');
+    expect(preview.preview.html).toContain('https://i.ytimg.com/vi/video-demo/maxresdefault.jpg');
+    expect(preview.preview.html).toContain('data-youtube-poster-fallback="https://i.ytimg.com/vi/video-demo/hqdefault.jpg"');
     expect(preview.preview.html).toContain('href="https://www.youtube.com/watch?v=video-demo"');
     expect(preview.preview.html).toContain('aria-label="YouTube: Demo video"');
     expect(preview.preview.html).toContain('target="_blank" rel="noopener noreferrer"');
@@ -6376,8 +6376,8 @@ tiers:
     expect(previewBody.preview.html).toContain('hero__video hero__video--youtube hero__video--youtube-facade');
     expect(previewBody.preview.html).toContain('hero__video-poster');
     expect(previewBody.preview.html).toContain('hero__video-play hero__video-play--youtube');
-    expect(previewBody.preview.html).toContain('https://i.ytimg.com/vi/dQw4w9WgXcQ/maxres1.jpg');
-    expect(previewBody.preview.html).toContain('data-youtube-poster-fallback="https://i.ytimg.com/vi/dQw4w9WgXcQ/hq1.jpg"');
+    expect(previewBody.preview.html).toContain('https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg');
+    expect(previewBody.preview.html).toContain('data-youtube-poster-fallback="https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"');
     expect(previewBody.preview.html).toContain('href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"');
     expect(previewBody.preview.html).not.toContain('video-embed__external-label');
     expect(previewBody.preview.html).not.toContain('frameborder="0" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"');

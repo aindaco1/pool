@@ -482,7 +482,12 @@ function initYoutubeHeroFacades() {
       image.src = fallback;
     };
     image.addEventListener('error', useFallback, { once: true });
-    if (image.complete && image.naturalWidth === 0) useFallback();
+    // YouTube can return a decodable 120px placeholder for a missing maxres image.
+    const checkThumbnail = () => {
+      if (image.naturalWidth <= 120) useFallback();
+    };
+    image.addEventListener('load', checkThumbnail, { once: true });
+    if (image.complete) checkThumbnail();
   });
 
   document.querySelectorAll('[data-youtube-embed]').forEach((facade) => {
