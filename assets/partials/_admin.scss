@@ -3024,6 +3024,24 @@ textarea.admin-settings__input--readonly {
   width: 100%;
 }
 
+.campaign-protected-preview__video-dialog {
+  max-width: min(92vw, 1100px, calc((100dvh - 140px) * 16 / 9));
+  overflow: auto;
+}
+
+.campaign-protected-preview__video-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: $space-sm;
+}
+
+.campaign-protected-preview__video-player iframe {
+  aspect-ratio: 16 / 9;
+  border: 0;
+  display: block;
+  width: 100%;
+}
+
 @media (min-width: 1180px) {
   .campaign-protected-preview__frame {
     min-width: 1120px;
