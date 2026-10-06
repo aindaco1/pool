@@ -49,7 +49,13 @@ The release audit reported development-only findings in `smol-toml` 1.7.1
 (GHSA-r4xh-jqrq-34v2) and `source-map-js` 1.2.1 (GHSA-68fv-2mgg-jv7q).
 The direct TOML tooling pin is 1.9.0; the existing transitive source-map dependency
 resolves to 1.2.2. Root and Worker production/full audits pass with zero findings.
-No Worker runtime dependency changed.
+Pool adopts Platform 0.43.1 at `86709d34822649a5679bf2da65d25a5937b3d215` (Release Core 0.5.1),
+replacing `e28d2773f3060700f9483a44705038fc436570d1` (Platform 0.43.0,
+Release Core 0.5.0). The shared `npm run check` passed, including Wrangler
+parsing/inventory tests, dependency audits, and recipe tests. The consumer's
+exact-pin checks remain in force. No Worker runtime dependency changed.
+Rollback restores the prior gitlink, version assertions, root TOML pin and
+lockfile together; that restores the prior audited advisory as well.
 
 ## Ethical review
 

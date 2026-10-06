@@ -7,8 +7,8 @@
   with working thumbnail fallback and keyboard activation. Preserve the campaign sandbox, strict script CSP, and
   token privacy; load the player only after Play.
 
-- Update development tooling to `smol-toml` 1.9.0 and `source-map-js` 1.2.2
-  to resolve dependency audit findings.
+- Adopt Platform 0.43.1 / Release Core 0.5.1 and update development tooling
+  to `smol-toml` 1.9.0 and `source-map-js` 1.2.2 to resolve dependency audit findings.
 
 ## v1.2.23 - 2026-10-04
 
