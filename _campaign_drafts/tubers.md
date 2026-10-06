@@ -63,7 +63,7 @@ long_content:
     caption: "Wouldn't you like to know..."
   - type: "text"
     body: |
-      **Being a micro budget** film means this is made out of love. And donations! Food is expensive. If we can’t pay our crew, the least we can do is offer a couple warm meals and Red Bulls. A fed crew is a happy crew, and a happy crew means a fun production for all!
+      **Being a micro-budget** film means this is made out of love... and donations! Food is expensive. If we can’t pay our crew, the least we can do is offer a couple warm meals and Red Bulls. A fed crew is a happy crew, and a happy crew means a fun production for all!
       
       It’s not just food though. The film taking place in 2007 means we need to meticulously craft a world from nearly 20 years ago (oof). That means that your generous donations go to period accurate costumes, creative set decor, and equipment to capture the charm of the early 21st century. Every cent of this project will be spent to craft the highest quality film about Youtubers to date!
   - type: "image"
@@ -131,7 +131,7 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "689052df8ec9345dd91b41fd35e952b17e2f03c1b9ff1ab686a53c1354c8a3bc"
-_pool_draft_saved_at: "2026-10-06T09:00:47.138Z"
+_pool_draft_saved_at: "2026-10-06T09:01:30.122Z"
 campaign_background: ""
 hero_video: "https://youtu.be/p6jQjvYDcBQ?si=cv-3_owpjM-KZtq6"
 ---
