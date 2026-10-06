@@ -19,7 +19,35 @@
   // first-party script so the inherited CSP never needs unsafe-inline.
   if (bootScript?.hasAttribute('data-campaign-preview-media')) {
     var parentOrigin = new URL(bootScript.src).origin;
-    var activePlayLink = null;
+    var activeVideos = new Map();
+    var measurePending = false;
+
+    function sendVideoPosition(slot, video, action) {
+      var rect = video.container.getBoundingClientRect();
+      window.parent.postMessage({
+        type: mediaMessage,
+        action: action,
+        slot: slot,
+        bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      }, parentOrigin);
+    }
+
+    function measureVideos() {
+      if (measurePending || !activeVideos.size) return;
+      measurePending = true;
+      window.requestAnimationFrame(function() {
+        measurePending = false;
+        activeVideos.forEach(function(video, slot) { sendVideoPosition(slot, video, 'layout'); });
+      });
+    }
+
+    // Keep the trusted players aligned with their placeholders during inner
+    // scrolling, responsive layout, font loading and late-loading images.
+    document.addEventListener('scroll', measureVideos, { capture: true, passive: true });
+    document.addEventListener('load', measureVideos, true);
+    window.addEventListener('resize', measureVideos);
+    var mediaResizeObserver = new ResizeObserver(measureVideos);
+    mediaResizeObserver.observe(document.body);
     document.querySelectorAll('[data-youtube-poster-fallback]').forEach(function(image) {
       var fallback = image.getAttribute('data-youtube-poster-fallback');
       if (!(image instanceof HTMLImageElement) || !fallback) return;
@@ -40,15 +68,21 @@
     });
     document.addEventListener('click', function(event) {
       var link = event.target.closest?.('a.hero__video-play--youtube');
-      var id = link && youtubeVideoId(link.href);
-      if (!id || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var slot = link?.dataset.previewVideoSlot;
+      var container = link?.closest('.hero__video--youtube');
+      if (!slot || !container || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
-      activePlayLink = link;
-      window.parent.postMessage({ type: mediaMessage, videoId: id }, parentOrigin);
+      var video = { container: container };
+      activeVideos.set(slot, video);
+      mediaResizeObserver.observe(container);
+      sendVideoPosition(slot, video, 'play');
+      link.style.visibility = 'hidden';
+      link.tabIndex = -1;
+      link.setAttribute('aria-hidden', 'true');
     });
     window.addEventListener('message', function(event) {
       if (event.source === window.parent && event.origin === parentOrigin &&
-          event.data?.type === mediaMessage + ':closed') activePlayLink?.focus();
+          event.data?.type === mediaMessage + ':measure') measureVideos();
     });
     return;
   }
@@ -72,33 +106,50 @@
   var previewRequestId = 0;
   var mediaScriptUrl = bootScript?.src || new URL('/assets/js/campaign-preview.js', window.location.href).href;
   var previewVideos = new Map();
-  var videoDialog = root.querySelector('[data-preview-video-dialog]');
-  var videoPlayer = root.querySelector('[data-preview-video-player]');
+  var videoLayer = root.querySelector('[data-preview-video-layer]');
+  var players = new Map();
 
-  function closeVideo() {
-    videoPlayer?.replaceChildren();
-    if (videoDialog?.open) videoDialog.close();
+  function clearVideos() {
+    videoLayer?.replaceChildren();
+    players.clear();
   }
 
-  if (videoDialog && videoPlayer) {
-    root.querySelector('[data-preview-video-close]').addEventListener('click', closeVideo);
-    videoDialog.addEventListener('close', function() {
-      videoPlayer.replaceChildren();
-      // The srcdoc frame has an opaque origin; this message contains no data.
-      frame.contentWindow?.postMessage({ type: mediaMessage + ':closed' }, '*');
-    });
+  if (videoLayer && frame) {
+    // Players need their own origin/storage, so they are siblings of the
+    // opaque campaign frame. The clipped layer places them exactly over the
+    // campaign's media slots without granting campaign HTML parent access.
+    new ResizeObserver(function() {
+      videoLayer.style.width = frame.clientWidth + 'px';
+      videoLayer.style.height = frame.clientHeight + 'px';
+      frame.contentWindow?.postMessage({ type: mediaMessage + ':measure' }, '*');
+    }).observe(frame);
     window.addEventListener('message', function(event) {
+      var data = event.data;
       if (event.source !== frame.contentWindow || event.origin !== 'null' || frame.hidden ||
-          root.dataset.campaignPreviewLoaded !== 'true' || event.data?.type !== mediaMessage ||
-          !previewVideos.has(event.data.videoId)) return;
-      var player = document.createElement('iframe');
-      player.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(event.data.videoId) + '?autoplay=1&rel=0';
-      player.title = previewVideos.get(event.data.videoId);
-      player.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
-      player.referrerPolicy = 'strict-origin-when-cross-origin';
-      player.allowFullscreen = true;
-      videoPlayer.replaceChildren(player);
-      if (!videoDialog.open) videoDialog.showModal();
+          root.dataset.campaignPreviewLoaded !== 'true' || data?.type !== mediaMessage ||
+          !previewVideos.has(data.slot) || !['play', 'layout'].includes(data.action)) return;
+      var bounds = data.bounds;
+      if (!bounds || !['x', 'y', 'width', 'height'].every(function(key) {
+        return Number.isFinite(bounds[key]) && Math.abs(bounds[key]) <= 100000;
+      }) || bounds.width <= 0 || bounds.height <= 0 || bounds.width > frame.clientWidth + 1) return;
+      var player = players.get(data.slot);
+      if (!player) {
+        if (data.action !== 'play') return;
+        var video = previewVideos.get(data.slot);
+        player = document.createElement('iframe');
+        player.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(video.id) + '?autoplay=1&rel=0';
+        player.title = video.title;
+        player.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media';
+        player.referrerPolicy = 'strict-origin-when-cross-origin';
+        player.allowFullscreen = true;
+        players.set(data.slot, player);
+        videoLayer.append(player);
+      }
+      player.style.left = bounds.x + 'px';
+      player.style.top = bounds.y + 'px';
+      player.style.width = bounds.width + 'px';
+      player.style.height = bounds.height + 'px';
+      if (data.action === 'play') player.focus({ preventScroll: true });
     });
   }
 
@@ -224,9 +275,12 @@
   function renderPreview(data) {
     var previewDocument = new DOMParser().parseFromString(data.preview?.html || '', 'text/html');
     previewVideos.clear();
-    previewDocument.querySelectorAll('a.hero__video-play--youtube').forEach(function(link) {
+    previewDocument.querySelectorAll('a.hero__video-play--youtube').forEach(function(link, index) {
       var id = youtubeVideoId(link.href);
-      if (id) previewVideos.set(id, link.getAttribute('aria-label') || message('previewVideoTitle', 'Campaign video'));
+      if (!id) return;
+      var slot = previewRequestId + ':' + index;
+      link.dataset.previewVideoSlot = slot;
+      previewVideos.set(slot, { id: id, title: link.getAttribute('aria-label') || message('previewVideoTitle', 'Campaign video') });
     });
     var mediaScript = previewDocument.createElement('script');
     mediaScript.src = mediaScriptUrl;
@@ -242,7 +296,7 @@
 
   async function loadPreview() {
     var requestId = ++previewRequestId;
-    closeVideo();
+    clearVideos();
     previewVideos.clear();
     delete root.dataset.campaignPreviewLoaded;
     if (!slug || !(frame instanceof HTMLIFrameElement)) {

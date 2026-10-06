@@ -346,10 +346,11 @@ Preview publication:
 
 Preview pages live at `/campaigns/:slug/preview/` and localized equivalents. Generic static shells are generated for every campaign slug, including sources marked `published: false` that Jekyll excludes from its public campaign collection. A newly created campaign needs its initial Pages build to finish; later preview publishes reuse that shell without waiting for another build. The shell does not embed the campaign title or draft content. The protected Worker reads the saved working copy when present, otherwise the canonical campaign. It fetches a full read-only campaign page preview through the Worker with either the current admin session or a valid reviewer token, loads the campaign stylesheet and font kit, permits approved media-player embeds, and disables pledge controls. The static preview shell is `noindex,nofollow,noarchive`, uses no social metadata, strips the preview token from the address bar after load, and remains outside public sitemap output and public prefetch eligibility.
 
-YouTube Play controls in the protected preview's hero, content, and diary open
-an embedded player dialog on the preview page. Close or Escape stops playback
-and returns focus to Play. The player loads only after Play and sends only the
-site origin as its referrer. Missing high-resolution YouTube thumbnails fall
+YouTube Play controls in the protected preview's hero, content, and diary play
+in place, at the same position and size as the campaign's video thumbnail.
+The surrounding project remains usable during playback. Players stay aligned
+through scrolling and responsive layout changes, load only after Play, and send
+only the site origin as their referrer. Missing high-resolution YouTube thumbnails fall
 back to the standard thumbnail. The dashboard's editing thumbnails continue
 to open external video links.
 

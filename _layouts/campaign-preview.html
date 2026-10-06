@@ -45,20 +45,17 @@
         <h2 data-campaign-preview-notice-title>{{ preview_access_title | strip }}</h2>
         <p data-campaign-preview-notice-body>{{ preview_access_body | strip }}</p>
       </div>
-      <iframe
-        class="campaign-protected-preview__frame"
-        title="{{ preview_frame_title | strip | escape }}"
-        sandbox="allow-scripts allow-popups allow-presentation"
-        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-        referrerpolicy="strict-origin-when-cross-origin"
-        data-campaign-preview-frame
-        hidden></iframe>
-      <dialog class="admin-action-dialog campaign-protected-preview__video-dialog" data-preview-video-dialog aria-label="{% include t.html key='campaign_protected_preview.video_title' lang=current_lang %}">
-        <div class="campaign-protected-preview__video-toolbar">
-          <button type="button" class="btn btn--secondary" data-preview-video-close autofocus>{% include t.html key="misc.close" lang=current_lang %}</button>
-        </div>
-        <div class="campaign-protected-preview__video-player" data-preview-video-player></div>
-      </dialog>
+      <div class="campaign-protected-preview__stage">
+        <iframe
+          class="campaign-protected-preview__frame"
+          title="{{ preview_frame_title | strip | escape }}"
+          sandbox="allow-scripts allow-popups allow-presentation"
+          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+          referrerpolicy="strict-origin-when-cross-origin"
+          data-campaign-preview-frame
+          hidden></iframe>
+        <div class="campaign-protected-preview__video-layer" data-preview-video-layer></div>
+      </div>
     </section>
   </main>
 

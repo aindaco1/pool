@@ -39,8 +39,8 @@ Protected-preview YouTube controls are covered by
 `npx playwright test tests/e2e/campaign-preview.spec.ts --project=chromium`.
 The built English/Spanish shells run with their real CSP and opaque sandbox;
 synthetic media responses verify thumbnail fallback, click/keyboard playback,
-origin-only referrers, close/focus behavior, mobile sizing, message rejection,
-and access loss. These deterministic checks do not establish YouTube provider
+origin-only referrers, inline position/size through layout changes and scrolling,
+continued project interaction, mobile sizing, message rejection, and access loss. These deterministic checks do not establish YouTube provider
 playback for a particular campaign video; verify that separately in the browser.
 
 The video runtime suite streams an exact 100,000,000-byte synthetic file through
