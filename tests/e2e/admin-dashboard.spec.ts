@@ -984,7 +984,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       const previewBody = videoBlock
         ? videoBlock.provider === 'local'
           ? `<div class="video-embed video-embed--local"><video controls preload="metadata" playsinline><source src="${videoBlock.src || ''}" type="video/webm"></video></div>`
-          : `<div class="hero__video hero__video--youtube hero__video--youtube-facade"><img class="hero__video-poster" src="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/maxres1.jpg" alt="" loading="lazy" decoding="async" data-youtube-poster-fallback="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/hq1.jpg"><a class="hero__video-play hero__video-play--youtube" href="https://www.youtube.com/watch?v=${encodeURIComponent(videoBlock.video_id || '')}" target="_blank" rel="noopener noreferrer" aria-label="YouTube: ${videoBlock.video_id || ''}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></a></div>`
+          : `<div class="hero__video hero__video--youtube hero__video--youtube-facade"><img class="hero__video-poster" src="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/maxresdefault.jpg" alt="" loading="lazy" decoding="async" data-youtube-poster-fallback="https://i.ytimg.com/vi/${encodeURIComponent(videoBlock.video_id || '')}/hqdefault.jpg"><a class="hero__video-play hero__video-play--youtube" href="https://www.youtube.com/watch?v=${encodeURIComponent(videoBlock.video_id || '')}" target="_blank" rel="noopener noreferrer" aria-label="YouTube: ${videoBlock.video_id || ''}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l11-7z"/></svg></a></div>`
         : imageBlocks.length
           ? imageBlocks.map((block: any) => `<figure class="admin-content-preview__block"><img src="${String(block.src || '').replace(/"/g, '&quot;')}" alt=""></figure>`).join('')
           : blocks.filter((block: any) => block.type === 'text').map((block: any) => markdownToEditorHtml(block.body)).join('');
@@ -1564,11 +1564,9 @@ test.describe('Admin Dashboard', () => {
     const heroVideoFacade = heroVideoField.locator('.admin-settings__video-embed-preview .hero__video--youtube-facade');
     await expect(heroVideoFacade).toBeVisible();
     const heroVideoPoster = heroVideoFacade.locator('.hero__video-poster');
-    await expect(heroVideoPoster).toHaveAttribute('data-video-thumbnail-fallback', 'https://i.ytimg.com/vi/XCQWR9cNsgY/hq1.jpg');
-    expect([
-      'https://i.ytimg.com/vi/XCQWR9cNsgY/maxres1.jpg',
-      'https://i.ytimg.com/vi/XCQWR9cNsgY/hq1.jpg'
-    ]).toContain(await heroVideoPoster.getAttribute('src'));
+    await expect(heroVideoPoster).toHaveAttribute('data-video-thumbnail-fallback', 'https://i.ytimg.com/vi/XCQWR9cNsgY/hqdefault.jpg');
+    // The thumbnail fixture decodes as a small placeholder, so load must fall back.
+    await expect(heroVideoPoster).toHaveAttribute('src', 'https://i.ytimg.com/vi/XCQWR9cNsgY/hqdefault.jpg');
     const heroVideoFacadeBox = await heroVideoFacade.boundingBox();
     expect(heroVideoFacadeBox?.width || 0).toBeGreaterThan(100);
     expect(heroVideoFacadeBox?.height || 0).toBeGreaterThan(50);

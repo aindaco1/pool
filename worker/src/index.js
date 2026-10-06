@@ -19219,13 +19219,13 @@ function adminExternalVideoWatchUrl(provider, videoId) {
 function adminExternalVideoThumbnailUrl(provider, videoId) {
   const id = String(videoId || '').trim();
   if (!id || provider === 'vimeo') return '';
-  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/maxres1.jpg`;
+  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/maxresdefault.jpg`;
 }
 
 function adminExternalVideoThumbnailFallbackUrl(provider, videoId) {
   const id = String(videoId || '').trim();
   if (!id || provider === 'vimeo') return '';
-  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hq1.jpg`;
+  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
 }
 
 function renderAdminContentExternalLink(href, label, className) {

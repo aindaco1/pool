@@ -8,7 +8,7 @@ const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0l
 // built shell, inherited CSP, opaque sandbox and external preview runtime.
 function videoFacade(id: string, title: string) {
   return `<div class="hero__video hero__video--youtube hero__video--youtube-facade">
-    <img class="hero__video-poster" src="https://i.ytimg.com/vi/${id}/maxres1.jpg" alt="" data-youtube-poster-fallback="https://i.ytimg.com/vi/${id}/hq1.jpg">
+    <img class="hero__video-poster" src="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" alt="" data-youtube-poster-fallback="https://i.ytimg.com/vi/${id}/hqdefault.jpg">
     <a class="hero__video-play hero__video-play--youtube" href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener noreferrer" aria-label="${title}">Play</a>
   </div>`;
 }
@@ -27,7 +27,7 @@ for (const locale of ['en', 'es']) {
       if (/violates.*Content Security Policy|blocked script execution/i.test(message.text())) violations.push(message.text());
     });
     await page.route('https://i.ytimg.com/**', route => route.fulfill({
-      status: route.request().url().endsWith('/maxres1.jpg') ? 404 : 200,
+      status: route.request().url().endsWith('/maxresdefault.jpg') ? 404 : 200,
       contentType: 'image/png', body: tinyPng
     }));
     await page.route('https://www.youtube-nocookie.com/embed/**', async route => {
@@ -62,7 +62,7 @@ for (const locale of ['en', 'es']) {
     await expect(page).not.toHaveURL(/\?t=/);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex,nofollow,noarchive');
     await expect(page.locator('[data-campaign-preview-frame]')).toHaveAttribute('sandbox', 'allow-scripts allow-popups allow-presentation');
-    await expect(frame.locator('img').first()).toHaveAttribute('src', `https://i.ytimg.com/vi/${videoId}/hq1.jpg`);
+    await expect(frame.locator('img').first()).toHaveAttribute('src', `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
     await expect.poll(() => frame.locator('img').first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
     expect(players).toHaveLength(0);
 
