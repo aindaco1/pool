@@ -56,7 +56,7 @@ long_content:
   - type: "image"
     src: "/assets/images/campaigns/tubers/content-tubers-crew-resized-20261005-070825-2f6c55ed.png"
     alt: ""
-    caption: "(some of) Our crew"
+    caption: "(Some of) our crew."
   - type: "image"
     src: "/assets/images/campaigns/tubers/content-tubers-pool-headers-budget-20260930-072511-9a37de78.png"
     alt: ""
@@ -131,7 +131,7 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-06T00:25:44.895Z"
+_pool_draft_saved_at: "2026-10-06T00:26:45.333Z"
 campaign_background: ""
 hero_video: "https://youtu.be/p6jQjvYDcBQ?si=jIW-1ppcLqv5k-Pi"
 ---
