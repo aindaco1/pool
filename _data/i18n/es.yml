@@ -125,6 +125,7 @@ campaign_protected_preview:
   access_title: "El enlace de vista previa no está disponible"
   access_body: "Este enlace de vista previa venció o no es válido. Pide al equipo de la campaña un nuevo enlace de vista previa de 24 horas."
   frame_title: "Vista previa protegida de la campaña"
+  video_title: "Video de la campaña"
 
 embed:
   builder_title: "Embed de campaña"

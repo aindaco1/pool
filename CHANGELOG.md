@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Play YouTube videos within protected campaign previews using a player dialog,
+  with working thumbnail fallback, keyboard close/focus behavior, and English
+  and Spanish labels. Preserve the campaign sandbox, strict script CSP, and
+  token privacy; load the player only after Play.
+
 ## v1.2.23 - 2026-10-04
 
 - Let admins remove images from every upload field, preserving empty fields,

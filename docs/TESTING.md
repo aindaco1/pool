@@ -35,6 +35,14 @@ Campaign video-upload regression checks run with:
 npx vitest run tests/unit/github-video-runtime.test.ts tests/unit/github-worker-runtime.test.ts tests/unit/admin-dashboard.test.ts
 ```
 
+Protected-preview YouTube controls are covered by
+`npx playwright test tests/e2e/campaign-preview.spec.ts --project=chromium`.
+The built English/Spanish shells run with their real CSP and opaque sandbox;
+synthetic media responses verify thumbnail fallback, click/keyboard playback,
+origin-only referrers, close/focus behavior, mobile sizing, message rejection,
+and access loss. These deterministic checks do not establish YouTube provider
+playback for a particular campaign video; verify that separately in the browser.
+
 The video runtime suite streams an exact 100,000,000-byte synthetic file through
 workerd with a simulated GitHub receiver and checks the complete encoded-body
 hash. It also covers chunk boundaries, oversize declarations, truncated or

@@ -31,6 +31,7 @@
       class="campaign-protected-preview__shell"
       data-campaign-preview
       data-campaign-preview-slug="{{ page.campaign_slug | escape }}"
+      data-preview-video-title="{% include t.html key='campaign_protected_preview.video_title' lang=current_lang %}"
       data-preview-loading="{{ preview_loading | strip | escape }}"
       data-preview-error="{{ preview_error | strip | escape }}"
       data-preview-access-title="{{ preview_access_title | strip | escape }}"
@@ -52,6 +53,12 @@
         referrerpolicy="strict-origin-when-cross-origin"
         data-campaign-preview-frame
         hidden></iframe>
+      <dialog class="admin-action-dialog campaign-protected-preview__video-dialog" data-preview-video-dialog aria-label="{% include t.html key='campaign_protected_preview.video_title' lang=current_lang %}">
+        <div class="campaign-protected-preview__video-toolbar">
+          <button type="button" class="btn btn--secondary" data-preview-video-close autofocus>{% include t.html key="misc.close" lang=current_lang %}</button>
+        </div>
+        <div class="campaign-protected-preview__video-player" data-preview-video-player></div>
+      </dialog>
     </section>
   </main>
 

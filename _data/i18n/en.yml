@@ -127,6 +127,7 @@ campaign_protected_preview:
   access_title: "Preview link unavailable"
   access_body: "This preview link has expired or is invalid. Ask the campaign team for a new 24-hour preview link."
   frame_title: "Protected campaign preview"
+  video_title: "Campaign video"
 
 embed:
   builder_title: "Campaign Embed"
