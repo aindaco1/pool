@@ -9186,6 +9186,73 @@
         }
       ],
       "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30.png",
+      "publicPath": "/assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30.png",
+      "name": "hero-square-20261006-074404-19901f30.png",
+      "label": "hero square 20261006 074404 19901f30",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 44373,
+      "sha256": "5abd4e974e5f80630d26a65d819c64987256726d8701ddb47b68886b74dd64fa",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-320.webp",
+        "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-480.webp",
+        "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-640.webp",
+        "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-960.webp",
+        "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-320.webp",
+          "bytes": 4860,
+          "sha256": "eae4b6a8a20595c080b51ff620046304d132c4f993c1041a3ae41fe25b80e2ec",
+          "sourceSha256": "5abd4e974e5f80630d26a65d819c64987256726d8701ddb47b68886b74dd64fa",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-480.webp",
+          "bytes": 6904,
+          "sha256": "9b0c78a5fc966046fb229bf516c2ba953e08af653c204e5617a041540ffad470",
+          "sourceSha256": "5abd4e974e5f80630d26a65d819c64987256726d8701ddb47b68886b74dd64fa",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-640.webp",
+          "bytes": 8876,
+          "sha256": "a0e47d2f899334976c633ccb492313f4e2457cd60a665cc61390ac982525d6ca",
+          "sourceSha256": "5abd4e974e5f80630d26a65d819c64987256726d8701ddb47b68886b74dd64fa",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-960.webp",
+          "bytes": 13006,
+          "sha256": "f670304b73121b4420a4d6d7a647098f866fb4c443032d138a892b49b0fba958",
+          "sourceSha256": "5abd4e974e5f80630d26a65d819c64987256726d8701ddb47b68886b74dd64fa",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30-1600.webp",
+          "bytes": 20914,
+          "sha256": "dcebd53fff166fd712927e7793d4d39a1dcafd89ae73acad29752c10a94bb016",
+          "sourceSha256": "5abd4e974e5f80630d26a65d819c64987256726d8701ddb47b68886b74dd64fa",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
       "references": [
         {
           "path": "_campaigns/tubers.md",
@@ -9696,6 +9763,73 @@
           "bytes": 10296,
           "sha256": "a62d645746190eea0648f6ec189a0a49a1ac07a6f299d48475378577318b625d",
           "sourceSha256": "0c817cd62d3a9b79afd7450faa4324ab39a12b3bc2d5ec7de1e83016293ab93e",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a.png",
+      "publicPath": "/assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a.png",
+      "name": "hero-wide-20261006-075018-ba644b3a.png",
+      "label": "hero wide 20261006 075018 ba644b3a",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "tubers",
+      "bytes": 1556718,
+      "sha256": "32390ab2431825a281be0a6fff6fc70d05eff3774a4a5ae7f2a3da66edfab0a2",
+      "width": 2000,
+      "height": 1125,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-320.webp",
+        "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-480.webp",
+        "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-640.webp",
+        "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-960.webp",
+        "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-320.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-320.webp",
+          "bytes": 4182,
+          "sha256": "c4133142352798e1c3d60d3ed594002905236d408b4c9611917a54a7bd3ea9f7",
+          "sourceSha256": "32390ab2431825a281be0a6fff6fc70d05eff3774a4a5ae7f2a3da66edfab0a2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-480.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-480.webp",
+          "bytes": 8462,
+          "sha256": "54ea3ca6682c3b4062fa76c2aefe1dd698c47ba828f6795218032ce61c27951c",
+          "sourceSha256": "32390ab2431825a281be0a6fff6fc70d05eff3774a4a5ae7f2a3da66edfab0a2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-640.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-640.webp",
+          "bytes": 14140,
+          "sha256": "a31e67b450e85928488eb852d2fdc553b5c5af66aa433468c3189f72ad09a9e4",
+          "sourceSha256": "32390ab2431825a281be0a6fff6fc70d05eff3774a4a5ae7f2a3da66edfab0a2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-960.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-960.webp",
+          "bytes": 42334,
+          "sha256": "6e346da05b7d1c3645f0124c019a8c803f47973867ea801a6317a5cfbfc3eb6c",
+          "sourceSha256": "32390ab2431825a281be0a6fff6fc70d05eff3774a4a5ae7f2a3da66edfab0a2",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-1600.webp",
+          "publicPath": "/assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a-1600.webp",
+          "bytes": 109096,
+          "sha256": "5428c30eafea47b75e67b1386396f09991258ecedbd4c2303d4bbaae1b91faf3",
+          "sourceSha256": "32390ab2431825a281be0a6fff6fc70d05eff3774a4a5ae7f2a3da66edfab0a2",
           "width": 1600
         }
       ],
