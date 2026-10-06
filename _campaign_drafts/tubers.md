@@ -54,7 +54,7 @@ long_content:
     alt: ""
     caption: "Our cast so far."
   - type: "image"
-    src: "/assets/images/campaigns/tubers/content-tubers-crew-resized-20261005-070825-2f6c55ed.png"
+    src: "/assets/images/campaigns/tubers/content-tubers-crew-resized-20261006-011144-3f62acec.png"
     alt: ""
     caption: "(Some of) our crew."
   - type: "image"
@@ -131,7 +131,7 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-06T01:10:15.975Z"
+_pool_draft_saved_at: "2026-10-06T01:11:48.970Z"
 campaign_background: ""
 hero_video: "https://youtu.be/p6jQjvYDcBQ?si=ofcf-3AtoAcZJz9t"
 ---
