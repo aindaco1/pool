@@ -80,7 +80,7 @@ long_content:
     caption: "Movie comps -- coincidentally all 2007 movies."
   - type: "text"
     body: |
-      Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw==) Instagram page and [website](https://ratamacue.com/).
+      Follow along at the [Ratamacue](https://www.instagram.com/ratamacuefilm/) Instagram page and [website](https://ratamacue.com/).
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -131,7 +131,7 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-06T03:13:37.658Z"
+_pool_draft_saved_at: "2026-10-06T03:14:24.253Z"
 campaign_background: ""
 hero_video: "https://youtu.be/p6jQjvYDcBQ?si=cv-3_owpjM-KZtq6"
 ---
