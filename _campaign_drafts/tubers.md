@@ -11,8 +11,8 @@ start_date: "2026-10-03"
 goal_deadline: "2026-11-15"
 goal_amount: 3000
 charged: false
-hero_image: "/assets/images/campaigns/tubers/hero-square-20261006-074404-19901f30.png"
-hero_image_wide: "/assets/images/campaigns/tubers/hero-wide-20261006-075018-ba644b3a.png"
+hero_image: "/assets/images/campaigns/tubers/hero-square-20261006-083226-682cd110.png"
+hero_image_wide: "/assets/images/campaigns/tubers/hero-wide-20261006-083228-29906f06.png"
 creator_image: "/assets/images/campaigns/tubers/creator-20260930-040217-935325a4.png"
 creator_name: "Anna Buan"
 category: "Short Film"
@@ -130,8 +130,8 @@ ongoing_items: []
 diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
-_pool_draft_base_hash: "7d2985fa2ff9d92330d617175890a105834b0d2f43ca380b9d1872b4da9df896"
-_pool_draft_saved_at: "2026-10-06T07:50:26.019Z"
+_pool_draft_base_hash: "632f5c7b266361742159eb1c03b1b3da0c7168923258728f844aa6a2d1c8a8c3"
+_pool_draft_saved_at: "2026-10-06T08:32:39.013Z"
 campaign_background: ""
 hero_video: "https://youtu.be/p6jQjvYDcBQ?si=cv-3_owpjM-KZtq6"
 ---
