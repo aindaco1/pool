@@ -2,10 +2,13 @@
 
 ## Unreleased
 
-- Play YouTube videos within protected campaign previews using a player dialog,
-  with working thumbnail fallback, keyboard close/focus behavior, and English
-  and Spanish labels. Preserve the campaign sandbox, strict script CSP, and
+- Play YouTube videos in place within protected campaign previews, matching
+  the published project's video position and size through scrolling and resizing,
+  with working thumbnail fallback and keyboard activation. Preserve the campaign sandbox, strict script CSP, and
   token privacy; load the player only after Play.
+
+- Adopt Platform 0.43.1 / Release Core 0.5.1 and update development tooling
+  to `smol-toml` 1.9.0 and `source-map-js` 1.2.2 to resolve dependency audit findings.
 
 ## v1.2.23 - 2026-10-04
 
