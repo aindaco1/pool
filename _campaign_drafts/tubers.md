@@ -131,7 +131,7 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
 _pool_draft_base_hash: "91fc838264672b3fdb8e8d5b7bbdb112075375fe49dae967a525c392bcbf600a"
-_pool_draft_saved_at: "2026-10-06T00:53:49.512Z"
+_pool_draft_saved_at: "2026-10-06T00:54:14.757Z"
 campaign_background: ""
-hero_video: "https://youtu.be/p6jQjvYDcBQ?si=jIW-1ppcLqv5k-Pi"
+hero_video: "https://youtu.be/p6jQjvYDcBQ?si=ofcf-3AtoAcZJz9t"
 ---
