@@ -268,6 +268,14 @@
       supportsLinkAuthenticationElement: Boolean(linkAuthenticationElement),
       supportsShippingAddressElement: Boolean(shippingAddressElement),
       updateEmail: function(email) {
+        // Stripe locks emails supplied at session creation, including saved customers.
+        // Read the current session so an unchanged address never becomes an update.
+        const session = typeof loadActionsResult.actions.getSession === 'function'
+          ? loadActionsResult.actions.getSession()
+          : null;
+        if (email && session?.email === email) {
+          return Promise.resolve({});
+        }
         if (typeof loadActionsResult.actions.updateEmail !== 'function') {
           return Promise.resolve({});
         }

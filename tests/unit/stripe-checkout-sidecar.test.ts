@@ -240,6 +240,74 @@ describe('stripe checkout sidecar helper', () => {
     expect(shippingUnmount).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['returned', 'thrown'])('confirms with an unchanged preset email without triggering Stripe\'s %s email-lock error', async (failureMode) => {
+    const error = { message: 'You cannot update the email because a `customer_email` or `customer` with an email is already set on the Checkout Session.' };
+    const actions = {
+      getSession: vi.fn(() => ({ id: 'cs_test_preset', email: 'supporter@example.com' })),
+      updateEmail: vi.fn(async () => {
+        if (failureMode === 'thrown') throw new Error(error.message);
+        return { type: 'error', error };
+      }),
+      confirm: vi.fn(async () => ({ type: 'success' }))
+    };
+    (window as any).Stripe = () => ({
+      initCheckout: async () => ({
+        loadActions: async () => ({ type: 'success', actions }),
+        createPaymentElement: () => ({ mount: vi.fn() })
+      })
+    });
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const result = await (window as any).PoolStripeCheckoutSidecar.mount({
+      publishableKey: 'pk_test_123',
+      clientSecret: 'cs_test_secret_123',
+      paymentContainer: document.createElement('div')
+    });
+
+    await expect(result.updateEmail('supporter@example.com')).resolves.not.toHaveProperty('error');
+    await expect(result.confirm()).resolves.toEqual({ type: 'success' });
+    expect(actions.updateEmail).not.toHaveBeenCalled();
+    expect(actions.confirm).toHaveBeenCalledExactlyOnceWith({ redirect: 'if_required' });
+
+    // A different address must still reach Stripe and expose its rejection.
+    if (failureMode === 'thrown') {
+      await expect(result.updateEmail('different@example.com')).rejects.toThrow(error.message);
+    } else {
+      await expect(result.updateEmail('different@example.com')).resolves.toEqual({ type: 'error', error });
+    }
+  });
+
+  it('updates missing and changed emails using the current Stripe session', async () => {
+    let email: string | null = null;
+    const actions = {
+      getSession: vi.fn(() => ({ id: 'cs_test_editable', email })),
+      updateEmail: vi.fn(async (nextEmail: string) => {
+        email = nextEmail;
+        return { type: 'success' };
+      })
+    };
+    (window as any).Stripe = () => ({
+      initCheckout: async () => ({
+        loadActions: async () => ({ type: 'success', actions }),
+        createPaymentElement: () => ({ mount: vi.fn() })
+      })
+    });
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const result = await (window as any).PoolStripeCheckoutSidecar.mount({
+      publishableKey: 'pk_test_123',
+      clientSecret: 'cs_test_secret_123',
+      paymentContainer: document.createElement('div')
+    });
+
+    await result.updateEmail('supporter@example.com');
+    await result.updateEmail('supporter@example.com');
+    await result.updateEmail('corrected@example.com');
+    await result.updateEmail('corrected@example.com');
+    expect(actions.updateEmail.mock.calls).toEqual([
+      ['supporter@example.com'], ['corrected@example.com']
+    ]);
+    expect(email).toBe('corrected@example.com');
+  });
+
   it('fails clearly when Stripe custom checkout actions do not load', async () => {
     const checkout = {
       loadActions: vi.fn(async () => ({

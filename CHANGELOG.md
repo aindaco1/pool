@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fix on-site pledge checkout blocking supporters when Stripe already has their
+  email. Keep new checkout emails editable, skip unchanged-email updates in
+  checkout and card-update flows, and retain hosted checkout email prefilling.
+- Update the Worker development-tooling Sharp override to 0.35.5 to resolve
+  GHSA-wq5f-xc86-pv6w in its bundled librsvg dependency.
+
 - Use the main YouTube thumbnail for campaign hero posters in the dashboard,
   protected preview, and published page, with a lower-resolution thumbnail fallback.
   Detect YouTube's small missing-image placeholder so all three surfaces fall back.

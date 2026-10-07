@@ -1196,19 +1196,29 @@ test.describe('Campaign States', () => {
 });
 
 test.describe('Checkout Flow', () => {
-  for (const confirmationScenario of ['normal', 'stale-summary', 'retry-after-reload']) {
+  for (const confirmationScenario of ['normal', 'preset-email', 'changed-email', 'stale-summary', 'retry-after-reload']) {
   test(`custom on-site checkout confirms safely: ${confirmationScenario}`, async ({ page }) => {
     test.setTimeout(60_000);
 
-    await page.addInitScript(() => {
+    await page.addInitScript((scenario) => {
+      let email = scenario === 'preset-email' ? 'e2e-supporter@example.com' : null;
       (window as any).Stripe = () => ({
         initCheckout: async () => ({
           loadActions: async () => ({
             type: 'success',
             actions: {
-              getSession: () => ({ id: 'cs_test_custom_e2e' }),
-              updateEmail: async () => ({}),
+              getSession: () => ({ id: 'cs_test_custom_e2e', email }),
+              updateEmail: async (nextEmail: string) => {
+                if (scenario === 'preset-email') {
+                  return { type: 'error', error: { message: 'You cannot update the email because a `customer_email` or `customer` with an email is already set on the Checkout Session.' } };
+                }
+                email = nextEmail;
+                sessionStorage.setItem('test-updated-email', nextEmail);
+                return { type: 'success' };
+              },
               confirm: async () => {
+                if (!email) return { type: 'error', error: { message: 'An email address is required.' } };
+                sessionStorage.setItem('test-confirm-email', email);
                 sessionStorage.setItem('test-confirm-count', String(Number(sessionStorage.getItem('test-confirm-count') || 0) + 1));
                 return { type: 'success' };
               }
@@ -1227,7 +1237,7 @@ test.describe('Checkout Flow', () => {
           }
         })
       });
-    });
+    }, confirmationScenario);
 
     await page.goto('/campaigns/smoke-editable/');
 
@@ -1328,6 +1338,12 @@ test.describe('Checkout Flow', () => {
     const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
     await expect(saveButton).toBeVisible();
     await expect(saveButton).toBeEnabled();
+    expect(await page.evaluate(() => sessionStorage.getItem('test-updated-email'))).toBe(
+      confirmationScenario === 'preset-email' ? null : 'e2e-supporter@example.com'
+    );
+    if (confirmationScenario === 'changed-email') {
+      await emailField.fill('corrected@example.com');
+    }
     await saveButton.click();
     if (confirmationScenario === 'retry-after-reload') {
       const checkButton = page.getByRole('button', { name: 'Check pledge status', exact: true });
@@ -1360,6 +1376,9 @@ test.describe('Checkout Flow', () => {
     });
     expect(starts).toBe(1);
     expect(await page.evaluate(() => sessionStorage.getItem('test-confirm-count'))).toBe('1');
+    expect(await page.evaluate(() => sessionStorage.getItem('test-confirm-email'))).toBe(
+      confirmationScenario === 'changed-email' ? 'corrected@example.com' : 'e2e-supporter@example.com'
+    );
 
   });
   }

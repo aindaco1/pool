@@ -5117,6 +5117,13 @@
         }
 
         activeCustomCheckoutMount = mountResult;
+        // New custom sessions leave email editable; seed it before confirmation
+        // so Stripe can recognize returning Link users as the payment UI opens.
+        const initialEmail = String(checkoutUiState.customCheckout.emailDraft || '').trim();
+        if (initialEmail) {
+          await syncCustomCheckoutEmailToStripe(initialEmail);
+          if (!isActiveCustomCheckoutFlow(flowToken)) return;
+        }
         checkoutUiState.customCheckout.mountStatus = 'mounted';
         if (shippingContainer && !mountResult?.supportsShippingAddressElement) {
           shippingContainer.hidden = true;
