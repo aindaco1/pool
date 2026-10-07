@@ -222,6 +222,16 @@ The Worker creates a Stripe Checkout Session in `setup` mode. The normal path re
 
 If custom checkout is unavailable because the publishable key is missing, the Worker falls back to a hosted Stripe Checkout URL instead of failing the supporter.
 
+New custom pledge sessions leave `customer_email` unset so the on-site contact
+field can supply and correct the email through Stripe.js before confirmation.
+The browser supplies its draft email as the payment UI opens so Stripe Link
+can recognize returning users before they choose a payment method.
+Hosted fallback sessions still receive `customer_email`. The shared browser
+helper reads Stripe's current session and skips `updateEmail` when the address
+already matches; Stripe locks emails preset at creation, including existing
+customers used for card updates. A different address still goes through Stripe
+validation, and provider errors remain visible.
+
 The Stripe session metadata includes order and integrity context such as:
 
 - `orderId`

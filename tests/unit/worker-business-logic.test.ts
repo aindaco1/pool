@@ -758,7 +758,7 @@ describe('Worker business logic hardening', () => {
     expect(checkoutIntents.calls).toHaveLength(1);
 
     const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
-    expect(sessionPayload.customer_email).toBe('buyer@example.com');
+    expect(sessionPayload.customer_email).toBeUndefined();
     expect(sessionPayload.metadata.checkoutProvider).toBe('first_party');
     expect(sessionPayload.metadata.checkoutNonce).toBeTruthy();
     expect(sessionPayload.metadata.checkoutCartHash).toMatch(/^[a-f0-9]{64}$/);
@@ -1704,7 +1704,7 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(200);
 
     const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
-    expect(sessionPayload.customer_email).toBe('buyer@example.com');
+    expect(sessionPayload.customer_email).toBeUndefined();
     expect(sessionPayload.shipping_address_collection).toMatchObject({
       allowed_countries: expect.arrayContaining(['US'])
     });
@@ -1763,7 +1763,7 @@ describe('Worker business logic hardening', () => {
     expect(response.status).toBe(200);
 
     const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
-    expect(sessionPayload.customer_email).toBe('buyer@example.com');
+    expect(sessionPayload.customer_email).toBeUndefined();
     expect(sessionPayload.metadata.hasPhysical).toBe('true');
 
     const kv = env.PLEDGES as MockKVNamespace;
@@ -2398,6 +2398,9 @@ describe('Worker business logic hardening', () => {
     const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
     const requestOptions = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[1];
     expect(sessionPayload.ui_mode).toBe('custom');
+    // The browser owns the editable contact field; a preset email locks Stripe's session.
+    expect(sessionPayload.customer_email).toBeUndefined();
+    expect(sessionPayload.customer).toBeUndefined();
     expect(sessionPayload.payment_method_types).toEqual(['card', 'link']);
     expect(sessionPayload.consent_collection).toEqual({
       payment_method_reuse_agreement: {
@@ -2481,6 +2484,7 @@ describe('Worker business logic hardening', () => {
     const sessionPayload = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0];
     const requestOptions = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[1];
     expect(sessionPayload.ui_mode).toBeUndefined();
+    expect(sessionPayload.customer_email).toBe('buyer@example.com');
     expect(sessionPayload.success_url).toMatch(/^https:\/\/pool\.test\/pledge-success\/\?orderId=pool-intent-/);
     expect(sessionPayload.cancel_url).toBe('https://pool.test/pledge-cancelled/');
     expect(requestOptions).toBeUndefined();

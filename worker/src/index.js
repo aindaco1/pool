@@ -7151,7 +7151,9 @@ async function handleFirstPartyCheckoutStart(request, env) {
       sessionParams.cancel_url = getLocalizedSiteUrl(env, '/pledge-cancelled/', normalizedPreferredLang);
     }
 
-    if (email) {
+    // Custom checkout collects an editable email through Stripe.js. Setting it
+    // here locks the session and makes the browser's updateEmail call fail.
+    if (email && !usingCustomCheckoutUi) {
       sessionParams.customer_email = email;
     }
 
