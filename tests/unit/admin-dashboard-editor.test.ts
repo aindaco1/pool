@@ -31,9 +31,41 @@ describe('admin dashboard content editor serialization', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    Reflect.deleteProperty(document, 'execCommand');
     document.body.innerHTML = '';
     localStorage.clear();
     delete (window as unknown as { POOL_CONFIG?: unknown }).POOL_CONFIG;
+  });
+
+  it.each([
+    { weight: 'normal', target: 'body' },
+    { weight: '400', target: 'body' },
+    { weight: 'normal', target: 'nested' },
+    { weight: '400', target: 'nested' }
+  ])('honors Google Docs formatting with font-weight: $weight when pasting into $target', async ({ weight, target }) => {
+    await import('../../assets/js/admin-dashboard.js');
+    const editor = document.querySelector('[data-content-field="body"]') as HTMLElement;
+    const field = document.getElementById('admin-content-long-content') as HTMLTextAreaElement;
+    Object.defineProperty(editor, 'isContentEditable', { configurable: true, value: true });
+    editor.setAttribute('contenteditable', 'true');
+    editor.innerHTML = '<p><strong>Replace this text.</strong></p>';
+    const pasteTarget = target === 'nested' ? editor.querySelector('strong')! : editor;
+    document.execCommand = vi.fn((_command, _showUi, html) => {
+      editor.innerHTML = html || '';
+      return true;
+    });
+    const html = `<b style="font-weight:${weight}" id="docs-internal-guid-fixture">`
+      + '<p><span style="font-weight:400">Normal text.</span></p>'
+      + '<p><span style="font-weight:700">Bold</span> and <span style="font-weight:400;font-style:italic">italic</span>'
+      + ' with <span style="font-weight:700;font-style:italic">both</span>.</p>'
+      + '<p><b>Semantic bold</b> and <strong style="font-weight:400">normal override</strong>.</p></b>';
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, 'clipboardData', { value: { getData: (type: string) => type === 'text/html' ? html : '' } });
+    pasteTarget.dispatchEvent(paste);
+    expect(paste.defaultPrevented).toBe(true);
+    expect(document.execCommand).toHaveBeenCalledWith('insertHTML', false,
+      '<p>Normal text.</p><p><strong>Bold</strong> and <em>italic</em> with <strong><em>both</em></strong>.</p><p><strong>Semantic bold</strong> and normal override.</p>');
+    expect(JSON.parse(field.value)[0].body).toBe('Normal text.\n\n**Bold** and *italic* with ***both***.\n\n**Semantic bold** and normal override.');
   });
 
   it('keeps boundary spaces outside Markdown emphasis markers', async () => {

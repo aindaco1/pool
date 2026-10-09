@@ -1693,14 +1693,14 @@ test.describe('Admin Dashboard', () => {
       selection?.addRange(range);
       editor.focus();
       const data = new DataTransfer();
-      data.setData('text/html', '<p><span style="font-weight: 700;">Word bold paste</span></p>');
+      data.setData('text/html', '<b style="font-weight:normal"><p>Regular text with <span style="font-weight: 700;">Word bold paste</span></p></b>');
       editor.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
     });
     await expect(tierDescriptionEditor.locator('.admin-settings__rich-inline-editor strong')).toContainText('Word bold paste');
     await expect.poll(async () => {
       const value = await tierEditor.evaluate((element: any) => element.value);
       return JSON.parse(value)[0].description;
-    }).toContain('**Word bold paste**');
+    }).toContain('Regular text with **Word bold paste**');
     await expect(tierEditor.getByRole('button', { name: 'About Category' })).toHaveAttribute('aria-describedby', /admin-setting-help-/);
     await expect(tierEditor.getByRole('spinbutton', { name: 'Quantity limit' }).first()).toBeVisible();
     await expect(tierEditor.locator('[data-collection-field="remaining"]')).toHaveCount(0);
@@ -2357,6 +2357,12 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-panel-settings')).toBeHidden();
     await expect(page.locator('#admin-panel-campaigns')).toBeVisible();
     await expect(page.locator('#admin-inventory-section')).toBeHidden();
+
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="diary"]').click();
+    const diaryPhase = page.locator('[data-settings-path="diary"][data-settings-campaign="hand-relations"] select[data-collection-field="phase"]').first();
+    await expect(diaryPhase.locator('option')).toHaveText(['Lanzamiento', 'Recaudación', 'Producción', 'Postproducción', 'Cumplimiento']);
+    await diaryPhase.selectOption({ label: 'Postproducción' });
+    await expect(diaryPhase).toHaveValue('post-production');
   });
 
   test('keeps Spanish admin tabs compact on tablet viewports', async ({ page }) => {
@@ -2425,6 +2431,54 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.reportCsv.length).toBe(1);
     expect(calls.reportCsv[0]).toMatchObject({ campaignSlug: 'hand-relations', reportType: 'pledge' });
 
+  });
+
+  for (const pasteTarget of ['body', 'nested']) test(`preserves Google Docs emphasis and paragraphs when pasting into ${pasteTarget}`, async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+    await selectAdminSection(page, 'Campaigns');
+    await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
+    const body = page.locator('#admin-content-blocks [data-content-field="body"]').first();
+    // Google Docs uses a non-bold <b> wrapper around the entire clipboard fragment.
+    const html = '<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-fixture">'
+      + '<p><span style="font-weight:400">Hello supporters,</span></p><br>'
+      + '<p><span style="font-weight:700">An update</span><span style="font-weight:400"> with </span>'
+      + '<span style="font-weight:400;font-style:italic">italics</span><span style="font-weight:400"> and </span>'
+      + '<span style="font-weight:700;font-style:italic">both</span><span style="font-weight:400">.</span></p><br>'
+      + '<p><span style="font-weight:700">What happens next?</span></p><p><span style="font-weight:400">The answer starts on its own line.</span></p>'
+      + '<p><strong style="font-weight:400">Still normal.</strong> <b>Still bold.</b></p>'
+      + '<ul><li><span style="font-weight:400">A list with </span><a href="https://example.com/"><span style="font-weight:400">a link</span></a></li></ul></b>';
+    const expected = 'Hello supporters,\n\n**An update** with *italics* and ***both***.\n\n**What happens next?**\n\nThe answer starts on its own line.\n\nStill normal. **Still bold.**\n\n- A list with [a link](https://example.com/)';
+    await body.evaluate((editor: HTMLElement, { clipboardHtml, pasteTarget }) => {
+      editor.focus();
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      const data = new DataTransfer();
+      data.setData('text/html', clipboardHtml);
+      const target = pasteTarget === 'nested' ? editor.querySelector('p')! : editor;
+      target.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
+    }, { clipboardHtml: html, pasteTarget });
+    await expect.poll(async () => JSON.parse(await page.locator('#admin-content-long-content').inputValue())[0].body).toBe(expected);
+    await expect(body.locator('p').first()).toHaveText('Hello supporters,');
+    await expect(body.locator('p').first()).not.toHaveCSS('font-weight', '700');
+    await expect(body.locator('strong')).toHaveText(['An update', 'both', 'What happens next?', 'Still bold.']);
+    await expect(body.locator('em')).toHaveText(['italics', 'both']);
+    await expect(body.locator('ul li a')).toHaveAttribute('href', 'https://example.com/');
+    await page.locator('#admin-campaign-save').click();
+    await expect.poll(() => calls.projectSave.length).toBe(1);
+    expect(calls.projectSave[0].draft.longContent[0].body).toBe(expected);
+    expect(calls.projectPublish).toHaveLength(0);
+    // Re-render the saved Markdown, as reopening a saved project does.
+    await page.locator('#admin-content-long-content').evaluate((textarea: HTMLTextAreaElement, blocks) => {
+      textarea.value = JSON.stringify(blocks);
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    }, calls.projectSave[0].draft.longContent);
+    await expect(body.locator('p')).toHaveText(['Hello supporters,', 'An update with italics and both.', 'What happens next?', 'The answer starts on its own line.', 'Still normal. Still bold.']);
+    const headingBox = await body.locator('p').nth(2).boundingBox();
+    const answerBox = await body.locator('p').nth(3).boundingBox();
+    expect(answerBox!.y).toBeGreaterThan(headingBox!.y + headingBox!.height);
   });
 
   test('keeps marketing local and validates content preview/publish flows', async ({ page }) => {
@@ -3377,6 +3431,9 @@ test.describe('Admin Dashboard', () => {
     await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="diary"]').click();
 
     const diaryField = page.locator('[data-settings-path="diary"][data-settings-campaign="hand-relations"]');
+    const diaryPhase = diaryField.locator('select[data-collection-field="phase"]').first();
+    await expect(diaryPhase.locator('option')).toHaveText(['Launch', 'Fundraising', 'Production', 'Post-Production', 'Fulfillment']);
+    await diaryPhase.selectOption({ label: 'Post-Production' });
     const diaryContentEditor = diaryField.locator('[data-diary-content-editor]').first();
     await diaryContentEditor.locator('select[data-content-action="type"]').first().selectOption('image');
 
@@ -3407,6 +3464,7 @@ test.describe('Admin Dashboard', () => {
 
     await expect.poll(() => calls.projectSave.length).toBe(1);
     const previewDiaryChange = calls.projectSave[0].changes.find((change: any) => change.path === 'diary');
+    expect(JSON.parse(previewDiaryChange.value)[0].phase).toBe('post-production');
     expect(JSON.parse(previewDiaryChange.value)[0].content[0]).toMatchObject({
       type: 'image',
       src: '/assets/images/campaigns/hand-relations/image-e2e.png'
