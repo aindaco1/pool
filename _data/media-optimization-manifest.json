@@ -4214,7 +4214,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/sunder/header-what-are-the-risks.png",
@@ -4708,7 +4713,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/sunder/progress.png",
@@ -4959,7 +4969,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/sunder/super-fan.png",
@@ -5017,7 +5032,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/sunder/ultra-fan.png",
@@ -5075,7 +5095,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/sunder/wide-alt.png",
