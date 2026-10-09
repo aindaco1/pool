@@ -96,6 +96,18 @@ test.describe('Public Page Keyboard Controls', () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  for (const locale of ['', '/es']) test(`opens an individual diary entry in its phase (${locale || 'en'})`, async ({ page }) => {
+    const catalog = await (await page.request.get('/api/campaigns.json')).json();
+    expect(catalog.campaigns.find((campaign: any) => campaign.slug === 'hand-relations').diary).toContainEqual(expect.objectContaining({ id: 'day-14-principal-photography' }));
+    await page.goto(locale + '/campaigns/hand-relations/#diary-entry-day-14-principal-photography');
+    const entry = page.locator('#diary-entry-day-14-principal-photography');
+    await expect(entry).toBeVisible();
+    await expect(entry.locator('h4')).toHaveText('Day 14 — Principal Photography');
+    await expect(page.locator('#diary-tab-production')).toHaveAttribute('aria-selected', 'true');
+    await expect(entry.locator('h4')).toBeInViewport();
+    await expect(page.locator('#diary-fundraising')).toBeHidden();
+  });
+
   test('diary tabs stay usable on a small phone viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/campaigns/hand-relations/');

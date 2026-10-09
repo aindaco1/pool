@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Link Diary emails to stable individual entries, opening the correct phase in
+  localized campaign pages. Render nested Markdown emphasis in bounded email excerpts.
+- Bring Store-style save/publish progress to campaign editing: sticky actions,
+  upload counts, elapsed time, deployment phases, and explicit failure/retry state.
+  Production publishes track the exact saved revision before reporting Live.
+
 - Preserve paragraph breaks when pasting into existing text inside a dashboard
   Text block, including Google Docs updates with adjacent paragraphs.
 

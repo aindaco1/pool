@@ -10,7 +10,7 @@ describe('diary tabs script', () => {
         <button class="diary-tab" id="diary-tab-production" aria-selected="false" aria-controls="diary-production" tabindex="-1" data-tab="production" type="button">Production</button>
       </div>
       <div id="diary-fundraising" class="diary-panel" role="tabpanel" aria-labelledby="diary-tab-fundraising"></div>
-      <div id="diary-production" class="diary-panel hidden" role="tabpanel" aria-labelledby="diary-tab-production" hidden></div>
+      <div id="diary-production" class="diary-panel hidden" role="tabpanel" aria-labelledby="diary-tab-production" hidden><article id="diary-entry-update"><h4>Update</h4></article></div>
     `;
   });
 
@@ -38,6 +38,20 @@ describe('diary tabs script', () => {
     expect(fundraisingPanel.hidden).toBe(true);
     expect(productionPanel.classList.contains('hidden')).toBe(false);
     expect(productionPanel.hidden).toBe(false);
+  });
+
+  it('opens the containing phase for an entry permalink, including hash changes', async () => {
+    window.history.replaceState({}, '', '/campaigns/sunder/#diary-entry-update');
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { callback(0); return 1; });
+    const entry = document.getElementById('diary-entry-update')!;
+    const scroll = vi.fn();
+    Object.defineProperty(entry, 'scrollIntoView', { configurable: true, value: scroll });
+    await import('../../assets/js/diary-tabs.js');
+    expect(document.getElementById('diary-production')!.hidden).toBe(false);
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    (document.getElementById('diary-tab-fundraising') as HTMLElement).click();
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    expect(document.getElementById('diary-production')!.hidden).toBe(false);
   });
 
   it('supports arrow and Home/End keyboard navigation', async () => {

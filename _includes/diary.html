@@ -26,7 +26,7 @@
       {% if phase_entries.size > 0 %}
         <div class="diary-list">
           {% for entry in phase_entries %}
-            <article class="diary-entry">
+            <article class="diary-entry"{% if entry.id and entry.id != empty %} id="diary-entry-{{ entry.id | escape }}"{% endif %}>
               <h4 class="diary-entry__title">{{ entry.title }}</h4>
               {% if entry.date %}
                 <time class="diary-entry__date" datetime="{{ entry.date | date_to_xmlschema }}">

@@ -115,6 +115,7 @@ layout: null
       "diary": [
         {% for entry in campaign.diary %}
         {
+          "id": {{ entry.id | jsonify }},
           "date": {{ entry.date | date_to_xmlschema | jsonify }},
           "title": {{ entry.title | jsonify }},
           "phase": {{ entry.phase | jsonify }},

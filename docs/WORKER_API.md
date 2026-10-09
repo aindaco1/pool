@@ -34,6 +34,8 @@ return the updated working-copy status and reject stale revisions with HTTP 409
 `campaign_revision_conflict`. The local repo helper implements the same revision
 precondition with serialized atomic file replacement.
 
+Production publish also returns `repositoryMode` and `deployment: { commitSha, requestedAt, triggered }`. The Pages dispatch receives the immutable saved revision. `GET /admin/campaigns/deployment?campaignSlug=<slug>&commitSha=<40-character-sha>&requestedAt=<timestamp>&runId=<optional-id>` requires read access to that campaign and returns private/no-store workflow status and build/deploy phases. Tracking reads GitHub only; it never retries a publication or sends email. A missing run remains requested, and a mismatched commit/workflow is rejected. Local publication returns no production tracking coordinates.
+
 Protected preview publishing accepts optional `workingRevision` and
 `preserveLinks: true` from the current dashboard. A stale working revision fails;
 active links retain their original token and expiry while new invitations are

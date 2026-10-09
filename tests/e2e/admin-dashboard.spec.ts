@@ -947,6 +947,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       calls.previewPublish.push(body);
       return fulfillJson({ success: true, currentUserPreview: { previewUrl: SITE_BASE + '/campaigns/hand-relations/preview/?t=fixture', expiresAt: new Date(Date.now() + 86400000).toISOString() }, reviewerEmails: [], emails: [] });
     }
+    if (url.pathname === '/admin/campaigns/deployment') return fulfillJson({ deployment: { status: 'completed', conclusion: 'success', runId: 123, url: 'https://github.com/aindaco1/pool/actions/runs/123' } });
     if (url.pathname === '/admin/campaigns/draft') {
       if (method === 'GET') {
         calls.contentLoad.push(Object.fromEntries(url.searchParams.entries()));
@@ -960,7 +961,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         workingCampaign.hasUnpublishedChanges = false;
         workingCampaign.isPublished = true;
       }
-      return fulfillJson({ success: true, ...workingCampaign, rebuild: { triggered: body.intent === 'publish' } });
+      return fulfillJson({ success: true, ...workingCampaign, repositoryMode: 'github', deployment: { commitSha: 'a'.repeat(40), requestedAt: new Date().toISOString(), triggered: true }, rebuild: { triggered: body.intent === 'publish' } });
     }
     if (url.pathname === '/admin/content/campaign') {
       calls.contentLoad.push(Object.fromEntries(url.searchParams.entries()));
@@ -2363,6 +2364,12 @@ test.describe('Admin Dashboard', () => {
     await expect(diaryPhase.locator('option')).toHaveText(['Lanzamiento', 'Recaudación', 'Producción', 'Postproducción', 'Cumplimiento']);
     await diaryPhase.selectOption({ label: 'Postproducción' });
     await expect(diaryPhase).toHaveValue('post-production');
+    await page.locator('#admin-campaign-save').click();
+    await expect(page.locator('#admin-campaign-status')).toContainText('Proyecto guardado.');
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    await expect(page.locator('#admin-campaign-status')).toContainText('Tus cambios están en línea.');
+    await expect(page.locator('#admin-campaign-status [data-state="complete"]')).toContainText(['Guardado', 'Publicando', 'En línea']);
   });
 
   test('keeps Spanish admin tabs compact on tablet viewports', async ({ page }) => {
@@ -2935,7 +2942,7 @@ test.describe('Admin Dashboard', () => {
 
     page.once('dialog', (dialog) => dialog.accept());
     await page.locator('#admin-content-publish').click();
-    await expect(page.locator('#admin-campaign-status')).toContainText('Project published.');
+    await expect(page.locator('#admin-campaign-status')).toContainText('Published. Your changes are live.');
     await expect.poll(() => calls.projectPublish.length).toBe(1);
 
     expect(calls.contentPreview.length).toBeGreaterThanOrEqual(2);
@@ -2944,6 +2951,40 @@ test.describe('Admin Dashboard', () => {
       { type: 'quote', text: 'A thoughtful pull quote.', author: '', align: 'left' }
     ]);
     expect(calls.authStart).toHaveLength(0);
+  });
+
+  for (const width of [1280, 390]) test(`tracks campaign deployment and preserves retry at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    const calls = await signInWithMagicToken(page);
+    let conclusion = '';
+    await page.route('**/admin/campaigns/deployment?**', route => route.fulfill({
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ deployment: { status: conclusion ? 'completed' : 'in_progress', conclusion, runId: 123, url: 'https://github.com/aindaco1/pool/actions/runs/123' } })
+    }));
+    await selectAdminSection(page, 'Campaigns');
+    await page.locator('[data-settings-path="runner_report_excluded_emails"]').getByRole('checkbox', { name: 'Assigned runner', exact: true }).uncheck();
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    const status = page.locator('#admin-campaign-status');
+    await expect(status).toContainText('Building and deploying', { timeout: 12000 });
+    await expect(status.locator('progress')).not.toHaveAttribute('value');
+    await expect(status.locator('[data-state="complete"]')).toContainText(['Saved']);
+    await expect(status.locator('[aria-current="step"]')).toContainText('Deploying');
+    await expect(page.locator('#admin-content-publish')).toBeDisabled();
+    expect(await status.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('publishing-progress.png') });
+    conclusion = 'failure';
+    await expect(status).toContainText('deployment failed', { timeout: 12000 });
+    await expect(status).toHaveAttribute('role', 'alert');
+    await expect(page.locator('#admin-content-publish')).toBeEnabled();
+    expect(calls.projectSave).toHaveLength(1);
+    conclusion = 'success';
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    await expect(status).toContainText('Your changes are live.');
+    await expect(status.locator('progress')).toHaveCount(0);
+    expect(calls.projectSave).toHaveLength(1);
+    expect(calls.projectPublish).toHaveLength(2);
   });
 
   test('saves assigned campaign runner opt-outs before publishing them', async ({ page }) => {

@@ -269,6 +269,21 @@ describe('email HTML security', () => {
     expect(payload.html).toContain('border-radius: 14px;');
   });
 
+  it('links a localized diary email to its exact entry and renders bounded emphasis safely', async () => {
+    const fetchMock = mockResend();
+    await sendDiaryUpdateEmail(env, {
+      email: 'supporter@example.com', campaignSlug: 'sunder', campaignTitle: 'sunder',
+      diaryTitle: 'An update', diaryId: 'update-from-sabrina', diaryPhase: 'post-production', preferredLang: 'es',
+      diaryExcerpt: '**Producer Man** with ***both*** and [a link](javascript:alert).', token: 'token'
+    });
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('https://pool.test/es/campaigns/sunder/#diary-entry-update-from-sabrina');
+    expect(payload.html).toContain('<strong>Producer Man</strong>');
+    expect(payload.html).toContain('<strong><em>both</em></strong>');
+    expect(payload.html).not.toContain('javascript:');
+    expect(payload.text).toContain('Producer Man with both');
+  });
+
   it('escapes diary content in update emails', async () => {
     const fetchMock = mockResend();
 
@@ -284,7 +299,7 @@ describe('email HTML security', () => {
 
     const payload = getEmailPayload(fetchMock);
     expect(payload.html).toContain('&lt;img src=x onerror=alert(1)&gt;');
-    expect(payload.html).toContain('line 1<br>&lt;script&gt;alert(2)&lt;/script&gt;');
+    expect(payload.html).toContain('line 1 &lt;script&gt;alert(2)&lt;/script&gt;');
     expect(payload.html).not.toContain('<script>alert(2)</script>');
     expect(payload.from).toBe('The Pool <updates@pool.test>');
     expect(payload.reply_to).toBe('info@pool.test');

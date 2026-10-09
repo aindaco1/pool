@@ -709,7 +709,7 @@
     });
     setDirtyButtonState(addOnsPublish, settingsDirty, settingsCleanText, settingsDirtyText);
     updateAdminUsersSaveState(adminUsersEditor());
-    setDirtyButtonState(contentPublish, campaignDirty || Boolean(campaignSave && workingState?.hasUnpublishedChanges), t('content_publish', 'Publish'), t('content_publish', 'Publish'), {
+    setDirtyButtonState(contentPublish, campaignDirty || Boolean(campaignSave && (workingState?.hasUnpublishedChanges || workingState?.deploymentPending)), t('content_publish', 'Publish'), t('content_publish', 'Publish'), {
       forceDisabled: activeDiaryContentField instanceof HTMLTextAreaElement || Boolean(contentLoadingCampaignSlug || campaignSavingSlug) || Boolean(campaignSave && !workingState)
     });
     setDirtyButtonState(contentSaveDraft, contentHasUnsavedChanges, t('content_save_draft', 'Save draft'), t('content_save_draft', 'Save draft'));
@@ -9760,6 +9760,7 @@
         filenameBase = filenameBase.replace(/^content-/, '');
         if (filenameBase && !filenameBase.startsWith('blast-')) filenameBase = 'blast-' + filenameBase;
       }
+      if (campaignSavingSlug && context?.collection !== 'blast') renderCampaignProgress('media', t('campaign_progress_uploading', 'Uploading media %{current} of %{total}…', { current: i + 1, total: uploads.length }));
       var result = await uploadMediaFile(uploadPath, file, {
         filename: file.name || pending.name || (kind === 'video' ? 'content-video' : kind === 'audio' ? 'content-audio' : 'content-image'),
         contentType: file.type || pending.type || '',
@@ -9894,6 +9895,117 @@
       });
   }
 
+  function campaignProgressElement(tag, className, text) {
+    var element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text) element.textContent = text;
+    return element;
+  }
+
+  var campaignProgress = null;
+  var campaignProgressTimer = null;
+
+  function campaignProgressElapsed() {
+    var seconds = Math.max(0, Math.floor((Date.now() - campaignProgress.startedAt) / 1000));
+    return seconds < 60 ? seconds + 's' : Math.floor(seconds / 60) + 'm ' + seconds % 60 + 's';
+  }
+
+  function renderCampaignProgress(stage, message, options) {
+    var status = campaignStatus || contentStatus;
+    if (!status) return;
+    var opts = options || {};
+    if (!campaignProgress || opts.start) {
+      window.clearInterval(campaignProgressTimer);
+      campaignProgress = { startedAt: Date.now(), publish: Boolean(opts.publish), media: Boolean(opts.media) };
+    }
+    campaignProgress.stage = stage;
+    var failed = stage === 'failed';
+    var finished = failed || stage === 'live' || stage === 'local' || (stage === 'saved' && !campaignProgress.publish);
+    status.replaceChildren();
+    status.classList.add('admin-campaign-progress');
+    status.setAttribute('role', failed ? 'alert' : 'status');
+    status.setAttribute('aria-live', failed ? 'assertive' : status.dataset.progressMessage === message ? 'off' : 'polite');
+    status.dataset.progressMessage = message;
+    status.dataset.progressStage = stage;
+    var summary = campaignProgressElement('div', 'admin-campaign-progress__summary');
+    summary.appendChild(campaignProgressElement('span', '', message));
+    if (!finished) {
+      var progress = campaignProgressElement('progress', 'admin-campaign-progress__bar');
+      progress.setAttribute('aria-label', message);
+      summary.appendChild(progress);
+    }
+    var elapsed = campaignProgressElement('time', 'admin-campaign-progress__elapsed', campaignProgressElapsed());
+    elapsed.setAttribute('aria-hidden', 'true');
+    summary.appendChild(elapsed);
+    status.appendChild(summary);
+    var steps = campaignProgressElement('ol', 'admin-campaign-progress__steps');
+    var stages = (campaignProgress.media ? ['media'] : []).concat(['saved'], campaignProgress.publish ? ['deploying', 'live'] : []);
+    var active = stage === 'saving' ? stages.indexOf('saved') : stage === 'local' ? stages.indexOf('deploying') : stages.indexOf(stage);
+    stages.forEach(function(name, index) {
+      var complete = (failed && index < stages.indexOf(opts.failedStage)) || stage === 'live' || (name === 'saved' && ['saved', 'deploying', 'local'].includes(stage)) || (active >= 0 && index < active);
+      var state = complete ? 'complete' : index === active ? 'current' : 'pending';
+      if (failed && name === opts.failedStage) state = 'failed';
+      var item = campaignProgressElement('li', '', t('campaign_progress_' + name, name.charAt(0).toUpperCase() + name.slice(1)));
+      item.dataset.state = state;
+      var marker = campaignProgressElement('span', '', complete ? '✓' : state === 'current' ? '●' : state === 'failed' ? '×' : '○');
+      marker.setAttribute('aria-hidden', 'true');
+      item.prepend(marker);
+      if (state === 'current') item.setAttribute('aria-current', 'step');
+      steps.appendChild(item);
+    });
+    status.appendChild(steps);
+    if (/^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/\d+$/.test(opts.url || '')) {
+      var link = campaignProgressElement('a', 'admin-campaign-progress__link', t('campaign_progress_open_run', 'View deployment'));
+      link.href = opts.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      status.appendChild(link);
+    }
+    window.clearInterval(campaignProgressTimer);
+    if (!finished) campaignProgressTimer = window.setInterval(function() {
+      var timer = status.querySelector('time');
+      if (timer) timer.textContent = campaignProgressElapsed();
+    }, 1000);
+  }
+
+  async function trackCampaignDeployment(data, slug) {
+    if (data.repositoryMode === 'local') {
+      renderCampaignProgress('local', t('campaign_progress_local', 'Published locally. The local site rebuilds automatically.'));
+      return true;
+    }
+    var tracking = data.deployment;
+    var run = {};
+    if (!tracking?.commitSha || !tracking.requestedAt || tracking.triggered === false) {
+      renderCampaignProgress('failed', t('campaign_progress_unavailable', 'Changes saved for publication, but deployment could not be confirmed. Your edits are safe.'), { failedStage: 'deploying' });
+      return false;
+    }
+    var startedAt = Date.now();
+    var errors = 0;
+    while (Date.now() - startedAt < 20 * 60 * 1000) {
+      renderCampaignProgress('deploying', t(run.status === 'in_progress' ? 'campaign_progress_building' : 'campaign_progress_queued', run.status === 'in_progress' ? 'Building and deploying the public site…' : 'Saved. Waiting for deployment…'), { url: run.url });
+      try {
+        var params = new URLSearchParams({ campaignSlug: slug, commitSha: tracking.commitSha, requestedAt: tracking.requestedAt });
+        if (run.runId) params.set('runId', run.runId);
+        var status = await requestJson('/admin/campaigns/deployment?' + params.toString(), { method: 'GET' });
+        run = status.deployment || {};
+        errors = 0;
+        if (run.status === 'completed') {
+          var success = run.conclusion === 'success';
+          renderCampaignProgress(success ? 'live' : 'failed', success
+            ? t('campaign_progress_complete', 'Published. Your changes are live.')
+            : t('campaign_progress_failed', 'Changes saved, but deployment failed. The previous site may still be live. Publish again to retry.'), { url: run.url, failedStage: 'deploying' });
+          return success;
+        }
+      } catch (_error) {
+        errors += 1;
+        if (errors >= 5) break;
+      }
+      await new Promise(function(resolve) { window.setTimeout(resolve, 4000); });
+    }
+    renderCampaignProgress('failed', t('campaign_progress_unavailable', 'Changes saved for publication, but deployment could not be confirmed. Your edits are safe.'), { url: run.url, failedStage: 'deploying' });
+    return false;
+  }
+
   async function saveCampaignProject(options) {
     var slug = selectedContentCampaignSlug();
     var state = campaignWorkingStates[slug];
@@ -9902,7 +10014,7 @@
     if (options?.ifNeeded && state.hasWorkingCopy && !campaignProjectHasChanges()) return true;
     campaignSavingSlug = slug;
     updateDirtyIndicators();
-    setText(status, t('campaign_saving', 'Saving project...'));
+    renderCampaignProgress('saving', t('campaign_saving', 'Saving project...'), { start: true, publish: options?.publish, media: hasPendingContentUploads(contentBlocks) || pendingDiaryContentEditors(selectedCampaignSettingsPanel()).length > 0 });
     try {
       syncActiveDiaryContentField();
       var draft = readContentEditorDraft();
@@ -9920,6 +10032,7 @@
       var submittedControls = Array.from(root?.querySelectorAll('[data-settings-path]') || []).filter(function(control) {
         return control.dataset.settingsCampaign === slug && submittedPaths.has(control.dataset.settingsPath);
       }).map(function(control) { return { control: control, value: String(control.value || '') }; });
+      renderCampaignProgress('saving', t('campaign_saving', 'Saving project...'));
       var data = await requestJson('/admin/campaigns/draft', {
         method: 'POST',
         body: JSON.stringify({ intent: 'save', campaignSlug: slug, baseRevision: loadedContentBaseRevision,
@@ -9934,11 +10047,11 @@
       if (currentContentSnapshot() === submittedContent) resetContentDirtyBaseline();
       else updateContentDirty();
       writeContentDraft({ trackDirty: false, schedulePreview: false });
-      setText(status, t('campaign_saved', 'Project saved. These changes are ready to preview and have not been published.'));
+      renderCampaignProgress('saved', t('campaign_saved', 'Project saved. These changes are ready to preview and have not been published.'));
       return true;
     } catch (error) {
       renderContentValidation(error?.data || {});
-      setText(status, error?.data?.error || error?.message || t('campaign_save_failed', 'Unable to save the project. Your edits have been kept.'));
+      renderCampaignProgress('failed', error?.data?.error || error?.message || t('campaign_save_failed', 'Unable to save the project. Your edits have been kept.'), { failedStage: campaignProgress?.stage === 'media' ? 'media' : 'saved' });
       return false;
     } finally {
       campaignSavingSlug = '';
@@ -9948,21 +10061,21 @@
 
   async function publishSavedCampaignProject() {
     if (!window.confirm(t('campaign_publish_confirm', 'Publish all current project changes to the public site?'))) return;
-    if (!await saveCampaignProject({ ifNeeded: true })) return;
+    if (!await saveCampaignProject({ ifNeeded: true, publish: true })) return;
     var slug = selectedContentCampaignSlug();
-    var status = campaignStatus || contentStatus;
     campaignSavingSlug = slug;
     updateDirtyIndicators();
-    setText(status, t('campaign_publishing', 'Publishing saved project...'));
+    renderCampaignProgress('saved', t('campaign_publishing', 'Publishing saved project...'), { start: !campaignProgress?.publish || ['live', 'failed', 'local'].includes(campaignProgress?.stage), publish: true });
     try {
       var data = await requestJson('/admin/campaigns/draft', {
         method: 'POST', body: JSON.stringify({ intent: 'publish', campaignSlug: slug, baseRevision: loadedContentBaseRevision })
       });
       campaignWorkingStates[slug] = Object.assign({}, data, { settingsRevision: data.baseRevision });
-      setText(status, t('campaign_published', 'Project published. The public site will update when deployment finishes.'));
+      campaignWorkingStates[slug].deploymentPending = true;
+      campaignWorkingStates[slug].deploymentPending = !await trackCampaignDeployment(data, slug);
     } catch (error) {
       renderContentValidation(error?.data || {});
-      setText(status, error?.data?.error || t('campaign_publish_failed', 'Unable to publish. Your saved project is still available.'));
+      renderCampaignProgress('failed', error?.data?.error || t('campaign_publish_failed', 'Unable to publish. Your saved project is still available.'), { failedStage: 'deploying' });
     } finally {
       campaignSavingSlug = '';
       updateDirtyIndicators();

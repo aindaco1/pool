@@ -297,7 +297,7 @@ diary:
     body: "Simple text without rich content."
 ```
 
-**Email broadcasts:** When diary entries are added and deployed, the GitHub Action triggers `/admin/diary/check` which sends update emails to all campaign supporters. The automatic check sends only entries that have not been broadcast before. Diary entries use stable `id` values for broadcast tracking; the dashboard preserves existing IDs, and the Worker derives title-based IDs for newly added entries. Legacy date markers are still recognized so edits to older entries do not resend. The email excerpt is auto-extracted from text blocks (first 200 chars, markdown stripped).
+**Email broadcasts:** When diary entries are added and deployed, the GitHub Action triggers `/admin/diary/check` which sends update emails to all campaign supporters. The automatic check sends only entries that have not been broadcast before. Diary entries use stable `id` values for broadcast tracking; the dashboard preserves existing IDs, and the Worker derives title-based IDs for newly added entries. Legacy date markers are still recognized so edits to older entries do not resend. The email excerpt is auto-extracted from text and quote blocks, parses Markdown emphasis, and truncates to 200 visible characters without cutting formatting tags. Stable IDs also identify entry permalinks (`#diary-entry-<id>`); preserve IDs when editing so existing links and broadcast tracking remain valid.
 
 See [Email](EMAIL.md) for broadcast delivery and suppression, and
 [Deployment](DEPLOYMENT.md#post-deploy-diary-check) for matching Action/Worker

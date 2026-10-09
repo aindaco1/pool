@@ -1,3 +1,4 @@
+import { getDiaryExcerpt, buildDiaryExcerpt } from '../../worker/src/diary.js';
 /**
  * Unit tests for email broadcast functionality
  * 
@@ -116,47 +117,23 @@ async function checkMilestones(
 // Rate limit constant lives with the shared Resend email integration.
 const RESEND_RATE_LIMIT_DELAY = RESEND_RATE_LIMIT_DELAY_MS;
 
-// Inline implementation of getDiaryExcerpt (mirrors worker/src/index.js)
-function getDiaryExcerpt(entry: { body?: string; content?: Array<{ type: string; body?: string; text?: string }> }, maxLength = 200): string {
-  // Legacy: plain text body
-  if (entry.body && typeof entry.body === 'string') {
-    return entry.body.slice(0, maxLength);
-  }
-  
-  // New: content blocks array
-  if (entry.content && Array.isArray(entry.content)) {
-    const textParts: string[] = [];
-    for (const block of entry.content) {
-      if (block.type === 'text' && block.body) {
-        // Strip basic markdown formatting for email excerpt
-        const plainText = block.body
-          .replace(/\*\*([^*]+)\*\*/g, '$1')  // bold
-          .replace(/\*([^*]+)\*/g, '$1')       // italic
-          .replace(/_([^_]+)_/g, '$1')         // italic
-          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links
-          .replace(/^#+\s*/gm, '')              // headers
-          .replace(/\n+/g, ' ')                 // newlines to spaces
-          .trim();
-        textParts.push(plainText);
-      } else if (block.type === 'quote' && block.text) {
-        textParts.push(`"${block.text}"`);
-      }
-    }
-    const combined = textParts.join(' ').trim();
-    if (combined.length > maxLength) {
-      return combined.slice(0, maxLength) + '…';
-    }
-    return combined;
-  }
-  
-  return '';
-}
-
 // =============================================================================
 // Diary Excerpt Extraction
 // =============================================================================
 
 describe('getDiaryExcerpt', () => {
+  it('parses nested emphasis and closes formatting when truncating the rendered excerpt', () => {
+    const excerpt = buildDiaryExcerpt({ body: '**Producer Man** here. **What happened to *sunder*? Is it done yet?**' }, 51);
+    expect(excerpt.text).toBe('Producer Man here. What happened to sunder? Is it d…');
+    expect(excerpt.html).toBe('<strong>Producer Man</strong> here. <strong>What happened to <em>sunder</em>? Is it d</strong>…');
+    expect(excerpt.text).not.toContain('*');
+  });
+  it('keeps Unicode and entities intact and treats raw HTML as text', () => {
+    const excerpt = buildDiaryExcerpt({ body: '**A & B 😀😀** <img src=x onerror=alert(1)>' }, 9);
+    expect(excerpt.html).toBe('<strong>A &amp; B 😀😀</strong>…');
+    expect(buildDiaryExcerpt({body:'<script>alert(1)</script>'}).html).toContain('&lt;script&gt;');
+  });
+
   it('extracts plain text from legacy body field', () => {
     const entry = { body: 'This is a simple update.' };
     expect(getDiaryExcerpt(entry)).toBe('This is a simple update.');
@@ -164,7 +141,7 @@ describe('getDiaryExcerpt', () => {
 
   it('truncates legacy body to maxLength', () => {
     const entry = { body: 'A'.repeat(300) };
-    expect(getDiaryExcerpt(entry, 200)).toBe('A'.repeat(200));
+    expect(getDiaryExcerpt(entry, 200)).toBe('A'.repeat(200) + '…');
   });
 
   it('adds ellipsis when content blocks are truncated', () => {

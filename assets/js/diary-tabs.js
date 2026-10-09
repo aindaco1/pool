@@ -61,7 +61,7 @@
       ? target
       : target.classList.contains('diary-tab')
         ? document.getElementById(target.getAttribute('aria-controls') || '')
-        : null;
+        : target.closest('.diary-panel');
     if (!(panel instanceof HTMLElement)) return false;
 
     var tab = tabForPanel(panel.id);
