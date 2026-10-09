@@ -1375,6 +1375,8 @@ admin:
   feedback_dates_order: "Choose an end date on or after the start date."
   feedback_dates: "Choose a valid campaign start date and end date."
   feedback_goal: "Enter a funding goal greater than zero."
+  feedback_featured_tier: "The featured tier is missing from this project. Check the Tiers and Settings tabs. Your edits have been kept."
+  feedback_campaign_source: "The saved project could not be read completely. Your edits have been kept. Contact an administrator to repair the campaign source."
   content_title: "Content editor"
   content_intro: "Load campaign Markdown blocks into a browser-local draft, validate them, and preview desktop/mobile layouts without writing KV."
   content_load: "Load content"

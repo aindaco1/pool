@@ -12795,8 +12795,28 @@ function adminYamlIndent(line = '') {
 
 function nextAdminYamlContentIndex(lines, index) {
   let cursor = index;
-  while (cursor < lines.length && !String(lines[cursor] || '').trim()) cursor += 1;
+  while (cursor < lines.length && (!String(lines[cursor] || '').trim() || String(lines[cursor]).trimStart().startsWith('#'))) cursor += 1;
   return cursor;
+}
+
+function parseAdminYamlScalarLines(lines, index, parentIndent, rawValue) {
+  // Plain YAML strings may wrap onto indented continuation lines. Consume the
+  // entire scalar before parsing the next field or sequence item.
+  let cursor = index;
+  let value = rawValue;
+  if (!/^["'[{>|&*!%@`]/.test(rawValue)) {
+    let blankLines = 0;
+    while (cursor < lines.length) {
+      const line = String(lines[cursor] || '');
+      if (!line.trim()) { blankLines += 1; cursor += 1; continue; }
+      if (line.trimStart().startsWith('#')) { cursor += 1; continue; }
+      if (adminYamlIndent(line) <= parentIndent || /:(?:\s|$)/.test(line)) break;
+      value += (blankLines ? '\n'.repeat(blankLines) : ' ') + line.trim();
+      blankLines = 0;
+      cursor += 1;
+    }
+  }
+  return { value: parseAdminYamlScalar(value), index: cursor };
 }
 
 function parseAdminYamlBlockScalar(lines, index, parentIndent) {
@@ -12885,7 +12905,9 @@ function parseAdminYamlMapping(lines, index, indent) {
       continue;
     }
     if (pair.raw !== '') {
-      data[pair.key] = parseAdminYamlScalar(pair.raw);
+      const scalar = parseAdminYamlScalarLines(lines, cursor, indent, pair.raw);
+      data[pair.key] = scalar.value;
+      cursor = scalar.index;
       continue;
     }
 
@@ -12946,7 +12968,9 @@ function parseAdminYamlSequence(lines, index, indent) {
         object[firstPair.key] = block.value;
         cursor = block.index;
       } else if (firstPair.raw !== '') {
-        object[firstPair.key] = parseAdminYamlScalar(firstPair.raw);
+        const scalar = parseAdminYamlScalarLines(lines, cursor, indent + 2, firstPair.raw);
+        object[firstPair.key] = scalar.value;
+        cursor = scalar.index;
       } else {
         const childIndex = nextAdminYamlContentIndex(lines, cursor);
         if (childIndex < lines.length && adminYamlIndent(lines[childIndex]) > indent) {
@@ -12968,7 +12992,9 @@ function parseAdminYamlSequence(lines, index, indent) {
       continue;
     }
 
-    items.push(parseAdminYamlScalar(itemText));
+    const scalar = parseAdminYamlScalarLines(lines, cursor, indent, itemText);
+    items.push(scalar.value);
+    cursor = scalar.index;
   }
   return { value: items, index: cursor };
 }
@@ -12977,7 +13003,9 @@ function parseAdminFrontMatter(source = '') {
   const match = String(source || '').match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return null;
   const lines = match[1].split(/\r?\n/);
-  return parseAdminYamlMapping(lines, 0, 0).value;
+  const parsed = parseAdminYamlMapping(lines, 0, 0);
+  // Never publish a partial document after encountering unsupported syntax.
+  return nextAdminYamlContentIndex(lines, parsed.index) === lines.length ? parsed.value : null;
 }
 
 function normalizeAdminCampaignFromMarkdown(source = '', file = {}) {
@@ -20200,6 +20228,7 @@ async function handleAdminCampaignWorkingCopy(request, env) {
   const settings = applyAdminCampaignSettingsPatchToMarkdown(source, validated.changes);
   if (!settings.ok) return privateJsonResponse(settings, 422, env);
   const candidate = normalizeAdminCampaignFromMarkdown(settings.content, { path: adminCampaignDraftPath(slug) });
+  if (!candidate) return privateJsonResponse({ error: 'Campaign source could not be read. Existing data has been left untouched.', code: 'campaign_source_invalid' }, 422, env);
   const draft = normalizeAdminContentDraft({ campaignSlug: slug, draft: body.draft });
   for (const [path, field] of [['title', 'title'], ['short_blurb', 'shortBlurb']]) {
     if (validated.changes.some(change => change.path === path)) draft[field] = candidate[path];

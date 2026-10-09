@@ -7126,6 +7126,69 @@ Preserved Markdown body.
     return { env, session, files, source, writes, request, save, fail: () => { failWrites = true; } };
   }
 
+  it('preserves wrapped tier descriptions and later fields when publishing an italic-only Diary edit', async () => {
+    const w = await workspace();
+    const tiers = `tiers:
+  - id: basic
+    name: Basic
+    price: 10
+    description: Storyboards and a digital copy
+      of the blooper reel.
+    category: digital
+  # Keep the featured reward after the wrapped description.
+  - description: All the goodies
+
+      Plus the premiere.
+    id: featured
+    name: Featured
+    price: 30
+    category: digital
+featured_tier_id: featured`;
+    const source = w.source.replace('tiers: []', tiers);
+    w.files.set('_campaigns/hand-relations.md', { content: source, sha: 'public-sha' });
+    // A retained working copy can carry an old base hash even after publishing.
+    // Equal authoring data must recover the current live hash before saving.
+    w.files.set('_campaign_drafts/hand-relations.md', {
+      content: source.replace('title: "Hand Relations"', 'title: Hand Relations\n_pool_draft_base_hash: "old-base-hash"'), sha: 'draft-sha'
+    });
+    const initial = await w.request();
+    expect(initial.body.campaign.hasUnpublishedChanges).toBe(false);
+    const diary = [{ id: 'update', title: 'Update', date: '2026-10-09', phase: 'post-production', content: [{ type: 'text', body: 'Hello *patrons*.\n\n**Production** continues.' }] }];
+    const saved = await w.save(initial.body.campaign.baseRevision, [{ campaignSlug: 'hand-relations', path: 'diary', value: diary }], 'Original story');
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const published = await w.request({ intent: 'publish', campaignSlug: 'hand-relations', baseRevision: saved.body.baseRevision });
+    expect(published.status, JSON.stringify(published.body)).toBe(200);
+    expect(published.body.hasUnpublishedChanges).toBe(false);
+    const settings = await worker.fetch(new Request('https://pledge.pool.test/admin/settings?working=true', { headers: { Cookie: w.session.cookie } }), w.env, w.session.ctx);
+    const rows = (await settings.json()).campaigns[0].rows;
+    expect(rows.find((row: any) => row.path === 'tiers').rawValue).toMatchObject([
+      { id: 'basic', description: 'Storyboards and a digital copy of the blooper reel.', category: 'digital' },
+      { id: 'featured', description: 'All the goodies\nPlus the premiere.', category: 'digital' }
+    ]);
+    expect(rows.find((row: any) => row.path === 'diary').rawValue).toEqual(diary);
+    const live = w.files.get('_campaigns/hand-relations.md')!.content;
+    expect(live).toContain('id: "featured"');
+    expect(live).toContain('of the blooper reel.');
+    expect(live).toContain('Hello *patrons*.');
+    expect(live).toContain('Preserved Markdown body.');
+    expect((await w.save(saved.body.baseRevision, [], 'Original story')).status).toBe(200);
+  });
+
+  it('rejects an incompletely parsed campaign instead of saving or publishing partial data', async () => {
+    const w = await workspace();
+    const unsupported = w.source.replace('short_blurb: "Original blurb"', 'short_blurb: "A quoted string\n  wrapped across lines"');
+    w.files.set('_campaign_drafts/hand-relations.md', { content: unsupported, sha: 'draft-sha' });
+    for (const body of [undefined, { intent: 'publish', campaignSlug: 'hand-relations', baseRevision: 'draft:draft-sha' }]) {
+      const response = await w.request(body);
+      expect(response.status).toBe(422);
+      expect(response.body.error).toContain('Existing data has been left untouched');
+    }
+    expect((await w.save('draft:draft-sha')).status).toBe(422);
+    expect(w.writes).toEqual([]);
+    expect(w.files.get('_campaigns/hand-relations.md')!.content).toBe(w.source);
+    expect(w.files.get('_campaign_drafts/hand-relations.md')!.content).toBe(unsupported);
+  });
+
   it('restricts deployment tracking to authenticated campaign access and keeps it read-only', async () => {
     const w = await workspace(true, 'creator@example.com');
     const originalFetch = global.fetch;

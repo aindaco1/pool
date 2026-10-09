@@ -1367,6 +1367,8 @@ admin:
   feedback_dates_order: "Elige una fecha de finalización igual o posterior a la fecha de inicio."
   feedback_dates: "Elige fechas válidas de inicio y finalización de la campaña."
   feedback_goal: "Introduce una meta de financiación mayor que cero."
+  feedback_featured_tier: "El nivel destacado no está en este proyecto. Revisa las pestañas Niveles y Configuración. Tus cambios se han conservado."
+  feedback_campaign_source: "No se pudo leer el proyecto guardado por completo. Tus cambios se han conservado. Contacta a un administrador para reparar el archivo de la campaña."
   content_title: "Editor de contenido"
   content_intro: "Carga bloques Markdown de campaña en un borrador local del navegador, valídalos y previsualiza escritorio/móvil sin escribir KV."
   content_load: "Cargar contenido"
