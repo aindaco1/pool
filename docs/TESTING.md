@@ -29,11 +29,17 @@ eligible. A security fix still requires a reviewed compatible Platform upgrade;
 do not weaken the pin test to bypass it. Continue running both dependency audits
 described in [SECURITY.md](./SECURITY.md#dependency-and-release-security).
 
-Campaign video-upload regression checks run with:
+Campaign media-upload regression checks run with:
 
 ```bash
 npx vitest run tests/unit/github-video-runtime.test.ts tests/unit/github-worker-runtime.test.ts tests/unit/admin-dashboard.test.ts
 ```
+
+Image/audio API cases exercise the reported 2.3 MB image, exact 8 MiB image
+and 25 MiB audio limits, and one-byte-over rejection before provider writes.
+The GitHub Worker runtime suite verifies byte-preserving JSON transfers at
+both limits with a simulated provider. Logo limits remain 512 KiB. These
+checks do not establish live provider acceptance of a creator's actual file.
 
 Protected-preview YouTube controls are covered by
 `npx playwright test tests/e2e/campaign-preview.spec.ts --project=chromium`.
