@@ -109,11 +109,11 @@ diary:
         body: |
           Our editor, Jacob Schmidt, is also hard at work **sequencing the live-action portion of the movie**. Once the animation team finishes up, we can get a **picture lock** and move on to Aidan’s **sound design** and Robin’s **score**!
           
-          **Is it done yet?**
+          ***Is it done yet?***
           
           Sadly, *sunder* is not done yet. I wish it were done too. I want you all to see the **work**, **expertise**, and **passion** that went into this project.
           
-          **When can I watch it?**
+          ***When can I watch it?***
           
           We want everyone on the post team to have enough time to do their best work on *sunder*. On our current timeline, animation should wrap up by **February 2027**. After that, we’re gonna give the sound team a couple months to **record foley**, wrap up their **score**, and really **build just how the world of** ***sunder*** **sounds**. So, tentatively, *sunder* should be completed by the beginning of **summer 2027!**
           
@@ -145,44 +145,41 @@ diary:
         body: |
           To keep things fair, we’re going to send out all the digital goodies the **same day** we mail out all your physical goodies. We’re gonna **package it nicely** so it feels like a **reward**, because you all deserve it! **We wouldn’t have gotten this far without your help.**
           
-          Producer Man Sabrina
+          *-- Producer Man Sabrina*
 ongoing_items: []
 tiers:
-  - id: screw-goodies
-    name: screw goodies!
+  - id: "screw-goodies"
+    name: "screw goodies!"
     price: 10
-    description: special thanks in the credits and via social media.
-    image: /assets/images/campaigns/sunder/screw-goodies.png
-    category: digital
+    image: "/assets/images/campaigns/sunder/screw-goodies.png"
+    description: "special thanks in the credits and via social media."
     stackable: false
+    category: "digital"
     late_support: false
-  - id: some-goodies
-    name: some goodies
+  - id: "some-goodies"
+    name: "some goodies"
     price: 20
-    description: access to the film's storyboards, concept art, and a digital copy
-      of the blooper reel.
-    image: /assets/images/campaigns/sunder/some-goodies.png
-    category: digital
+    image: "/assets/images/campaigns/sunder/some-goodies.png"
+    description: "access to the film's storyboards, concept art, and a digital copy of the blooper reel."
     stackable: false
+    category: "digital"
     late_support: false
-  - id: physical-media
-    name: physical media
+  - id: "physical-media"
+    name: "physical media"
     price: 35
-    description: everything in the $20 tier and a dvd copy of the film or cd of the
-      film's original soundtrack.
-    image: /assets/images/campaigns/sunder/physical-media.png
-    category: physical
+    image: "/assets/images/campaigns/sunder/physical-media.png"
+    description: "everything in the $20 tier and a dvd copy of the film or cd of the film's original soundtrack."
     stackable: false
+    category: "physical"
+    shipping_preset: "dvd"
     late_support: false
-    shipping_preset: dvd
-  - id: fan
-    name: fan
+  - id: "fan"
+    name: "fan"
     price: 50
-    description: everything in the $35 tier and a poster pack.
-    image: /assets/images/campaigns/sunder/fan.png
-    category: physical
+    image: "/assets/images/campaigns/sunder/fan.png"
+    description: "everything in the $35 tier and a poster pack."
     stackable: false
-    late_support: false
+    category: "physical"
     shipping:
       weight_oz: 10
       packaging_weight_oz: 3
@@ -190,14 +187,14 @@ tiers:
       width_in: 3
       height_in: 3
       stack_height_in: 0.5
-  - id: super-fan
-    name: super-fan!
+    late_support: false
+  - id: "super-fan"
+    name: "super-fan!"
     price: 100
-    description: everything in the $50 tier and bts footage.
-    image: /assets/images/campaigns/sunder/super-fan.png
-    category: physical
+    image: "/assets/images/campaigns/sunder/super-fan.png"
+    description: "everything in the $50 tier and bts footage."
     stackable: false
-    late_support: false
+    category: "physical"
     shipping:
       weight_oz: 10
       packaging_weight_oz: 3
@@ -205,14 +202,14 @@ tiers:
       width_in: 3
       height_in: 3
       stack_height_in: 0.5
-  - id: ultra-fan
-    name: ultra-fan!!!
+    late_support: false
+  - id: "ultra-fan"
+    name: "ultra-fan!!!"
     price: 250
-    description: everything in the $100 tier and two free tickets to the premiere.
-    image: /assets/images/campaigns/sunder/ultra-fan.png
-    category: physical
+    image: "/assets/images/campaigns/sunder/ultra-fan.png"
+    description: "everything in the $100 tier and two free tickets to the premiere."
     stackable: false
-    late_support: false
+    category: "physical"
     shipping:
       weight_oz: 10
       packaging_weight_oz: 3
@@ -220,6 +217,7 @@ tiers:
       width_in: 3
       height_in: 3
       stack_height_in: 0.5
+    late_support: false
 test_only: false
 preview_enabled: true
 preview_reviewer_emails: []
