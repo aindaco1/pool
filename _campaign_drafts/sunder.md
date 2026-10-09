@@ -109,11 +109,11 @@ diary:
         body: |
           Our editor, Jacob Schmidt, is also hard at work **sequencing the live-action portion of the movie**. Once the animation team finishes up, we can get a **picture lock** and move on to Aidan’s **sound design** and Robin’s **score**!
           
-          **Is it done yet?**
+          ***Is it done yet?***
           
           Sadly, *sunder* is not done yet. I wish it were done too. I want you all to see the **work**, **expertise**, and **passion** that went into this project.
           
-          **When can I watch it?**
+          ***When can I watch it?***
           
           We want everyone on the post team to have enough time to do their best work on *sunder*. On our current timeline, animation should wrap up by **February 2027**. After that, we’re gonna give the sound team a couple months to **record foley**, wrap up their **score**, and really **build just how the world of** ***sunder*** **sounds**. So, tentatively, *sunder* should be completed by the beginning of **summer 2027!**
           
@@ -145,7 +145,7 @@ diary:
         body: |
           To keep things fair, we’re going to send out all the digital goodies the **same day** we mail out all your physical goodies. We’re gonna **package it nicely** so it feels like a **reward**, because you all deserve it! **We wouldn’t have gotten this far without your help.**
           
-          Producer Man Sabrina
+          *-- Producer Man Sabrina*
 ongoing_items: []
 tiers:
   - id: screw-goodies
@@ -224,6 +224,6 @@ test_only: false
 preview_enabled: true
 preview_reviewer_emails: []
 preview_updated_at: "2026-06-15T16:33:33.453Z"
-_pool_draft_base_hash: "331474d64a967770da19d9b0d87e3462f076381ecf076f7e0bc27ae09896fb9b"
-_pool_draft_saved_at: "2026-10-09T18:01:05.512Z"
+_pool_draft_base_hash: "a4bc2ebc39a659198b5e0eb9bbf0f07dd545a694eec162dca2ba9d6edd86eb77"
+_pool_draft_saved_at: "2026-10-09T19:34:28.869Z"
 ---
