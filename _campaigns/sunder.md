@@ -97,7 +97,7 @@ diary:
         body: |
           Hello patrons,
           
-          **Producer Man** Sabrina here. Now, I’ve been hearing some questions about *sunder*: **“What happened to** ***sunder***?” **“Is it done yet?” “When can I watch it?” “*WHERE can I watch it?*”** Well, I’m gonna answer those questions for you now.
+          **Producer Man** Sabrina here. Now, I’ve been hearing some questions about *sunder*: ***“What happened to** **sunder**?”* ***“Is it done yet?” “When can I watch it?”* “*WHERE can I watch it?*”** Well, I’m gonna answer those questions for you now.
           
           **What happened to** ***sunder?***
           
@@ -121,7 +121,7 @@ diary:
           
           Well, those of you who ask for a dvd as one of your goodies will be able to watch sunder as many times as you want from the comfort of your home. But for everyone else, we have some options. A large premiere at the **Guild cinema** in downtown Albuquerque…a private backers-only screening at **Dust Wave’s microcinema**…maybe a **film festival** or two…the possibilities are endless!
           
-          **“Okay Sabrina, I hear you, but what about my goodies I paid for?”** So here’s the thing: almost all of you wanted some **physical media**. You guys believe so deeply in this project that you want a **dvd copy of sunder** or a **cd of the soundtrack**. And that really warms our hearts. But that means we can’t send you any physical media until we finish **animating, editing, coloring, sound designing, scoring, blah blah blah…**
+          ***“Okay Sabrina, I hear you, but what about my goodies I paid for?”*** So here’s the thing: almost all of you wanted some **physical media**. You guys believe so deeply in this project that you want a **dvd copy of sunder** or a **cd of the soundtrack**. And that really warms our hearts. But that means we can’t send you any physical media until we finish **animating, editing, coloring, sound designing, scoring, blah blah blah…**
           
           A bunch of you are also gonna get a pack of **two posters**. We want to ship everything out at the same time, so you’ll get your **poster pack** and **physical media** at the same time! In the meantime, here’s a look at the two posters you’ll get!
       - type: "gallery"
