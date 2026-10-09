@@ -3065,7 +3065,7 @@ runner_report_emails:
           title: 'New diary update',
           id: '',
           date: '2026-05-29T10:00-06:00',
-          phase: 'fundraising',
+          phase: 'post-production',
           content: [{ type: 'text', body: 'A freshly added update.', align: 'left' }]
         }])
       }
@@ -3126,6 +3126,7 @@ runner_report_emails:
     expect(campaignContent).toContain('diary:');
     expect(campaignContent).toContain('title: "New diary update"');
     expect(campaignContent).toContain('id: "new-diary-update"');
+    expect(campaignContent).toContain('phase: "post-production"');
     expect(githubCalls.some((call) => call.url.endsWith('/actions/workflows/deploy.yml/dispatches'))).toBe(true);
     expectNoKvWritesOrLists(env, 'settings publish');
   });

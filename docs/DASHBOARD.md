@@ -448,6 +448,8 @@ Ongoing items define post-campaign or ongoing support needs shown by the campaig
 
 Diary entries are campaign updates sorted newest first. Each entry includes title, date/time, phase, and its own WYSIWYG content editor. Diary content uses the same content block model as the campaign Content tab.
 
+The phase selector offers Launch, Fundraising, Production, Post-Production, and Fulfillment, in that order. Post-Production saves as `post-production`, matching the existing public diary and protected-preview phase. Existing entries with other phase values retain their selection.
+
 ### Decisions
 
 Decisions define supporter vote/poll prompts. `vote` means the result is meant to decide an outcome; `poll` means the result is advisory supporter feedback. Both use the same option and tally flow today.
@@ -770,6 +772,13 @@ Markdown, including italic text nested inside bold text. Pool retains campaign
 block rendering and URL validation. The public Ruby filter has a parity test for
 nested emphasis. Shared Design Core mixins provide editor control containment,
 long-filename wrapping, open-panel stacking, spacing, and responsive preview media.
+
+Pasting rich text honors explicit font weights, including Google Docs' normal-weight
+`<b>` wrapper, so only text marked as bold in the source becomes bold. Text blocks preserve
+supported inline emphasis, lists, and links; external fonts, colors, and unsafe HTML
+are stripped by the paste sanitizer.
+Pasting inside existing paragraph or emphasis text uses the enclosing Text block,
+preserving paragraph boundaries through Save and reopening the editor.
 
 Image uploads keep a tab-local preview keyed by the returned repository path.
 Hero images and editor blocks stay visible before the new asset reaches the public

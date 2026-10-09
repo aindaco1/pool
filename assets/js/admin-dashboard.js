@@ -2938,6 +2938,7 @@
       { value: 'launch', label: t('diary_phase_launch', 'Launch') },
       { value: 'fundraising', label: t('diary_phase_fundraising', 'Fundraising') },
       { value: 'production', label: t('diary_phase_production', 'Production') },
+      { value: 'post-production', label: t('diary_phase_post_production', 'Post-Production') },
       { value: 'fulfillment', label: t('diary_phase_fulfillment', 'Fulfillment') }
     ];
     var current = String(currentValue || '').trim();
@@ -3086,7 +3087,7 @@
         diary: {
           title: t('collection_help_diary_title', 'Public title for this campaign diary or update entry.'),
           date: t('collection_help_diary_date', 'Publication date and time used for display and newest-first ordering.'),
-          phase: t('collection_help_diary_phase', 'Campaign phase label used to contextualize the update, such as launch, fundraising, production, or fulfillment.'),
+          phase: t('collection_help_diary_phase', 'Campaign phase label used to contextualize the update, such as launch, fundraising, production, post-production, or fulfillment.'),
           content: t('collection_help_diary_content', 'WYSIWYG content blocks for this diary entry. Edits stay local until you save the draft and publish settings.')
         },
         decisions: {
@@ -7543,7 +7544,13 @@
 
   function elementHasClipboardStyle(element, styleName) {
     var style = (element.getAttribute('style') || '').toLowerCase();
-    if (styleName === 'bold') return /font-weight\s*:\s*(bold|[6-9]00)/.test(style);
+    if (styleName === 'bold') {
+      // Google Docs wraps its clipboard fragment in <b style="font-weight:normal">.
+      // An explicit weight overrides the tag's default, including on <strong>.
+      // Read the attribute directly: the editor's CSP can block CSSOM styles.
+      var weight = style.match(/(?:^|;)\s*font-weight\s*:\s*(normal|bold(?:er)?|lighter|[1-9]\d{0,3})(?:\s*!important)?\s*(?:;|$)/)?.[1];
+      return weight ? /^(bold|bolder)$/.test(weight) || Number(weight) >= 600 : /^(b|strong)$/i.test(element.tagName);
+    }
     if (styleName === 'italic') return /font-style\s*:\s*italic/.test(style);
     if (styleName === 'underline') return /text-decoration[^;]*underline/.test(style);
     return false;
@@ -7562,7 +7569,7 @@
       var value = htmlValue;
       if ((tag === 'u' || elementHasClipboardStyle(element, 'underline')) && value) value = '<u>' + value + '</u>';
       if ((tag === 'em' || tag === 'i' || elementHasClipboardStyle(element, 'italic')) && value) value = '<em>' + value + '</em>';
-      if ((tag === 'strong' || tag === 'b' || elementHasClipboardStyle(element, 'bold')) && value) value = '<strong>' + value + '</strong>';
+      if (elementHasClipboardStyle(element, 'bold') && value) value = '<strong>' + value + '</strong>';
       return value;
     }
     function cleanNode(node) {
@@ -11382,8 +11389,8 @@
     });
     root.addEventListener('paste', function(event) {
       runContentEditorAction(root, field, function() {
-        var control = event.target;
-        if (!(control instanceof HTMLElement) || !control.isContentEditable) return;
+        var control = editableForNode(event.target);
+        if (!control) return;
         var sanitized = sanitizedClipboardHtml(event, control.dataset.contentField === 'body');
         if (!sanitized) return;
         event.preventDefault();

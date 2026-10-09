@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Preserve paragraph breaks when pasting into existing text inside a dashboard
+  Text block, including Google Docs updates with adjacent paragraphs.
+
+- Preserve mixed normal, bold, and italic text pasted from Google Docs into the
+  dashboard editor by honoring normal font weights on clipboard wrappers.
+
+- Add Post-Production between Production and Fulfillment in the dashboard's
+  Diary phase selector, with English and Spanish labels.
+
 - Fix image and audio uploads above 2 MB being rejected by the GitHub transport.
   Honor the existing 8 MiB image, 25 MiB audio, and 512 KiB logo limits throughout
   the upload path; retain the separate 100 MB video transport.
