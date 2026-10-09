@@ -3549,6 +3549,276 @@
       "references": []
     },
     {
+      "path": "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c.png",
+      "publicPath": "/assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c.png",
+      "name": "content-insert-a2-20261009-180051-769e446c.png",
+      "label": "content insert a2 20261009 180051 769e446c",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "sunder",
+      "bytes": 1972254,
+      "sha256": "5314d4b7d37d3655dbbb1d722bc8df3b9cc31733421464246ce58d7a2ab9e170",
+      "width": 1500,
+      "height": 2122,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-320.webp",
+        "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-480.webp",
+        "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-640.webp",
+        "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-320.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-320.webp",
+          "bytes": 26378,
+          "sha256": "c6361b8fa4612b299545cad71a92b09bc67ad680c0e577f4a97516e943ddd635",
+          "sourceSha256": "5314d4b7d37d3655dbbb1d722bc8df3b9cc31733421464246ce58d7a2ab9e170",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-480.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-480.webp",
+          "bytes": 53642,
+          "sha256": "f5e04245dd36a7b999a6c4807fe46e510feb948e2067a14cfc693469540d31b5",
+          "sourceSha256": "5314d4b7d37d3655dbbb1d722bc8df3b9cc31733421464246ce58d7a2ab9e170",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-640.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-640.webp",
+          "bytes": 86030,
+          "sha256": "d76f9ffd73ed6b5277e9868509bb1eede08cec96ffea720f8c2f4f7fff5bfef5",
+          "sourceSha256": "5314d4b7d37d3655dbbb1d722bc8df3b9cc31733421464246ce58d7a2ab9e170",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-960.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a2-20261009-180051-769e446c-960.webp",
+          "bytes": 150068,
+          "sha256": "047e15a7edbb31db5639a0e4ab3dacacdde15a3e53e587bc88920ff6030a1477",
+          "sourceSha256": "5314d4b7d37d3655dbbb1d722bc8df3b9cc31733421464246ce58d7a2ab9e170",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d.png",
+      "publicPath": "/assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d.png",
+      "name": "content-insert-a3-20261009-180054-7bf6fe6d.png",
+      "label": "content insert a3 20261009 180054 7bf6fe6d",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "sunder",
+      "bytes": 1596457,
+      "sha256": "a9d4ce40c075662a2b2b7eb7b342af603458f3cc89a2d82d00dadcb9076806dd",
+      "width": 1587,
+      "height": 2245,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-320.webp",
+        "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-480.webp",
+        "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-640.webp",
+        "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-320.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-320.webp",
+          "bytes": 30454,
+          "sha256": "78cf0f60a987282747ddff4d88132c294dd54d4421e668c8ae961ce6cba9cd7e",
+          "sourceSha256": "a9d4ce40c075662a2b2b7eb7b342af603458f3cc89a2d82d00dadcb9076806dd",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-480.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-480.webp",
+          "bytes": 63288,
+          "sha256": "87e1aac7cd8c1b01e5b69dcec97aa1e84115d060f573d6f517fd80008ac737a9",
+          "sourceSha256": "a9d4ce40c075662a2b2b7eb7b342af603458f3cc89a2d82d00dadcb9076806dd",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-640.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-640.webp",
+          "bytes": 101720,
+          "sha256": "14b0ab7bc885d239264b9b9f0854127e3b75cbd8f1e67c54d69e4fbfcf699d6d",
+          "sourceSha256": "a9d4ce40c075662a2b2b7eb7b342af603458f3cc89a2d82d00dadcb9076806dd",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-960.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a3-20261009-180054-7bf6fe6d-960.webp",
+          "bytes": 182530,
+          "sha256": "2425b45786f97980e9b07d9625efe7f774132d410fe641e00d04e4140ad17590",
+          "sourceSha256": "a9d4ce40c075662a2b2b7eb7b342af603458f3cc89a2d82d00dadcb9076806dd",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af.png",
+      "publicPath": "/assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af.png",
+      "name": "content-insert-a4-20261009-180057-6b45c0af.png",
+      "label": "content insert a4 20261009 180057 6b45c0af",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "sunder",
+      "bytes": 1521588,
+      "sha256": "0d0a79bb4db2a7867384b4ecb49d5d570348c4993b301d48e2292c79a4012931",
+      "width": 2000,
+      "height": 1545,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-320.webp",
+        "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-480.webp",
+        "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-640.webp",
+        "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-960.webp",
+        "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-320.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-320.webp",
+          "bytes": 24710,
+          "sha256": "93ee4557a03977ad8c0c4a553d4a533d295407ba0aa89efa37d5a9a0e4d5312b",
+          "sourceSha256": "0d0a79bb4db2a7867384b4ecb49d5d570348c4993b301d48e2292c79a4012931",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-480.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-480.webp",
+          "bytes": 51578,
+          "sha256": "7aa7b76ce2501e20760a3b145b057d664d27809aee7e18d29b388c569eeb72f8",
+          "sourceSha256": "0d0a79bb4db2a7867384b4ecb49d5d570348c4993b301d48e2292c79a4012931",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-640.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-640.webp",
+          "bytes": 83240,
+          "sha256": "627c3cf3ac780056511506cfbe2eb3d4ae787e5a57c12eb28063b74a92c87ac7",
+          "sourceSha256": "0d0a79bb4db2a7867384b4ecb49d5d570348c4993b301d48e2292c79a4012931",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-960.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-960.webp",
+          "bytes": 169210,
+          "sha256": "79d5a561aab05805829a151b6e30ff359758d0c5919561e5cc1abc7a25150d68",
+          "sourceSha256": "0d0a79bb4db2a7867384b4ecb49d5d570348c4993b301d48e2292c79a4012931",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-1600.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a4-20261009-180057-6b45c0af-1600.webp",
+          "bytes": 340680,
+          "sha256": "338eb9c9cb8372ba60cc6d6a0f71c5498f67afe00204c82cb72c2086ad2af1b7",
+          "sourceSha256": "0d0a79bb4db2a7867384b4ecb49d5d570348c4993b301d48e2292c79a4012931",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f.png",
+      "publicPath": "/assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f.png",
+      "name": "content-insert-a5-20261009-180101-e3ccf54f.png",
+      "label": "content insert a5 20261009 180101 e3ccf54f",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "sunder",
+      "bytes": 1667604,
+      "sha256": "96f532be06e75af08934a0dcb61518ab08b6ab949a44fd94598386a5496e4292",
+      "width": 2000,
+      "height": 1545,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-320.webp",
+        "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-480.webp",
+        "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-640.webp",
+        "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-960.webp",
+        "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-320.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-320.webp",
+          "bytes": 22816,
+          "sha256": "42b9eff7db4d556d72a054d9fdd95f030a8b5bc157c4b43863d49c7ac5f35b29",
+          "sourceSha256": "96f532be06e75af08934a0dcb61518ab08b6ab949a44fd94598386a5496e4292",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-480.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-480.webp",
+          "bytes": 48742,
+          "sha256": "93640c1b35b0d78c801d4a7ceba1f4b5d6e0e9c209495ed3150cce726fb3b051",
+          "sourceSha256": "96f532be06e75af08934a0dcb61518ab08b6ab949a44fd94598386a5496e4292",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-640.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-640.webp",
+          "bytes": 83210,
+          "sha256": "12ffc9f81ec9833fc35452356830f7913b1b7e08b0c54c54afd716e89c2a299a",
+          "sourceSha256": "96f532be06e75af08934a0dcb61518ab08b6ab949a44fd94598386a5496e4292",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-960.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-960.webp",
+          "bytes": 168742,
+          "sha256": "028635bc56a204170a7ff8d5acaa4364b6f1b1ec7945ebab3ca72013175e8f75",
+          "sourceSha256": "96f532be06e75af08934a0dcb61518ab08b6ab949a44fd94598386a5496e4292",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-1600.webp",
+          "publicPath": "/assets/images/campaigns/sunder/content-insert-a5-20261009-180101-e3ccf54f-1600.webp",
+          "bytes": 352178,
+          "sha256": "07ff2e353d678108980c83b714b735e252a0053e5b457511ebdc9ef2e448c93d",
+          "sourceSha256": "96f532be06e75af08934a0dcb61518ab08b6ab949a44fd94598386a5496e4292",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/campaigns/sunder/content-wrapped-20260603-052919.gif",
       "publicPath": "/assets/images/campaigns/sunder/content-wrapped-20260603-052919.gif",
       "name": "content-wrapped-20260603-052919.gif",
@@ -3578,12 +3848,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/diary-1-1.png",
@@ -3650,12 +3915,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/diary-1-2.png",
@@ -3713,12 +3973,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/diary-1-3.png",
@@ -3776,12 +4031,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/diary-1-4.png",
@@ -3848,12 +4098,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/diary-1-5.png",
@@ -3911,12 +4156,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/fan.png",
@@ -3974,12 +4214,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/header-what-are-the-risks.png",
@@ -4473,12 +4708,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/progress.png",
@@ -4729,12 +4959,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/super-fan.png",
@@ -4792,12 +5017,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/ultra-fan.png",
@@ -4855,12 +5075,7 @@
         }
       ],
       "warnings": [],
-      "references": [
-        {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        }
-      ]
+      "references": []
     },
     {
       "path": "assets/images/campaigns/sunder/wide-alt.png",
@@ -12958,10 +13173,6 @@
       "warnings": [],
       "references": [
         {
-          "path": "_campaigns/sunder.md",
-          "count": 1
-        },
-        {
           "path": "_campaigns/worst-movie-ever.md",
           "count": 1
         }
@@ -13456,6 +13667,36 @@
       "references": [
         {
           "path": "_campaigns/deinonychus.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/videos/campaigns/sunder/content-video-insert-a1-20261009-180045-5ca086bf.mp4",
+      "publicPath": "/assets/videos/campaigns/sunder/content-video-insert-a1-20261009-180045-5ca086bf.mp4",
+      "name": "content-video-insert-a1-20261009-180045-5ca086bf.mp4",
+      "label": "content video insert a1 20261009 180045 5ca086bf",
+      "type": "video",
+      "scope": "campaign",
+      "campaignSlug": "sunder",
+      "bytes": 5261837,
+      "sha256": "28fd18d6d773536415a86df419ec4b1a6fb8c8d264e7c85a99d852a9bc634a7d",
+      "width": 2880,
+      "height": 2160,
+      "durationMs": 3917,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/videos/campaigns/sunder/content-video-insert-a1-20261009-180045-5ca086bf.webm"
+      ],
+      "missingDerivatives": [
+        "assets/videos/campaigns/sunder/content-video-insert-a1-20261009-180045-5ca086bf.webm"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/sunder.md",
           "count": 1
         }
       ]
