@@ -4,6 +4,8 @@ run-name: ${{ inputs.ref && format('Deploy {0}', inputs.ref) || 'Refresh Product
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '_campaign_drafts/**'
   schedule:
     # Run at midnight Mountain Time in MDT and MST to update campaign states.
     - cron: '0 6 * * *'

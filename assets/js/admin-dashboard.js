@@ -9995,7 +9995,9 @@
           var success = run.conclusion === 'success';
           renderCampaignProgress(success ? 'live' : 'failed', success
             ? t('campaign_progress_complete', 'Published. Your changes are live.')
-            : t('campaign_progress_failed', 'Changes saved, but deployment failed. The previous site may still be live. Publish again to retry.'), { url: run.url, failedStage: 'deploying' });
+            : run.conclusion === 'cancelled'
+              ? t('campaign_progress_cancelled', 'Changes saved, but deployment was cancelled. Publish again to retry.')
+              : t('campaign_progress_failed', 'Changes saved, but deployment failed. The previous site may still be live. Publish again to retry.'), { url: run.url, failedStage: 'deploying' });
           return success;
         }
       } catch (_error) {
