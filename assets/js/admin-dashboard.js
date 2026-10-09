@@ -902,6 +902,8 @@
     if (/deadline must be on or after/i.test(text)) return t('feedback_dates_order', 'Choose an end date on or after the start date.');
     if (/Valid campaign dates/i.test(text)) return t('feedback_dates', 'Choose a valid campaign start date and end date.');
     if (/positive funding goal/i.test(text)) return t('feedback_goal', 'Enter a funding goal greater than zero.');
+    if (/Featured tier must be one of the saved project tiers/i.test(text)) return t('feedback_featured_tier', 'The featured tier is missing from this project. Check the Tiers and Settings tabs. Your edits have been kept.');
+    if (/Campaign source could not be read/i.test(text)) return t('feedback_campaign_source', 'The saved project could not be read completely. Your edits have been kept. Contact an administrator to repair the campaign source.');
     var rendered = window.DustWaveAdminShellFeedback.formatIssue(text, { field: field, locale: lang });
     if (rendered) return rendered;
     return block || row || diary ? feedbackText(warning ? 'review_warning' : 'review_field', { field: field }) : '';

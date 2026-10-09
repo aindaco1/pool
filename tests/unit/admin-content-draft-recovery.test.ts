@@ -368,6 +368,30 @@ describe('project Save and existing browser drafts', () => {
     expect(e.save().disabled).toBe(false);
   });
 
+  it.each([
+    ['Featured tier must be one of the saved project tiers.', 'Check the Tiers and Settings tabs.'],
+    ['Campaign source could not be read. Existing data has been left untouched.', 'Contact an administrator to repair the campaign source.']
+  ])('keeps italic edits and explains a rejected Publish save: %s', async (error, message) => {
+    const e = editor({}, true);
+    await e.load();
+    e.edit('Hello *patrons*.');
+    const fetch = e.w.fetch;
+    e.w.fetch = vi.fn(async (url, options) => {
+      if (String(url).includes('/admin/campaigns/draft') && options?.method === 'POST') {
+        return new Response(JSON.stringify({ error }), { status: 422 });
+      }
+      return fetch(url, options);
+    });
+    e.get('publish').click();
+    await vi.waitFor(() => expect(e.get('status').textContent).toContain(message));
+    expect(e.get('long-content').value).toContain('Hello *patrons*.');
+    expect(e.w.localStorage.getItem(key)).toContain('Hello *patrons*.');
+    expect(e.warns()).toBe(true);
+    expect(e.get('publish').disabled).toBe(false);
+    const writes = e.w.fetch.mock.calls.filter(([url, options]) => String(url).includes('/admin/campaigns/draft') && options?.method === 'POST');
+    expect(writes.map(([, options]) => JSON.parse(options.body).intent)).toEqual(['save']);
+  });
+
   it('publishes a saved draft and enables Save again for the next revision', async () => {
     const e = editor({}, true);
     await e.load();

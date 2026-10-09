@@ -148,18 +148,78 @@ diary:
           Producer Man Sabrina
 ongoing_items: []
 tiers:
-  - id: "screw-goodies"
-    name: "screw goodies!"
+  - id: screw-goodies
+    name: screw goodies!
     price: 10
-    image: "/assets/images/campaigns/sunder/screw-goodies.png"
-    description: "special thanks in the credits and via social media."
+    description: special thanks in the credits and via social media.
+    image: /assets/images/campaigns/sunder/screw-goodies.png
+    category: digital
     stackable: false
-    category: "digital"
     late_support: false
-  - id: "some-goodies"
-    name: "some goodies"
+  - id: some-goodies
+    name: some goodies
     price: 20
-    description: "access to the film's storyboards, concept art, and a digital copy"
+    description: access to the film's storyboards, concept art, and a digital copy
+      of the blooper reel.
+    image: /assets/images/campaigns/sunder/some-goodies.png
+    category: digital
+    stackable: false
+    late_support: false
+  - id: physical-media
+    name: physical media
+    price: 35
+    description: everything in the $20 tier and a dvd copy of the film or cd of the
+      film's original soundtrack.
+    image: /assets/images/campaigns/sunder/physical-media.png
+    category: physical
+    stackable: false
+    late_support: false
+    shipping_preset: dvd
+  - id: fan
+    name: fan
+    price: 50
+    description: everything in the $35 tier and a poster pack.
+    image: /assets/images/campaigns/sunder/fan.png
+    category: physical
+    stackable: false
+    late_support: false
+    shipping:
+      weight_oz: 10
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
+  - id: super-fan
+    name: super-fan!
+    price: 100
+    description: everything in the $50 tier and bts footage.
+    image: /assets/images/campaigns/sunder/super-fan.png
+    category: physical
+    stackable: false
+    late_support: false
+    shipping:
+      weight_oz: 10
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
+  - id: ultra-fan
+    name: ultra-fan!!!
+    price: 250
+    description: everything in the $100 tier and two free tickets to the premiere.
+    image: /assets/images/campaigns/sunder/ultra-fan.png
+    category: physical
+    stackable: false
+    late_support: false
+    shipping:
+      weight_oz: 10
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
 test_only: false
 preview_enabled: true
 preview_reviewer_emails: []

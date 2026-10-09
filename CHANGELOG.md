@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve wrapped YAML descriptions and following reward tiers during campaign
+  Save and Publish. Reject incomplete source reads, retain edits on failure, and
+  show specific validation messages. Restore sunder tiers from its intact draft.
+
 - Link Diary emails to stable individual entries, opening the correct phase in
   localized campaign pages. Render nested Markdown emphasis in bounded email excerpts.
 - Bring Store-style save/publish progress to campaign editing: sticky actions,
