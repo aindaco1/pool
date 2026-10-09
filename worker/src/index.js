@@ -17143,7 +17143,7 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     normalized.base64,
     message,
     normalized.replaceSha,
-    options.streamBinary ? options.maxFileBytes : undefined
+    options.maxFileBytes
   );
   if (!uploaded.ok) {
     return privateJsonResponse({

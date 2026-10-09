@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as runtime from '../../worker/node_modules/miniflare/dist/src/index.js';
 
 // Exercise the real workerd Request/fetch implementation. Node and mocked fetch
@@ -13,16 +13,25 @@ describe('GitHub adapter in the Worker runtime', () => {
   const requests: Array<{ url: string; method: string; body: string }> = [];
   let responseStatus = 200;
 
+  beforeEach(() => { requests.length = 0; responseStatus = 200; });
+
   beforeAll(async () => {
     const config = readFileSync(path.resolve('worker/wrangler.toml'), 'utf8');
     const bundle = await build({
       stdin: {
         resolveDir: process.cwd(),
         contents: `
-          import { listGitHubDirectory, putGitHubTextFile, triggerSiteRebuild } from './worker/src/github.js';
+          import { listGitHubDirectory, putGitHubTextFile, putGitHubBase64File, triggerSiteRebuild } from './worker/src/github.js';
           export default { async fetch(request) {
             const env = { GITHUB_TOKEN: 'test-token', GITHUB_OWNER: 'owner', GITHUB_REPO: 'repo' };
             const action = new URL(request.url).pathname;
+            if (action === '/image' || action === '/audio') {
+              const body = await request.json();
+              const image = action === '/image';
+              return Response.json(await putGitHubBase64File(env,
+                image ? 'assets/images/campaigns/demo/image.png' : 'assets/audio/campaigns/demo/audio.mp3',
+                body.content, 'Upload media', undefined, (image ? 8 : 25) * 1024 * 1024));
+            }
             const result = action === '/create'
               ? await putGitHubTextFile(env, '_campaigns/new-campaign.md', 'preview_only: true', 'Create campaign')
               : action === '/rebuild'
@@ -86,6 +95,18 @@ describe('GitHub adapter in the Worker runtime', () => {
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toBe('https://api.github.com/repos/owner/repo/contents/_campaigns/new-campaign.md');
   });
+
+  it.each([{ type: 'image', bytes: 8 * 1024 * 1024 }, { type: 'audio', bytes: 25 * 1024 * 1024 }])(
+    'preserves an exact-limit $type upload through the Worker JSON transport', async ({ type, bytes }) => {
+      const content = Buffer.alloc(bytes, 123).toString('base64');
+      const response = await worker.dispatchFetch(`http://localhost/${type}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content })
+      });
+      expect(await response.json()).toMatchObject({ ok: true, contentSha: 'file-sha', commitSha: 'commit-sha' });
+      expect(requests).toHaveLength(1);
+      expect(JSON.parse(requests[0].body).content).toBe(content);
+    }, 30_000
+  );
 
   it('preserves GitHub permission errors distinctly from transport failures', async () => {
     responseStatus = 403;

@@ -654,6 +654,13 @@ Images and videos uploaded through the dashboard are validated before persistenc
 
 **Remove image** uses the shared `@dustwave/admin-shell/editor-media` control. It clears the image reference and any staged replacement while preserving the field, captions, descriptions, and collection entries. It is available for brand images, campaign images and backgrounds, tiers, add-ons, decision options, Content/Diary/Blast images, gallery items, and video posters. Save the campaign or publish platform settings to persist the empty field. A late upload response cannot restore a removed image. The control clears the reference without deleting repository files. Existing server publication cleanup policies still apply: legacy Content/Diary publication can remove unused campaign-owned assets, while saved-project references protect those files. Existing public fallback rules still apply to branding and hero selection. Empty content images and gallery slots are omitted from published and protected preview output.
 
+Upload limits apply per file: images accept PNG, JPEG, WebP, or GIF up to
+8 MiB (8,388,608 bytes); audio accepts MP3, M4A, WAV, OGG, AAC, or WebM up to
+25 MiB (26,214,400 bytes). The dedicated logo uploader accepts PNG, JPEG, or
+WebP up to 512 KiB (524,288 bytes). The dashboard labels these binary limits
+as MB/KB. Each limit is enforced both during validation and when writing the
+file to GitHub. Video uses the decimal 100 MB limit below.
+
 Recommended campaign media:
 
 - Hero image: square, around 1000x1000px

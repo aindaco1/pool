@@ -3292,6 +3292,57 @@ runner_report_emails:
     expectNoKvWritesOrLists(env, 'content editor image upload');
   });
 
+  it.each([
+    { endpoint: 'image', contentType: 'image/png', extension: 'png', kind: 'campaign-content', bytes: 2_300_000, limit: 8 * 1024 * 1024 },
+    { endpoint: 'image', contentType: 'image/png', extension: 'png', kind: 'campaign-content', bytes: 8 * 1024 * 1024, limit: 8 * 1024 * 1024 },
+    { endpoint: 'audio', contentType: 'audio/mpeg', extension: 'mp3', kind: 'campaign-content-audio', bytes: 25 * 1024 * 1024, limit: 25 * 1024 * 1024 },
+    { endpoint: 'logo', contentType: 'image/png', extension: 'png', kind: 'admin-logo', bytes: 512 * 1024, limit: 512 * 1024 }
+  ])('persists $endpoint uploads of $bytes bytes with the media-specific GitHub bound', async ({ endpoint, contentType, extension, kind, bytes, limit }) => {
+    const env = { ...createEnv(), GITHUB_TOKEN: 'github-token', GITHUB_OWNER: 'owner', GITHUB_REPO: 'repo' };
+    const { ctx, cookie, csrfToken } = await signInAdmin(env);
+    const githubCalls: GitHubFetchCall[] = [];
+    const content = Buffer.alloc(bytes, 123).toString('base64');
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = String(init?.method || 'GET');
+      const dispatch = maybeMediaOptimizationDispatch(url, method, init, githubCalls);
+      if (dispatch) return dispatch;
+      if (url.includes('/contents/assets/') && method === 'PUT') {
+        const uploaded = JSON.parse(String(init?.body));
+        expect(uploaded.content).toBe(content);
+        githubCalls.push({ url, method });
+        return jsonResponse({ content: { sha: 'media-sha' }, commit: { sha: 'media-commit' } });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }) as typeof fetch;
+    const upload = (value: string) => worker.fetch(new Request(`https://pledge.pool.test/admin/settings/${endpoint}-upload`, {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': csrfToken },
+      body: JSON.stringify({ filename: `boundary.${extension}`, contentType, content: value, kind,
+        ...(kind.startsWith('campaign') ? { campaignSlug: 'hand-relations' } : {}) })
+    }), env, ctx);
+
+    resetKvCounters(env);
+    const response = await upload(content);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    expect(await response.json()).toMatchObject({ success: true, bytes, contentSha: 'media-sha', commitSha: 'media-commit' });
+    expect(githubPutCalls(githubCalls)).toHaveLength(1);
+    if (endpoint !== 'audio') expectChangedMediaOptimizationDispatch(githubCalls);
+    else expect(githubMediaOptimizationDispatch(githubCalls)).toBeUndefined();
+    expectNoKvWritesOrLists(env, `${endpoint} upload at supported size`);
+
+    if (bytes === limit) {
+      githubCalls.length = 0;
+      const oversized = await upload(Buffer.alloc(limit + 1).toString('base64'));
+      expect(oversized.status).toBe(400);
+      expect(oversized.headers.get('Cache-Control')).toContain('no-store');
+      expect(await oversized.json()).toEqual({ error: `${endpoint[0].toUpperCase()}${endpoint.slice(1)} upload must be ${endpoint === 'image' ? '8 MB' : endpoint === 'audio' ? '25 MB' : '512 KB'} or smaller.` });
+      expect(githubCalls).toHaveLength(0);
+      expectNoKvWritesOrLists(env, `${endpoint} upload over the limit`);
+    }
+  });
+
   it('keeps campaign media replacements separate from the live source', async () => {
     const env = {
       ...createEnv(),

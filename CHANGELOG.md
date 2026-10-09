@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fix image and audio uploads above 2 MB being rejected by the GitHub transport.
+  Honor the existing 8 MiB image, 25 MiB audio, and 512 KiB logo limits throughout
+  the upload path; retain the separate 100 MB video transport.
+
 - Fix on-site pledge checkout blocking supporters when Stripe already has their
   email. Keep new checkout emails editable, skip unchanged-email updates in
   checkout and card-update flows, and retain hosted checkout email prefilling.
