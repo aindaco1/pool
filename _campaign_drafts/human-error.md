@@ -48,11 +48,34 @@ tiers:
     stackable: true
     category: "digital"
     late_support: true
+  - id: "digital-access-to-behind-the-scenes-content"
+    name: "Digital Access to Behind the Scenes Content"
+    price: 50
+    description: "All previous rewards + get early access to exclusive behind the scenes content. Witness the \"making of\" *Human Error*!"
+    stackable: false
+    category: "digital"
+    late_support: true
+  - id: "physical-human-error-poster"
+    name: "Physical Human Error Poster"
+    price: 100
+    description: "All previous rewards + a limited edition *Human Error* poster. Perfect for occupying wall space in a nuclear bunker!"
+    limit_total: 12
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "your-face-in-the-film-no-really"
+    name: "Your Face in the Film (No really)"
+    price: 250
+    description: "All previous rewards + a black and white portrait of your face will be framed and hung in the background of the set decoration. Live out your dreams of being an imaginary decorated American hero!"
+    limit_total: 5
+    stackable: false
+    category: "digital"
+    late_support: false
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-06T00:27:07.299Z"
+_pool_draft_saved_at: "2026-10-09T01:34:46.283Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
