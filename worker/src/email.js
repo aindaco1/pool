@@ -1,3 +1,4 @@
+import { buildDiaryExcerpt, sanitizeDiaryExcerpt } from './diary.js';
 /**
  * Resend Email Integration for The Pool
  *
@@ -1561,13 +1562,14 @@ export async function sendChargeSuccessEmail(env, { email, campaignSlug, campaig
 /**
  * Send diary update notification to supporters
  */
-export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryPhase, token, instagramUrl, hasDecisions, preferredLang, unsubscribeUrl }) {
+export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignTitle, diaryTitle, diaryExcerpt, diaryExcerptHtml, diaryId, diaryPhase, token, instagramUrl, hasDecisions, preferredLang, unsubscribeUrl }) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
   const communityUrl = safeSiteUrl(`${getLocalizedPath(`/community/${encodeURIComponent(campaignSlug)}/`, preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
-  const diaryAnchor = diaryPhase ? `#diary-${diaryPhase}` : '#diary';
-  const campaignUrl = safeSiteUrl(`/campaigns/${encodeURIComponent(campaignSlug)}/${diaryAnchor}`, env.SITE_BASE);
+  const diaryAnchor = diaryId ? `#diary-entry-${encodeURIComponent(diaryId)}` : diaryPhase ? `#diary-${encodeURIComponent(diaryPhase)}` : '#diary';
+  const excerpt = diaryExcerptHtml ? sanitizeDiaryExcerpt(diaryExcerptHtml).html : buildDiaryExcerpt({ body: diaryExcerpt }).html;
+  const campaignUrl = safeSiteUrl(`${getLocalizedPath(`/campaigns/${encodeURIComponent(campaignSlug)}/`, preferredLang)}${diaryAnchor}`, env.SITE_BASE);
   const manageUrl = safeSiteUrl(`${getLocalizedPath('/manage/', preferredLang)}?t=${encodeURIComponent(token)}`, env.SITE_BASE);
   const instagramCTA = getInstagramCTA(instagramUrl, env.SITE_BASE, t, { theme });
   const unsubscribeHref = safeExternalUrl(unsubscribeUrl, env.WORKER_BASE || env.SITE_BASE);
@@ -1585,7 +1587,7 @@ export async function sendDiaryUpdateEmail(env, { email, campaignSlug, campaignT
   
   <div style="${getEmailCardStyle(theme)}">
     <h2 style="margin: 0 0 12px 0; font-size: 18px; font-family: ${theme.headingFontFamily};">${escapeHtml(diaryTitle)}</h2>
-    ${diaryExcerpt ? `<p style="margin: 0; color: ${theme.mutedTextColor};">${formatEmailText(diaryExcerpt)}</p>` : ''}
+    ${excerpt ? `<p style="margin: 0; color: ${theme.mutedTextColor};">${excerpt}</p>` : ''}
   </div>
   
   <div style="text-align: center; margin-bottom: 32px;">

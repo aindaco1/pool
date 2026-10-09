@@ -1,4 +1,5 @@
 name: Refresh Production Pages
+run-name: ${{ inputs.ref && format('Deploy {0}', inputs.ref) || 'Refresh Production Pages' }}
 
 on:
   push:
@@ -9,6 +10,10 @@ on:
     - cron: '0 7 * * *'
   workflow_dispatch:
     inputs:
+      ref:
+        description: 'Saved revision to publish (defaults to the triggering revision)'
+        required: false
+        default: ''
       reason:
         description: 'Reason for manual rebuild'
         required: false
@@ -29,6 +34,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
@@ -83,6 +89,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7

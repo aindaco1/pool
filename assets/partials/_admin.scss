@@ -342,6 +342,58 @@ body.campaign-preview-render {
   }
 }
 
+html:has(#admin-panel-campaigns:not([hidden])) { scroll-padding-top: 180px; }
+.admin-campaigns :is(input, textarea, button, select, [contenteditable="true"], .admin-content-insert) { scroll-margin-top: 180px; }
+
+// Keep the same compact status and phase treatment as Store's publishing bar.
+.admin-campaign-publishing {
+  background: $surface--page;
+  border-bottom: 1px solid $border--default;
+  container: campaign-publishing / inline-size;
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 10px 0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.admin-campaign-progress {
+  display: grid;
+  font-size: 0.8rem;
+  gap: 8px 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  line-height: 1.4;
+}
+.admin-campaign-progress__summary {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+.admin-campaign-progress__elapsed { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-campaign-progress__bar { accent-color: $color--primary; width: 40px; height: 4px; }
+.admin-campaign-progress__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  li { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  [data-state="current"] { color: $color--primary; font-weight: 700; }
+}
+.admin-campaign-progress__link { font: inherit; justify-self: end; }
+@container campaign-publishing (min-width: 48rem) {
+  .admin-campaign-progress { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .admin-campaign-progress__summary { grid-column: auto; }
+}
+@container campaign-publishing (max-width: 36rem) {
+  .admin-campaign-progress > * { grid-column: 1 / -1; }
+  .admin-campaign-progress__link { justify-self: start; }
+}
+
 .admin-settings__actions {
   @include admin-action-row($space-sm);
   align-items: center;

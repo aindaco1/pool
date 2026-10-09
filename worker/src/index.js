@@ -1,3 +1,5 @@
+import { getGitHubWorkflowRun } from './deployment-status.js';
+import { buildDiaryExcerpt } from './diary.js';
 import { isEmptyTextBlock, normalizeImageAccessibility } from "../../shared/dust-wave-platform/packages/admin-shell/src/editor-media.js";
 import { renderEditorInlineMarkdown as renderSharedInlineMarkdown } from "../../shared/dust-wave-platform/packages/admin-shell/src/editor-codec.js";
 /**
@@ -315,42 +317,6 @@ const ADMIN_UNPUBLISHED_CAMPAIGN_CACHE_TTL_MS = 60 * 1000;
 let cachedUnpublishedAdminCampaigns = null;
 let cachedUnpublishedAdminCampaignsAt = 0;
 let cachedUnpublishedAdminCampaignsKey = '';
-
-// Extract plain text excerpt from diary entry (supports both legacy body and content blocks)
-function getDiaryExcerpt(entry, maxLength = 200) {
-  // Legacy: plain text body
-  if (entry.body && typeof entry.body === 'string') {
-    return entry.body.slice(0, maxLength);
-  }
-  
-  // New: content blocks array
-  if (entry.content && Array.isArray(entry.content)) {
-    const textParts = [];
-    for (const block of entry.content) {
-      if (block.type === 'text' && block.body) {
-        // Strip basic markdown formatting for email excerpt
-        const plainText = block.body
-          .replace(/\*\*([^*]+)\*\*/g, '$1')  // bold
-          .replace(/\*([^*]+)\*/g, '$1')       // italic
-          .replace(/_([^_]+)_/g, '$1')         // italic
-          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links
-          .replace(/^#+\s*/gm, '')              // headers
-          .replace(/\n+/g, ' ')                 // newlines to spaces
-          .trim();
-        textParts.push(plainText);
-      } else if (block.type === 'quote' && block.text) {
-        textParts.push(`"${block.text}"`);
-      }
-    }
-    const combined = textParts.join(' ').trim();
-    if (combined.length > maxLength) {
-      return combined.slice(0, maxLength) + '…';
-    }
-    return combined;
-  }
-  
-  return '';
-}
 
 function normalizeDiaryDateMarker(value) {
   const text = String(value || '').trim();
@@ -5645,6 +5611,16 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminUsersSave(request, env, parsedBody.body || {});
+      }
+
+      if (path === '/admin/campaigns/deployment' && method === 'GET') {
+        const url = new URL(request.url);
+        const scoped = await getRoleScopedAdminCampaign(request, env, url.searchParams.get('campaignSlug') || '', 'campaign:read');
+        if (!scoped.ok) return scoped.response;
+        const result = await getGitHubWorkflowRun(env, {
+          commitSha: url.searchParams.get('commitSha'), requestedAt: url.searchParams.get('requestedAt'), runId: url.searchParams.get('runId')
+        });
+        return privateJsonResponse(result.ok ? { success: true, deployment: result.run } : { error: result.error, code: result.code }, result.ok ? 200 : result.status || 502, env);
       }
 
       if (path === '/admin/campaigns/create' && method === 'POST') {
@@ -11694,6 +11670,7 @@ async function handleDiaryCheck(request, env) {
         continue;
       }
 
+      const excerpt = buildDiaryExcerpt(entry);
       console.log(`📝 Broadcasting diary entry "${entry.title}" to ${supporters.length} supporters of ${campaign.slug}`);
 
       for (let i = 0; i < supporters.length; i++) {
@@ -11716,7 +11693,9 @@ async function handleDiaryCheck(request, env) {
             campaignTitle: campaign.title,
             preferredLang: supporter.preferredLang || DEFAULT_I18N_LANG,
             diaryTitle: entry.title,
-            diaryExcerpt: getDiaryExcerpt(entry),
+            diaryExcerpt: excerpt.text,
+            diaryExcerptHtml: excerpt.html,
+            diaryId: diaryEntryExplicitId(entry),
             diaryPhase: entry.phase,
             token,
             instagramUrl: campaign.instagram,
@@ -19725,7 +19704,7 @@ function renderAdminCampaignPreviewDiary(campaign = {}, lang = 'en', env = {}) {
       const contentHtml = blocks.length
         ? `<div class="diary-entry__content">${blocks.map((block, blockIndex) => renderAdminCampaignPreviewContentBlock(block, blockIndex, errors, env)).join('')}</div>`
         : bodyHtml;
-      return `<article class="diary-entry" id="${escapeAdminPreviewAttribute(entry?.id || `diary-${phase}-${entryIndex + 1}`)}">
+      return `<article class="diary-entry" id="${escapeAdminPreviewAttribute(entry?.id ? `diary-entry-${entry.id}` : `diary-${phase}-${entryIndex + 1}`)}">
         <h4 class="diary-entry__title">${escapeAdminPreviewHtml(entry?.title || '')}</h4>
         ${entry?.date ? `<time class="diary-entry__date" datetime="${escapeAdminPreviewAttribute(entry.date)}">${escapeAdminPreviewHtml(formatAdminPreviewDateTime(entry.date, lang))}</time>` : ''}
         ${contentHtml}
@@ -20201,9 +20180,12 @@ async function handleAdminCampaignWorkingCopy(request, env) {
     state.live = normalizeAdminCampaignFromMarkdown(publicSource.content, { path: getAdminCampaignMarkdownPath(slug), sha: committed.contentSha });
     state.liveHash = await adminCampaignAuthoringHash(state.live);
     cachedUnpublishedAdminCampaigns = null;
-    const rebuild = isLocalAdminRepoWritesEnabled(env) ? { triggered: false, reason: 'Local build' } : await triggerSiteRebuild(env, `campaign-publish:${slug}`);
+    const rebuild = isLocalAdminRepoWritesEnabled(env) ? { triggered: false, reason: 'Local build' } : await triggerSiteRebuild(env, `campaign-publish:${slug}`, { commitSha: committed.commitSha });
     await recordAdminAuditEvent(env, { action: 'campaign:publish', adminEmail: scoped.auth.user.email, campaignSlug: slug, commitSha: committed.commitSha }).catch(error => console.error('Project publish audit failed:', error?.message));
-    return privateJsonResponse({ success: true, ...adminCampaignWorkingCopyStatus(state), rebuild }, 200, env);
+    return privateJsonResponse({ success: true, ...adminCampaignWorkingCopyStatus(state), rebuild,
+      repositoryMode: isLocalAdminRepoWritesEnabled(env) ? 'local' : 'github',
+      deployment: isLocalAdminRepoWritesEnabled(env) ? null : { commitSha: committed.commitSha, requestedAt: rebuild.requestedAt, triggered: rebuild.triggered }
+    }, 200, env);
   }
   if (!body.draft || !Array.isArray(body.draft.longContent)) return privateJsonResponse({ error: 'The complete content draft is required.' }, 400, env);
   if (!Array.isArray(body.changes) || body.changes.some(change => change.campaignSlug !== slug || change.path === 'content_editor')) {

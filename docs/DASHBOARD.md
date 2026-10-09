@@ -330,6 +330,8 @@ Save writes one Git-backed working copy for both unpublished and already-public 
 
 Publish first saves current edits, then promotes the saved copy using the existing campaign-editor permission. Publication requires a title, valid ordered dates, and a positive goal. It clears the hidden flags; fundraising still follows dates. Public-source conflicts stop publication and preserve the working copy. Existing campaigns use their published copy until the first Save; no bulk migration is necessary.
 
+The campaign action bar stays visible while scrolling. Save/Publish reports media upload counts, Saved, Deploying, and Live with an indeterminate activity indicator and elapsed time. Save alone finishes at Saved and leaves the live campaign unchanged. Production Publish tracks the saved commit through the Pages workflow and shows Live only after that run succeeds. Failed or unavailable deployment checks preserve the saved copy, expose a run link when known, and leave Publish available to retry. New edits made during a save remain dirty. Local publication is labeled local and never claims a production deployment.
+
 ### Protected Preview
 
 Preview saves current edits before opening the sharing dialog, and rechecks the saved revision before sharing. Existing reviewer links show the latest successful Save until they expire. Save sends no invitations, changes no reviewer allowlist, and does not extend link expiry. Reopening Preview preserves existing active links; optional invitations remain explicit. Super admins and assigned campaign users can publish a protected preview for campaigns they can edit.

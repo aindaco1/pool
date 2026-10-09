@@ -201,8 +201,8 @@ Includes:
 
 Sent when new campaign diary entries are broadcast.
 
-- Uses a plain-text excerpt generated from the diary content.
-- Links back to the campaign diary.
+- Parses the diary Markdown before truncating the excerpt to 200 visible characters. Bold, italic, and underline survive in HTML; plain-text email remains readable without formatting markers. Raw HTML and unsafe links remain inert.
+- Links to `#diary-entry-<id>` on the localized campaign page. Opening the link selects the containing phase and scrolls to that entry. Legacy entries without IDs retain phase links.
 - Tracks sent entries in KV so the same diary entry is not broadcast repeatedly.
 - Updating existing diary metadata does not send a new email when the entry ID is stable.
 

@@ -7126,6 +7126,33 @@ Preserved Markdown body.
     return { env, session, files, source, writes, request, save, fail: () => { failWrites = true; } };
   }
 
+  it('restricts deployment tracking to authenticated campaign access and keeps it read-only', async () => {
+    const w = await workspace(true, 'creator@example.com');
+    const originalFetch = global.fetch;
+    const workflowCalls: string[] = [];
+    global.fetch = vi.fn(async (input, init) => {
+      const url = String(input);
+      if (url.includes('/actions/workflows/')) {
+        workflowCalls.push(url);
+        expect(init?.method).toBe('GET');
+        return jsonResponse({ workflow_runs: [] });
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    const endpoint = 'https://pledge.pool.test/admin/campaigns/deployment?commitSha=' + 'a'.repeat(40) + '&campaignSlug=';
+    const anonymous = await worker.fetch(new Request(endpoint + 'hand-relations'), w.env, w.session.ctx);
+    expect(anonymous.status).toBe(401);
+    const forbidden = await worker.fetch(new Request(endpoint + 'another-campaign', { headers: { Cookie: w.session.cookie } }), w.env, w.session.ctx);
+    expect(forbidden.status).toBe(403);
+    expect(workflowCalls).toHaveLength(0);
+    const allowed = await worker.fetch(new Request(endpoint + 'hand-relations', { headers: { Cookie: w.session.cookie } }), w.env, w.session.ctx);
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get('Cache-Control')).toContain('private, no-store');
+    expect(await allowed.json()).toMatchObject({ deployment: { status: 'requested', found: false } });
+    expect(workflowCalls).toHaveLength(1);
+    expect(w.writes).toEqual([]);
+  });
+
   it.each([false, true])('saves and previews every authoring section without changing public data (published=%s)', async published => {
     const w = await workspace(published);
     const initial = await w.request();

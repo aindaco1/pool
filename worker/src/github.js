@@ -62,13 +62,15 @@ async function triggerGitHubWorkflow(env, {
   };
 }
 
-export async function triggerSiteRebuild(env, reason = 'manual') {
+export async function triggerSiteRebuild(env, reason = 'manual', { commitSha = '' } = {}) {
+  const requestedAt = new Date().toISOString();
   const result = await triggerGitHubWorkflow(env, {
     workflow: env.GITHUB_WORKFLOW || 'deploy.yml',
-    inputs: { reason },
+    inputs: { reason, ...(/^[a-f0-9]{40}$/.test(commitSha) ? { ref: commitSha } : {}) },
     successMessage: `Site rebuild triggered: ${reason}`
   });
-  return result.triggered ? { triggered: true } : { triggered: false, reason: result.reason };
+  return /^[a-f0-9]{40}$/.test(commitSha) ? { ...result, requestedAt, commitSha }
+    : result.triggered ? { triggered: true } : { triggered: false, reason: result.reason };
 }
 
 export function triggerMediaOptimization(env, { scope = 'changed' } = {}) {

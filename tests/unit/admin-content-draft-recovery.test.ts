@@ -41,7 +41,7 @@ function editor(storage: Record<string, string> = {}, projectSave = false) {
       if (body.baseRevision !== savedCampaign.baseRevision) return new Response(JSON.stringify({ error: 'Project changed; edits kept.' }), { status: 409 });
       if (body.intent === 'save') savedCampaign = { ...savedCampaign, ...body.draft, baseRevision: 'draft:saved-sha', hasWorkingCopy: true, hasUnpublishedChanges: true };
       else savedCampaign.hasUnpublishedChanges = false;
-      result = { success: true, ...savedCampaign };
+      result = { success: true, ...savedCampaign, repositoryMode: 'local' };
     } else if (url.includes('/admin/content/campaign') || url.includes('/admin/campaigns/draft')) {
       result = { campaign: { ...savedCampaign, slug: new URL(url).searchParams.get('campaignSlug') } };
     } else if (url.includes('/admin/content/publish')) result = { success: true, contentSha: 'published-sha' };
@@ -375,7 +375,7 @@ describe('project Save and existing browser drafts', () => {
     e.save().click();
     await vi.waitFor(() => expect(e.get('status').textContent).toContain('Project saved'));
     e.get('publish').click();
-    await vi.waitFor(() => expect(e.get('status').textContent).toContain('Project published'));
+    await vi.waitFor(() => expect(e.get('status').textContent).toContain('Published locally'));
     expect(e.save().disabled).toBe(true);
     expect(e.get('publish').disabled).toBe(true);
     e.edit('Unpublished next revision');

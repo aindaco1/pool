@@ -45,6 +45,13 @@ Routine **Refresh Production Pages** runs, including scheduled campaign-state
 refreshes, do not deploy the Worker. The manual Worker-only fallback from the
 repository root is `npm run deploy:worker`.
 
+Campaign publishing dispatches **Refresh Production Pages** with the saved
+commit in its optional `ref` input. Both jobs use that revision; the run title
+records it as `Deploy <sha>` so dashboard progress can track the correct build
+even when the branch advances. The Worker GitHub credential needs Actions read
+access as well as its existing dispatch/write access. See
+[Dashboard](DASHBOARD.md) for Saved, Deploying, and Live behavior.
+
 The Pages build runs Jekyll first, then `npm run assets:minify` against generated `_site/assets` CSS/JavaScript and the generated copies of the pinned Site Shell browser scripts before uploading the artifact. The selected roots are explicit and traversal-safe; source files stay readable in the repository. Cloudflare still handles gzip/Brotli/Zstandard compression at the edge, so Cloudflare Auto Minify stays disabled.
 
 GitHub repository credentials used by deployment and related workflows:

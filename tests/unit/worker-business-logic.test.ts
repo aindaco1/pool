@@ -6093,6 +6093,7 @@ describe('Worker business logic hardening', () => {
           campaigns: [{
             ...campaignFixture,
             diary: [{
+              id: 'thank-you',
               title: 'THANK YOU!!!!',
               date: '2026-05-27T13:42-06:00',
               phase: 'fundraising',
@@ -6128,7 +6129,7 @@ describe('Worker business logic hardening', () => {
     expect(mockSendDiaryUpdateEmail).not.toHaveBeenCalled();
     const markers = JSON.parse(kv.store.get('diary-sent:hand-relations') || '[]');
     expect(markers).toContain('2026-05-27T13:42:00-06:00');
-    expect(markers).toContain('date:2026-05-27T13:42-06:00');
+    expect(markers).toContain('id:thank-you');
   });
 
   it('tracks diary broadcasts by stable entry id so title and date edits do not resend', async () => {
@@ -6244,6 +6245,7 @@ describe('Worker business logic hardening', () => {
     });
     expect(mockSendDiaryUpdateEmail).toHaveBeenCalledTimes(1);
     const markers = JSON.parse(kv.store.get('diary-sent:hand-relations') || '[]');
+    expect(mockSendDiaryUpdateEmail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ diaryId: 'new-update', diaryExcerpt: 'This is new.', diaryExcerptHtml: 'This is new.' }));
     expect(markers).toContain('id:new-update');
   });
 

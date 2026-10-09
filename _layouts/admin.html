@@ -189,6 +189,7 @@
         </section>
 
         <section id="admin-panel-campaigns" class="admin-campaigns admin-content admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-campaigns" data-admin-tab-panel="campaigns" hidden>
+          <div class="admin-campaign-publishing">
           <div class="admin-settings__header admin-campaigns__header">
             <div>
               <p class="admin-app__muted">{% include t.html key="admin.campaign_settings_intro" lang=current_lang %}</p>
@@ -201,6 +202,7 @@
             </div>
           </div>
           <div id="admin-campaign-status" class="admin-dashboard__status admin-campaigns__status" role="status" aria-live="polite"></div>
+          </div>
           <div class="admin-campaign-sidebar">
             <button id="admin-campaign-create" class="admin-campaign-create-button" type="button" hidden aria-label="{% include t.html key='admin.campaign_create' lang=current_lang %}" title="{% include t.html key='admin.campaign_create' lang=current_lang %}"><span class="admin-campaign-create-button__icon" aria-hidden="true">+</span><span class="admin-campaign-create-button__label">{% include t.html key='admin.campaign_create' lang=current_lang %}</span></button>
             <div id="admin-campaign-tabs" class="admin-campaign-tabs" role="tablist" aria-label="{% include t.html key='admin.campaign_settings_tabs_label' lang=current_lang %}"></div>
