@@ -277,6 +277,7 @@ admin:
   campaign_progress_queued: "Guardado. Esperando la publicación…"
   campaign_progress_complete: "Publicado. Tus cambios están en línea."
   campaign_progress_failed: "Cambios guardados, pero la publicación falló. Puede que el sitio anterior siga en línea. Publica de nuevo para reintentar."
+  campaign_progress_cancelled: "Los cambios se guardaron, pero se canceló la publicación. Pulsa Publicar de nuevo para reintentarlo."
   campaign_progress_uploading: "Subiendo archivo %{current} de %{total}…"
   campaign_saved: "Proyecto guardado. Los cambios están listos para previsualizar y no se han publicado."
   campaign_save_failed: "No se pudo guardar el proyecto. Se han conservado tus cambios."

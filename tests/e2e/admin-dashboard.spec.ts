@@ -2987,6 +2987,33 @@ test.describe('Admin Dashboard', () => {
     expect(calls.projectPublish).toHaveLength(2);
   });
 
+  test('follows a replacement deployment without reporting failure or publishing again', async ({ page }) => {
+    const calls = await signInWithMagicToken(page);
+    const deployments = [
+      { status: 'queued', conclusion: '', runId: 123, replacementPending: true },
+      { status: 'in_progress', conclusion: '', runId: 456 },
+      { status: 'completed', conclusion: 'success', runId: 456 }
+    ];
+    const trackedIds: (string | null)[] = [];
+    await page.route('**/admin/campaigns/deployment?**', route => {
+      trackedIds.push(new URL(route.request().url()).searchParams.get('runId'));
+      const deployment = deployments[Math.min(trackedIds.length - 1, deployments.length - 1)];
+      return route.fulfill({ headers: JSON_HEADERS, body: JSON.stringify({ deployment: { ...deployment, url: 'https://github.com/aindaco1/pool/actions/runs/' + deployment.runId } }) });
+    });
+    await selectAdminSection(page, 'Campaigns');
+    await page.locator('[data-settings-path="runner_report_excluded_emails"]').getByRole('checkbox', { name: 'Assigned runner', exact: true }).uncheck();
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#admin-content-publish').click();
+    const status = page.locator('#admin-campaign-status');
+    await expect(status).toContainText('Waiting for deployment');
+    await expect(status).not.toHaveAttribute('role', 'alert');
+    await expect(status).toContainText('Your changes are live.', { timeout: 18000 });
+    expect(trackedIds.slice(0, 3)).toEqual([null, '123', '456']);
+    await expect(status.getByRole('link', { name: 'View deployment' })).toHaveAttribute('href', 'https://github.com/aindaco1/pool/actions/runs/456');
+    expect(calls.projectSave).toHaveLength(1);
+    expect(calls.projectPublish).toHaveLength(1);
+  });
+
   test('saves assigned campaign runner opt-outs before publishing them', async ({ page }) => {
     const calls = await signInWithMagicToken(page);
     await selectAdminSection(page, 'Campaigns');

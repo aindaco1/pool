@@ -285,6 +285,7 @@ admin:
   campaign_progress_queued: "Saved. Waiting for deployment…"
   campaign_progress_complete: "Published. Your changes are live."
   campaign_progress_failed: "Changes saved, but deployment failed. The previous site may still be live. Publish again to retry."
+  campaign_progress_cancelled: "Changes saved, but deployment was cancelled. Publish again to retry."
   campaign_progress_uploading: "Uploading media %{current} of %{total}…"
   campaign_saved: "Project saved. These changes are ready to preview and have not been published."
   campaign_save_failed: "Unable to save the project. Your edits have been kept."

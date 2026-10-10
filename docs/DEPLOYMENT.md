@@ -48,7 +48,7 @@ repository root is `npm run deploy:worker`.
 Campaign publishing dispatches **Refresh Production Pages** with the saved
 commit in its optional `ref` input. Both jobs use that revision; the run title
 records it as `Deploy <sha>` so dashboard progress can track the correct build
-even when the branch advances. The Worker GitHub credential needs Actions read
+even when the branch advances. If GitHub cancels a pending duplicate, tracking follows a replacement for the same immutable revision and allows up to 30 seconds for it to appear in the run list. Runs for a different revision never count as publication success. Draft-only pushes under `_campaign_drafts/` do not start a Pages build. The Worker GitHub credential needs Actions read
 access as well as its existing dispatch/write access. See
 [Dashboard](DASHBOARD.md) for Saved, Deploying, and Live behavior.
 

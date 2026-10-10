@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Follow replacement deployments when GitHub cancels a pending duplicate, so
+  campaign Publish does not falsely report a failed build. Distinguish genuine
+  cancellation from failure and skip Pages builds for draft-only saves.
+
 - Preserve wrapped YAML descriptions and following reward tiers during campaign
   Save and Publish. Reject incomplete source reads, retain edits on failure, and
   show specific validation messages. Restore sunder tiers from its intact draft.

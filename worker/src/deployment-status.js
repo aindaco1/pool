@@ -3,6 +3,7 @@ import { fetchWithTimeout } from '../../shared/dust-wave-platform/packages/worke
 import { readBoundedText } from '../../shared/dust-wave-platform/packages/worker-core/src/response-body.js';
 const GITHUB_WORKFLOW_STATUS_TIMEOUT_MS = 10_000;
 const GITHUB_WORKFLOW_STATUS_MAX_BYTES = 512_000;
+const GITHUB_REPLACEMENT_GRACE_MS = 30_000;
 const GITHUB_COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/u;
 const GITHUB_WORKFLOW_FILE_PATTERN = /^[a-z0-9._-]+\.ya?ml$/iu;
 function notConfigured() {
@@ -170,13 +171,19 @@ export async function getGitHubWorkflowRun(env, options = {}) {
     return { ok: false, status: 400, code: 'github_invalid_workflow', error: 'GitHub workflow file is invalid.' };
   }
   let result;
+  let cancelledRun;
   if (Number.isSafeInteger(runId) && runId > 0) {
     result = await requestGitHubWorkflowStatus(env, `/actions/runs/${runId}`);
     if (!result.ok) return result;
     if (!workflowRunMatchesCommit(result.data, commitSha, workflow)) {
       return { ok: false, status: 409, code: 'github_workflow_commit_mismatch', error: 'GitHub workflow run does not match the published commit.' };
     }
-    return withPublishingPhases(env, result.data, options.requestedAt);
+    if (result.data.status !== 'completed' || result.data.conclusion !== 'cancelled') {
+      return withPublishingPhases(env, result.data, options.requestedAt);
+    }
+    // Push and explicit publish dispatches can replace a pending run. Follow
+    // another run for the same immutable source instead of reporting failure.
+    cancelledRun = result.data;
   }
 
   const query = new URLSearchParams({
@@ -193,13 +200,25 @@ export async function getGitHubWorkflowRun(env, options = {}) {
   const requestedAtMs = Date.parse(requestedAt);
   const earliestCreatedAt = Number.isFinite(requestedAtMs) ? requestedAtMs - 10_000 : 0;
   const runs = Array.isArray(result.data?.workflow_runs) ? result.data.workflow_runs : [];
-  const match = runs.find((run) => {
+  const matches = runs.filter((run) => {
     if (!workflowRunMatchesCommit(run, commitSha, workflow)) return false;
     const createdAtMs = Date.parse(String(run?.created_at || ''));
     return !earliestCreatedAt || (Number.isFinite(createdAtMs) && createdAtMs >= earliestCreatedAt);
   });
 
+  const match = matches.find((run) => run.conclusion !== 'cancelled');
   if (match) return withPublishingPhases(env, match, requestedAt);
+  cancelledRun ||= matches[0];
+  if (cancelledRun) {
+    const run = withWorkflowRequestTiming(normalizedWorkflowRun(cancelledRun), requestedAt);
+    const cancelledAt = Date.parse(run.updatedAt);
+    // GitHub can expose the cancellation before listing its replacement.
+    // Keep this bounded so a deliberate cancellation still reaches the editor.
+    if (Number.isFinite(cancelledAt) && Date.now() - cancelledAt < GITHUB_REPLACEMENT_GRACE_MS) {
+      return { ok: true, run: { ...run, status: 'queued', conclusion: '', replacementPending: true } };
+    }
+    return { ok: true, run };
+  }
   return {
     ok: true,
     run: withWorkflowRequestTiming({
