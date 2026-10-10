@@ -97,7 +97,7 @@ diary:
         body: |
           Hello patrons,
           
-          **Producer Man** Sabrina here. Now, I’ve been hearing some questions about *sunder*: ***“What happened to** **sunder**?”* ***“Is it done yet?” “When can I watch it?”* “*WHERE can I watch it?*”** Well, I’m gonna answer those questions for you now.
+          **Producer Man** Sabrina here. Now, I’ve been hearing some questions about *sunder*: ***“What happened to sunder?” “Is it done yet?” “When can I watch it?” “WHERE can I watch it?”*** Well, I’m gonna answer those questions for you now.
           
           **What happened to** ***sunder?***
           
