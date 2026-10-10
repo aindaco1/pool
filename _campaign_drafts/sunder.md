@@ -133,7 +133,7 @@ diary:
             alt: ""
       - type: "text"
         body: |
-          We listed a blooper reel as a reward in the **some goodies!** tier and behind-the-scenes footage in the **super-fan!** tier. Unfortunately, we don’t think the small amount of footage we managed to collect is an adequate reward for your **generous donations**. Instead of some footage cut together for those rewards, we’re going to give you bigger and better rewards! We’re going to replace the blooper reel with **digital access to all our on-set BTS stills**, and we’re going to replace the BTS footage with a **digital BTS scrapbook** chronicling our **pre-production meetings**, **rehearsals**, and of course our **time on set**! Here’s a little sample of what that scrapbook will look like!
+          We listed a blooper reel as a reward in the **some goodies** tier and behind-the-scenes footage in the **super-fan** tier. Unfortunately, we don’t think the small amount of footage we managed to collect is an adequate reward for your **generous donations**. Instead of some footage cut together for those rewards, we’re going to give you bigger and better rewards! We’re going to replace the blooper reel with **digital access to all our on-set BTS stills**, and we’re going to replace the BTS footage with a **digital BTS scrapbook** chronicling our **pre-production meetings**, **rehearsals**, and of course our **time on set**! Here’s a little sample of what that scrapbook will look like!
       - type: "gallery"
         layout: "grid"
         images:
@@ -224,6 +224,6 @@ test_only: false
 preview_enabled: true
 preview_reviewer_emails: []
 preview_updated_at: "2026-06-15T16:33:33.453Z"
-_pool_draft_base_hash: "6bef3c00ec184cf89860c57c3c25a0fd6af9c047cd7927635a6575e9a2114ed7"
-_pool_draft_saved_at: "2026-10-09T23:47:14.882Z"
+_pool_draft_base_hash: "f66d453d3b3dad7041b2340834333d3f1cb6656c152f0bdc8af0b4a9def1b71f"
+_pool_draft_saved_at: "2026-10-10T00:19:01.806Z"
 ---
