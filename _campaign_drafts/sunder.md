@@ -97,7 +97,7 @@ diary:
         body: |
           Hello patrons,
           
-          **Producer Man** Sabrina here. Now, I’ve been hearing some questions about *sunder*: ***“What happened to** **sunder**?”* ***“Is it done yet?” “When can I watch it?”* “*WHERE can I watch it?*”** Well, I’m gonna answer those questions for you now.
+          **Producer Man** Sabrina here. Now, I’ve been hearing some questions about *sunder*: ***“What happened to sunder?” “Is it done yet?” “When can I watch it?” “WHERE can I watch it?”*** Well, I’m gonna answer those questions for you now.
           
           **What happened to** ***sunder?***
           
@@ -224,6 +224,6 @@ test_only: false
 preview_enabled: true
 preview_reviewer_emails: []
 preview_updated_at: "2026-06-15T16:33:33.453Z"
-_pool_draft_base_hash: "f66d453d3b3dad7041b2340834333d3f1cb6656c152f0bdc8af0b4a9def1b71f"
-_pool_draft_saved_at: "2026-10-10T00:19:01.806Z"
+_pool_draft_base_hash: "0b27ec71752e1e2bd643b6386db7539efd374fb8d6a4f9821174e8929cb95d19"
+_pool_draft_saved_at: "2026-10-10T00:23:23.029Z"
 ---
