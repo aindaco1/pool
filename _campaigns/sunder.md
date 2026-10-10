@@ -133,7 +133,7 @@ diary:
             alt: ""
       - type: "text"
         body: |
-          We listed a blooper reel as a reward in the **some goodies!** tier and behind-the-scenes footage in the **super-fan!** tier. Unfortunately, we don’t think the small amount of footage we managed to collect is an adequate reward for your **generous donations**. Instead of some footage cut together for those rewards, we’re going to give you bigger and better rewards! We’re going to replace the blooper reel with **digital access to all our on-set BTS stills**, and we’re going to replace the BTS footage with a **digital BTS scrapbook** chronicling our **pre-production meetings**, **rehearsals**, and of course our **time on set**! Here’s a little sample of what that scrapbook will look like!
+          We listed a blooper reel as a reward in the **some goodies** tier and behind-the-scenes footage in the **super-fan** tier. Unfortunately, we don’t think the small amount of footage we managed to collect is an adequate reward for your **generous donations**. Instead of some footage cut together for those rewards, we’re going to give you bigger and better rewards! We’re going to replace the blooper reel with **digital access to all our on-set BTS stills**, and we’re going to replace the BTS footage with a **digital BTS scrapbook** chronicling our **pre-production meetings**, **rehearsals**, and of course our **time on set**! Here’s a little sample of what that scrapbook will look like!
       - type: "gallery"
         layout: "grid"
         images:
