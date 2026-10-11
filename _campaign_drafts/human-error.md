@@ -69,6 +69,7 @@ tiers:
   - id: "your-face-in-the-film-no-really"
     name: "Your Face in the Film (No really)"
     price: 250
+    image: "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb.png"
     description: "All previous rewards + a black and white portrait of your face will be framed and hung in the background of the set decoration. Live out your dreams of being an imaginary decorated American hero!"
     limit_total: 5
     stackable: false
@@ -79,6 +80,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-11T22:53:36.626Z"
+_pool_draft_saved_at: "2026-10-11T22:53:40.451Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
