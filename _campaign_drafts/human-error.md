@@ -16,19 +16,20 @@ hero_image_wide: "/assets/images/campaigns/human-error/hero-wide-20261001-214059
 creator_image: "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241.png"
 creator_name: "Anna Buan"
 category: "Short Film"
-short_blurb: "Set during the height of the cold war, **Human Error** follows two officers within a remote nuclear launch site as they receive contradicting orders from command control."
+short_blurb: "Set during the height of the cold war, two officers within a remote nuclear launch site receive contradicting orders from command control."
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
 custom_late_support: false
 runner_report_emails: []
 long_content:
+  - type: "image"
+    align: "center"
+    src: "/assets/images/campaigns/human-error/content-pool-1-20261011-222007-a462a203.png"
+    alt: ""
   - type: "text"
     body: |
-      Follow along and see updates on the [A.M. Cinematics](https://www.instagram.com/a.m._cinematics_?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw==) Instagram or the [Dust Wave](https://dustwave.xyz/) website.
-  - type: "text"
-    body: |
-      this is a test to be deleted - anna
+      *Human Error* is a short film set in 1962 that follows two officers within a remote nuclear launch site as they receive contradicting orders from command control. With the fate of the world potentially hanging in the balance, the two men find themselves at odds with one another as they debate what to do next.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -76,6 +77,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-09T01:34:46.283Z"
+_pool_draft_saved_at: "2026-10-11T22:20:11.632Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
