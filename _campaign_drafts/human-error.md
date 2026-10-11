@@ -60,7 +60,7 @@ tiers:
   - id: "physical-human-error-poster"
     name: "Physical Human Error Poster"
     price: 100
-    image: "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea.png"
+    image: "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8.png"
     description: "All previous rewards + a limited edition *Human Error* poster. Perfect for occupying wall space in a nuclear bunker!"
     limit_total: 12
     stackable: false
@@ -69,7 +69,7 @@ tiers:
   - id: "your-face-in-the-film-no-really"
     name: "Your Face in the Film (No really)"
     price: 250
-    image: "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb.png"
+    image: "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b.png"
     description: "All previous rewards + a black and white portrait of your face will be framed and hung in the background of the set decoration. Live out your dreams of being an imaginary decorated American hero!"
     limit_total: 5
     stackable: false
@@ -80,6 +80,8 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-11T23:00:29.860Z"
+_pool_draft_saved_at: "2026-10-11T23:05:10.079Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
+campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
+progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
 ---
