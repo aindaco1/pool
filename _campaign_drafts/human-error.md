@@ -29,7 +29,7 @@ long_content:
     alt: ""
   - type: "text"
     body: |
-      *Human Error* is a short film set in 1962 that follows two officers within a remote nuclear launch site as they receive contradicting orders from command control. With the fate of the world potentially hanging in the balance, the two men find themselves at odds with one another as they debate what to do next.
+      ***Human Error* is a short film** set in 1962 that follows two officers within a remote nuclear launch site as they receive contradicting orders from command control. With the fate of the world potentially hanging in the balance, the two men find themselves at odds with one another as they debate what to do next.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -80,6 +80,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-11T22:53:40.451Z"
+_pool_draft_saved_at: "2026-10-11T23:00:29.860Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
