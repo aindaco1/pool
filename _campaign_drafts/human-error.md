@@ -44,7 +44,7 @@ tiers:
   - id: "get-a-digital-copy-of-the-film"
     name: "Get a Digital Copy of the Film"
     price: 25
-    image: "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png"
+    image: "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098.png"
     description: "All previous rewards + Get a high-res, early access, digital copy of them film. This will be a private screener sent to you before anyone else gets to see it."
     stackable: true
     category: "digital"
@@ -52,6 +52,7 @@ tiers:
   - id: "digital-access-to-behind-the-scenes-content"
     name: "Digital Access to Behind the Scenes Content"
     price: 50
+    image: "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703.png"
     description: "All previous rewards + get early access to exclusive behind the scenes content. Witness the \"making of\" *Human Error*!"
     stackable: false
     category: "digital"
@@ -59,6 +60,7 @@ tiers:
   - id: "physical-human-error-poster"
     name: "Physical Human Error Poster"
     price: 100
+    image: "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5.png"
     description: "All previous rewards + a limited edition *Human Error* poster. Perfect for occupying wall space in a nuclear bunker!"
     limit_total: 12
     stackable: false
@@ -77,6 +79,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-11T22:20:11.632Z"
+_pool_draft_saved_at: "2026-10-11T22:44:01.325Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 ---
