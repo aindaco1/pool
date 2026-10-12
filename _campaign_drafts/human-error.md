@@ -29,7 +29,7 @@ long_content:
     alt: ""
   - type: "text"
     body: |
-      ***Human Error* is a short film** **set in 1962** that follows two officers within a remote nuclear launch site as they receive contradicting orders from command control. With the fate of the world potentially hanging in the balance, the two men find themselves at odds with one another as they debate what to do next.
+      ***Human Error* is a short film** **set in 1962** that follows two officers within a remote nuclear launch site as they receive contradicting orders from command control. With the fate of the world potentially hanging in the balance, the two men find themselves at odds with one another as they clash on what to do next.
   - type: "text"
     align: "center"
     body: |
@@ -45,12 +45,28 @@ long_content:
     alt: ""
     caption: "The Producers of Human Error"
   - type: "text"
+    body: |
+      ### Ben Arndt & A.M. Cinematics
+  - type: "text"
+    body: |
+      **Ben Arndt is a filmmaker based in Albuquerque, New Mexico, with a BFA in film production from the University of New Mexico.** In 2020 Ben Arndt co-founded the production company and youtube channel **A.M. Cinematics** with his childhood friend Casper Montoya. The shared youtube channel has earned nearly a million views, with content based on conversations around art, pop culture, and original creative work.
+      
+      Some of Ben's previous films includes *Breakups Suck*, which screened at the oscar qualifying Santa Fe International Film Festival, the Austin Film Festival & Writers Conference, and was covered by *Movie Maker Magazine*.
+      
+      *Human Error* will be the latest film created under the A.M. Cinematics and DustWave name!
+  - type: "text"
+    body: |
+      ### DUSTWAVE
+  - type: "text"
+    body: |
+      **DustWave is an independent art collective working out of Albuquerque, New Mexico.** Aside from creating amazing open source crowdfunding softwares like The Pool, DustWave also runs community fundraising and networking events, and fosters a local creative scene with the intention of bringing together artists to create independent art. You can learn more about their mission statement, and see some of the cool work they do [**here!**](https://dustwave.xyz/)
+  - type: "text"
     align: "center"
     body: |
       ## Where Does My Money Go?
   - type: "text"
     body: |
-      **Your support will go towards feeding cast and crew, equipment rentals, and  art production.** *Human Error* is
+      **Your support will go towards feeding cast and crew, equipment rentals, and  art production.** *Human Error* doesn't have any massive studios or investors behind it, so it means we'll be heavily relying on your support to make this film into a reality.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -101,7 +117,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-12T18:20:09.968Z"
+_pool_draft_saved_at: "2026-10-12T18:46:23.801Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
