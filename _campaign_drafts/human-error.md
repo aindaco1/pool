@@ -40,6 +40,10 @@ long_content:
   - type: "image"
     src: "/assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431.png"
     alt: ""
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pool-3-20261012-174224-882a02c7.png"
+    alt: ""
+    caption: "The Producers of Human Error"
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -90,7 +94,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-12T05:05:46.188Z"
+_pool_draft_saved_at: "2026-10-12T17:42:29.817Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
