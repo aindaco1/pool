@@ -2302,6 +2302,73 @@
       ]
     },
     {
+      "path": "assets/images/campaigns/human-error/background-20261011-230031-10358d80.png",
+      "publicPath": "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png",
+      "name": "background-20261011-230031-10358d80.png",
+      "label": "background 20261011 230031 10358d80",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 5601720,
+      "sha256": "dd09c4314e1059da1dee051bd325dae4d07b78f1abc57a7cafb4ce3d7452bcb1",
+      "width": 2550,
+      "height": 3300,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/background-20261011-230031-10358d80-320.webp",
+        "assets/images/campaigns/human-error/background-20261011-230031-10358d80-480.webp",
+        "assets/images/campaigns/human-error/background-20261011-230031-10358d80-640.webp",
+        "assets/images/campaigns/human-error/background-20261011-230031-10358d80-960.webp",
+        "assets/images/campaigns/human-error/background-20261011-230031-10358d80-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/background-20261011-230031-10358d80-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261011-230031-10358d80-320.webp",
+          "bytes": 14254,
+          "sha256": "a39e588614f7789ca61b97956a8791a364cf9a11172185e3db0bdb941c858f61",
+          "sourceSha256": "dd09c4314e1059da1dee051bd325dae4d07b78f1abc57a7cafb4ce3d7452bcb1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/background-20261011-230031-10358d80-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261011-230031-10358d80-480.webp",
+          "bytes": 31112,
+          "sha256": "5e39bac5d406a88cee4cfff2b738e629369c827a82a7aff66c250f23ed05223a",
+          "sourceSha256": "dd09c4314e1059da1dee051bd325dae4d07b78f1abc57a7cafb4ce3d7452bcb1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/background-20261011-230031-10358d80-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261011-230031-10358d80-640.webp",
+          "bytes": 53712,
+          "sha256": "6b2ab6933c635cf8264aedc8a6080037406fc81886b0f588bfb592582fff7a59",
+          "sourceSha256": "dd09c4314e1059da1dee051bd325dae4d07b78f1abc57a7cafb4ce3d7452bcb1",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/background-20261011-230031-10358d80-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261011-230031-10358d80-960.webp",
+          "bytes": 108178,
+          "sha256": "1daa7298bc4feda5538d5c72f9c46be867c00ad842bbfaab9677d440b89bed86",
+          "sourceSha256": "dd09c4314e1059da1dee051bd325dae4d07b78f1abc57a7cafb4ce3d7452bcb1",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/background-20261011-230031-10358d80-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261011-230031-10358d80-1600.webp",
+          "bytes": 219128,
+          "sha256": "3fa21da1526f33755263c2c0c0aa103281ba9d13ee64f53c27d19bf220b170d9",
+          "sourceSha256": "dd09c4314e1059da1dee051bd325dae4d07b78f1abc57a7cafb4ce3d7452bcb1",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
       "publicPath": "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
       "name": "content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
@@ -2411,6 +2478,64 @@
           "bytes": 153612,
           "sha256": "979ad325a0ac6cc86321967adaec7e1598d05f562feaf7cc06e30a9be7ddb3ae",
           "sourceSha256": "c1b77a9e08f53d23842b297da2d20baf90a823a6ac61ba5b7ce30399eb09cf5e",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431.png",
+      "publicPath": "/assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431.png",
+      "name": "content-pool-2-20261012-050540-0cb2d431.png",
+      "label": "content pool 2 20261012 050540 0cb2d431",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1810247,
+      "sha256": "a1d88b479bcfd92030faf67745b7950fa4b9be158f23b6dfefbfdf2814c75be0",
+      "width": 1280,
+      "height": 720,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-320.webp",
+        "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-480.webp",
+        "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-640.webp",
+        "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-320.webp",
+          "bytes": 9554,
+          "sha256": "5386c8def44aace78d5b2815dec317b316d863b3a2fbcf281ff3dd2780626121",
+          "sourceSha256": "a1d88b479bcfd92030faf67745b7950fa4b9be158f23b6dfefbfdf2814c75be0",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-480.webp",
+          "bytes": 19842,
+          "sha256": "3f16f5e65ab80bd2b2b0355915c262dfb64ae8e843ff9e178b1d04d60501a955",
+          "sourceSha256": "a1d88b479bcfd92030faf67745b7950fa4b9be158f23b6dfefbfdf2814c75be0",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-640.webp",
+          "bytes": 45794,
+          "sha256": "c9881da5562ef5cec60acdf9bf74c2644a6a6ecc9a5757b3c6f622c516abc393",
+          "sourceSha256": "a1d88b479bcfd92030faf67745b7950fa4b9be158f23b6dfefbfdf2814c75be0",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431-960.webp",
+          "bytes": 98170,
+          "sha256": "dfd0130f7b9fff1eba282d7815da8982b4fbf6bbd366d0b5a05a30ccef45f9eb",
+          "sourceSha256": "a1d88b479bcfd92030faf67745b7950fa4b9be158f23b6dfefbfdf2814c75be0",
           "width": 960
         }
       ],
@@ -3190,6 +3315,265 @@
       "references": []
     },
     {
+      "path": "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png",
+      "publicPath": "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png",
+      "name": "progress-20261011-230027-16a9527f.png",
+      "label": "progress 20261011 230027 16a9527f",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1366420,
+      "sha256": "057236c7532e6edeb9307b3198919ef5db8142ed58791ab386f190a9f5d63331",
+      "width": 1152,
+      "height": 648,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-320.webp",
+        "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-480.webp",
+        "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-640.webp",
+        "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-320.webp",
+          "bytes": 10374,
+          "sha256": "322eb0adc3b57e0fd4b6ae0030716ae08e565ec7fa9bc5c88957de300caf992d",
+          "sourceSha256": "057236c7532e6edeb9307b3198919ef5db8142ed58791ab386f190a9f5d63331",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-480.webp",
+          "bytes": 23266,
+          "sha256": "d0f8bf980385d78b91bd0736e1d1b8c3ac3b6c06a35d9e5eb6a924e30437f253",
+          "sourceSha256": "057236c7532e6edeb9307b3198919ef5db8142ed58791ab386f190a9f5d63331",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-640.webp",
+          "bytes": 46180,
+          "sha256": "25a49d5a99df1df18e860907c1cdee0b3cddb6b8a07a22f1e75b4b54d1dd72c2",
+          "sourceSha256": "057236c7532e6edeb9307b3198919ef5db8142ed58791ab386f190a9f5d63331",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f-960.webp",
+          "bytes": 116886,
+          "sha256": "7641536cb7888d02fc23114a14de5e75674d7112eadb6e635ec66ff6ccb944a8",
+          "sourceSha256": "057236c7532e6edeb9307b3198919ef5db8142ed58791ab386f190a9f5d63331",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703.png",
+      "name": "tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703.png",
+      "label": "tier digital access to behind the scenes content 20261011 223732",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3491256,
+      "sha256": "c18a07a7f63da89f3d3a2eea02e3737b67b1c14d4f1a6d20928b58d0decdff5b",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-320.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-480.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-640.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-960.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-320.webp",
+          "bytes": 27218,
+          "sha256": "329ebb0f7832c609cea8414e3c2ea0240e4b37b3e81f20a30669f0ad70e3c428",
+          "sourceSha256": "c18a07a7f63da89f3d3a2eea02e3737b67b1c14d4f1a6d20928b58d0decdff5b",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-480.webp",
+          "bytes": 60570,
+          "sha256": "b30504d25e9008ed9cd6a4dea44d1a035246a74a51e96c97c17504c55a3ad5aa",
+          "sourceSha256": "c18a07a7f63da89f3d3a2eea02e3737b67b1c14d4f1a6d20928b58d0decdff5b",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-640.webp",
+          "bytes": 106236,
+          "sha256": "8d1dce86588d7720bc3e07446ad7a8f1c468463d9aca36d37b81057b1a0a8f87",
+          "sourceSha256": "c18a07a7f63da89f3d3a2eea02e3737b67b1c14d4f1a6d20928b58d0decdff5b",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-960.webp",
+          "bytes": 230330,
+          "sha256": "f4bf1a47555ff2fa453c3433b7fc46d74fad78dd73a1472b1f476a19771af63e",
+          "sourceSha256": "c18a07a7f63da89f3d3a2eea02e3737b67b1c14d4f1a6d20928b58d0decdff5b",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703-1600.webp",
+          "bytes": 520086,
+          "sha256": "8f31a535a2cc38dfb8a2ac37f6a786891c7eb1f4465913850ff590d3622044b4",
+          "sourceSha256": "c18a07a7f63da89f3d3a2eea02e3737b67b1c14d4f1a6d20928b58d0decdff5b",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47.png",
+      "name": "tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47.png",
+      "label": "tier digital access to behind the scenes content 20261011 225154 db8bcf47",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3571508,
+      "sha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-320.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-480.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-640.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-960.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-320.webp",
+          "bytes": 26926,
+          "sha256": "de82bfe5ea537e4e59a6b5708d628a276e09e2bb79363b6ba619f6cd02160a38",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-480.webp",
+          "bytes": 59714,
+          "sha256": "672d55dc8ec2fd6146f19ca1d37ce4017279b7a56bd9dab7bb6e6995876f79a4",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-640.webp",
+          "bytes": 104082,
+          "sha256": "675c920211b396a19c56c9dc0a006972f661b78eca30bc1507502fe9d015d499",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-960.webp",
+          "bytes": 222348,
+          "sha256": "ada7b78278cdc2b25bde4ba203ad83292a0ac990ef0241539bc5cc3107b7311e",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225154-db8bcf47-1600.webp",
+          "bytes": 507880,
+          "sha256": "9fbeb793ae8304abd1e7bcef62314c9aab81b7e6eb1b5a84621177b22946773c",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5.png",
+      "name": "tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5.png",
+      "label": "tier digital access to behind the scenes content 20261011 225321 23caafa5",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3571508,
+      "sha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-320.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-480.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-640.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-960.webp",
+        "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-320.webp",
+          "bytes": 26926,
+          "sha256": "de82bfe5ea537e4e59a6b5708d628a276e09e2bb79363b6ba619f6cd02160a38",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-480.webp",
+          "bytes": 59714,
+          "sha256": "672d55dc8ec2fd6146f19ca1d37ce4017279b7a56bd9dab7bb6e6995876f79a4",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-640.webp",
+          "bytes": 104082,
+          "sha256": "675c920211b396a19c56c9dc0a006972f661b78eca30bc1507502fe9d015d499",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-960.webp",
+          "bytes": 222348,
+          "sha256": "ada7b78278cdc2b25bde4ba203ad83292a0ac990ef0241539bc5cc3107b7311e",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-225321-23caafa5-1600.webp",
+          "bytes": 507880,
+          "sha256": "9fbeb793ae8304abd1e7bcef62314c9aab81b7e6eb1b5a84621177b22946773c",
+          "sourceSha256": "5e87aa66defa99ed44d1cf3c30a827e416a9503c81e44d27751d9cbd71cb0335",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png",
       "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png",
       "name": "tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png",
@@ -3245,6 +3629,475 @@
           "sha256": "2f072cb9828469aa0af264c604f1c9a10ae9bdb170f6aa04cddb8e26860fc8fd",
           "sourceSha256": "d94707431a3b3f233f519066ef0712c0b851786169222fdabaf580c15e6ce86f",
           "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098.png",
+      "name": "tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098.png",
+      "label": "tier get a digital copy of the film 20261011 223433 d1ae6098",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3511665,
+      "sha256": "892a4d6ecdf6ff1dd820379dce6b9d974937f8e4fbd65ba0c58e71f5d0a7e4f4",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-320.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-480.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-640.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-960.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-320.webp",
+          "bytes": 27346,
+          "sha256": "fea41669105d98299f2f2d4b0e210ff69f0d7980697c5eab64ae98ed17384279",
+          "sourceSha256": "892a4d6ecdf6ff1dd820379dce6b9d974937f8e4fbd65ba0c58e71f5d0a7e4f4",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-480.webp",
+          "bytes": 63086,
+          "sha256": "e8bb43ff1b14d497be8b12458cabeb1037b592131c7baefb8ae3ffdec0d11aab",
+          "sourceSha256": "892a4d6ecdf6ff1dd820379dce6b9d974937f8e4fbd65ba0c58e71f5d0a7e4f4",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-640.webp",
+          "bytes": 114096,
+          "sha256": "edda2c2b266c63aeb3dc42b2dd7bd3e93c7ac1562964d2f9c986b6f426035696",
+          "sourceSha256": "892a4d6ecdf6ff1dd820379dce6b9d974937f8e4fbd65ba0c58e71f5d0a7e4f4",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-960.webp",
+          "bytes": 248576,
+          "sha256": "eaa0177a809ff99322997655f052245d9b62b6eae390c833f923b505c0a2addc",
+          "sourceSha256": "892a4d6ecdf6ff1dd820379dce6b9d974937f8e4fbd65ba0c58e71f5d0a7e4f4",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-223433-d1ae6098-1600.webp",
+          "bytes": 570418,
+          "sha256": "65de0e9b3e1957a3978bcee9f24fe476bbe61f25cd48d0d61d5828678f5bffe4",
+          "sourceSha256": "892a4d6ecdf6ff1dd820379dce6b9d974937f8e4fbd65ba0c58e71f5d0a7e4f4",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142.png",
+      "name": "tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142.png",
+      "label": "tier get a digital copy of the film 20261011 225143 4e58f142",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3548622,
+      "sha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-320.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-480.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-640.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-960.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-320.webp",
+          "bytes": 27250,
+          "sha256": "79263bdf3d68b2ff3bd96e4db70cf406a781327d4eef481c55c1934fe0e752dc",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-480.webp",
+          "bytes": 62354,
+          "sha256": "0b60cb1a19024c058d12875f0d6689a5d3ec802854bee5877aebd2c48daf3ee3",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-640.webp",
+          "bytes": 113852,
+          "sha256": "12bdefe9b2d20b86feeaff3172f7bd316029ba410f4be44a10fa04428fec2604",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-960.webp",
+          "bytes": 248036,
+          "sha256": "fed4f5c796c2c83ae25a0222094700c28775c0ab6b54aaa643192a216353d61d",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225143-4e58f142-1600.webp",
+          "bytes": 569996,
+          "sha256": "2d25395d6d51b9824a6439aa69b7e0cc838b2c569fe9ba2cb38e9fd88295d629",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8.png",
+      "name": "tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8.png",
+      "label": "tier get a digital copy of the film 20261011 225317 edcdf1d8",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3548622,
+      "sha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-320.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-480.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-640.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-960.webp",
+        "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-320.webp",
+          "bytes": 27250,
+          "sha256": "79263bdf3d68b2ff3bd96e4db70cf406a781327d4eef481c55c1934fe0e752dc",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-480.webp",
+          "bytes": 62354,
+          "sha256": "0b60cb1a19024c058d12875f0d6689a5d3ec802854bee5877aebd2c48daf3ee3",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-640.webp",
+          "bytes": 113852,
+          "sha256": "12bdefe9b2d20b86feeaff3172f7bd316029ba410f4be44a10fa04428fec2604",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-960.webp",
+          "bytes": 248036,
+          "sha256": "fed4f5c796c2c83ae25a0222094700c28775c0ab6b54aaa643192a216353d61d",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261011-225317-edcdf1d8-1600.webp",
+          "bytes": 569996,
+          "sha256": "2d25395d6d51b9824a6439aa69b7e0cc838b2c569fe9ba2cb38e9fd88295d629",
+          "sourceSha256": "99f39aee705377d4092e6a0e4b32054fac8c4bc16ed14e305af27ec9dedc18a2",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5.png",
+      "name": "tier-physical-human-error-poster-20261011-223952-8c1975c5.png",
+      "label": "tier physical human error poster 20261011 223952 8c1975c5",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3446299,
+      "sha256": "826a82096b85ee28838f6e680799d3da646bc5293b9bb0584edac9ba1d64f757",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-320.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-480.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-640.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-960.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-320.webp",
+          "bytes": 25268,
+          "sha256": "d3f3bddde23d7d1899f4861b3a0dc89e007f4ddd1fbc6690cd98fc147ebe128c",
+          "sourceSha256": "826a82096b85ee28838f6e680799d3da646bc5293b9bb0584edac9ba1d64f757",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-480.webp",
+          "bytes": 54510,
+          "sha256": "eb94d638d2e46e2cc840efa0a8f59c47105ed0d05188c253858a600b7e288fd0",
+          "sourceSha256": "826a82096b85ee28838f6e680799d3da646bc5293b9bb0584edac9ba1d64f757",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-640.webp",
+          "bytes": 93554,
+          "sha256": "7be72a268ac968e3b42d2b0c097de65dc43000bc6b038fd6377dfac3bc93c2ce",
+          "sourceSha256": "826a82096b85ee28838f6e680799d3da646bc5293b9bb0584edac9ba1d64f757",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-960.webp",
+          "bytes": 199406,
+          "sha256": "eeb2d369a24a8fe00b525e69ad1bd1e9726e2ed4f3039776554da902347cbfbf",
+          "sourceSha256": "826a82096b85ee28838f6e680799d3da646bc5293b9bb0584edac9ba1d64f757",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5-1600.webp",
+          "bytes": 446636,
+          "sha256": "0ee1544a7531aac27462296bd24328c2d6295bebba32d4fdcafde123685598ea",
+          "sourceSha256": "826a82096b85ee28838f6e680799d3da646bc5293b9bb0584edac9ba1d64f757",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e.png",
+      "name": "tier-physical-human-error-poster-20261011-225202-3da13f5e.png",
+      "label": "tier physical human error poster 20261011 225202 3da13f5e",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3507156,
+      "sha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-320.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-480.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-640.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-960.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-320.webp",
+          "bytes": 24452,
+          "sha256": "33b9b20d8ec682f823f9ff2f4e113ea5e05a403004bf4699aad05b242161d472",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-480.webp",
+          "bytes": 51998,
+          "sha256": "61eb312495ba50b1fdab7540baf1a797f585011db9f9a94f03325944da4b2389",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-640.webp",
+          "bytes": 89270,
+          "sha256": "9b5321202b277ef245dc79faa05d6a08a65722197d1e72628cf322c2eadd57d6",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-960.webp",
+          "bytes": 190322,
+          "sha256": "388eca01f5425139bae2b293db1eea25a96547b9b26fee7e656b50adc6098dbc",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225202-3da13f5e-1600.webp",
+          "bytes": 426082,
+          "sha256": "4bf905ae841a6ab5b88290f81e3e817f56a31a8dfa1bc93d89b3be3e9184d32f",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea.png",
+      "name": "tier-physical-human-error-poster-20261011-225327-f3bf2aea.png",
+      "label": "tier physical human error poster 20261011 225327 f3bf2aea",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3507156,
+      "sha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-320.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-480.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-640.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-960.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-320.webp",
+          "bytes": 24452,
+          "sha256": "33b9b20d8ec682f823f9ff2f4e113ea5e05a403004bf4699aad05b242161d472",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-480.webp",
+          "bytes": 51998,
+          "sha256": "61eb312495ba50b1fdab7540baf1a797f585011db9f9a94f03325944da4b2389",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-640.webp",
+          "bytes": 89270,
+          "sha256": "9b5321202b277ef245dc79faa05d6a08a65722197d1e72628cf322c2eadd57d6",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-960.webp",
+          "bytes": 190322,
+          "sha256": "388eca01f5425139bae2b293db1eea25a96547b9b26fee7e656b50adc6098dbc",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-225327-f3bf2aea-1600.webp",
+          "bytes": 426082,
+          "sha256": "4bf905ae841a6ab5b88290f81e3e817f56a31a8dfa1bc93d89b3be3e9184d32f",
+          "sourceSha256": "8940a79df14b92cf564730012a66901dfff9f50de9b1576b27414542cac1698d",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8.png",
+      "name": "tier-physical-human-error-poster-20261011-230445-7bfe22e8.png",
+      "label": "tier physical human error poster 20261011 230445 7bfe22e8",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3470125,
+      "sha256": "bb2cbec1bc84999da1dfac348ba81c914b4f18f45371e4d593666d243c8c3c83",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-320.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-480.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-640.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-960.webp",
+        "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-320.webp",
+          "bytes": 24116,
+          "sha256": "ee8aa8942c4bf2380bc7f3321336c90a7c702daefd6b39cd5eff7130dd6654fc",
+          "sourceSha256": "bb2cbec1bc84999da1dfac348ba81c914b4f18f45371e4d593666d243c8c3c83",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-480.webp",
+          "bytes": 51672,
+          "sha256": "f936488b35068a6b90f01c544d430bf0886aedc5faf431ac3857e8a15bb3eec9",
+          "sourceSha256": "bb2cbec1bc84999da1dfac348ba81c914b4f18f45371e4d593666d243c8c3c83",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-640.webp",
+          "bytes": 88726,
+          "sha256": "7893f0b172cd9dc010ff2d988884b8f3b33cac38e5a7e8f9604ae9d0cbbeca84",
+          "sourceSha256": "bb2cbec1bc84999da1dfac348ba81c914b4f18f45371e4d593666d243c8c3c83",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-960.webp",
+          "bytes": 188290,
+          "sha256": "ff16995f5abfc3cead32a7ebdaa3e5b26ec75a6186a63e74a776e85d5f85a679",
+          "sourceSha256": "bb2cbec1bc84999da1dfac348ba81c914b4f18f45371e4d593666d243c8c3c83",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-230445-7bfe22e8-1600.webp",
+          "bytes": 417644,
+          "sha256": "924302fad8a6b1f8efd603e6102f922f3e1505b908efab6f0cadeba1d73e3c34",
+          "sourceSha256": "bb2cbec1bc84999da1dfac348ba81c914b4f18f45371e4d593666d243c8c3c83",
+          "width": 1600
         }
       ],
       "warnings": [],
@@ -3364,6 +4217,274 @@
           "sha256": "bda63af3f50a29cb2e5baeb7a1a151c2a992b074a6dc12bf51c67d1e3d269f81",
           "sourceSha256": "9053ae05022f9549c7d2c50f09e7aaaf3637ad067ad4eb063d1c95bf8a72726c",
           "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4.png",
+      "name": "tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4.png",
+      "label": "tier your face in the film no really 20261011 225211 bae56ea4",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3251575,
+      "sha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-320.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-480.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-640.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-960.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-320.webp",
+          "bytes": 18996,
+          "sha256": "0b03ff2b9e2fd382de4e666cd55b78e5f88b82378be088d82adbf90e723a9b2c",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-480.webp",
+          "bytes": 38782,
+          "sha256": "d9ca461f90a87ed06f146cfac1706a4a2dcab95c4e0414bfcfa4acfb68b3c1dc",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-640.webp",
+          "bytes": 64528,
+          "sha256": "67b4148a1cba1685db12a44b7650ccdcce34936fce7448cb4f990fa8ae815ecc",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-960.webp",
+          "bytes": 131248,
+          "sha256": "0b837f99bd6573c33a61f65abd4d514d1ab5be43e09c5740bd97d195d592d3d5",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4-1600.webp",
+          "bytes": 285044,
+          "sha256": "a018dbaaaff28a36d98b7740bbdf21d43b04f77333040ae20c65967182a34ca0",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb.png",
+      "name": "tier-your-face-in-the-film-no-really-20261011-225334-3f156afb.png",
+      "label": "tier your face in the film no really 20261011 225334 3f156afb",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3251575,
+      "sha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-320.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-480.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-640.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-960.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-320.webp",
+          "bytes": 18996,
+          "sha256": "0b03ff2b9e2fd382de4e666cd55b78e5f88b82378be088d82adbf90e723a9b2c",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-480.webp",
+          "bytes": 38782,
+          "sha256": "d9ca461f90a87ed06f146cfac1706a4a2dcab95c4e0414bfcfa4acfb68b3c1dc",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-640.webp",
+          "bytes": 64528,
+          "sha256": "67b4148a1cba1685db12a44b7650ccdcce34936fce7448cb4f990fa8ae815ecc",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-960.webp",
+          "bytes": 131248,
+          "sha256": "0b837f99bd6573c33a61f65abd4d514d1ab5be43e09c5740bd97d195d592d3d5",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225334-3f156afb-1600.webp",
+          "bytes": 285044,
+          "sha256": "a018dbaaaff28a36d98b7740bbdf21d43b04f77333040ae20c65967182a34ca0",
+          "sourceSha256": "f887a00443728bebc15e2e42e67ea69a5e1ab90e34b68a79c30061d6ec536d8f",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b.png",
+      "name": "tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b.png",
+      "label": "tier your face in the film no really 20261011 230449 1e9a300b",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3402511,
+      "sha256": "090ea553abbd4dbe0fe39cd0e75009867f803d2f4c8fe8828f62b3c123076c1a",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-320.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-480.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-640.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-960.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-320.webp",
+          "bytes": 19884,
+          "sha256": "39183d00aada3a1ba61b18befbd60a084ab0d15e532971a7279c6c41101d8cbc",
+          "sourceSha256": "090ea553abbd4dbe0fe39cd0e75009867f803d2f4c8fe8828f62b3c123076c1a",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-480.webp",
+          "bytes": 41090,
+          "sha256": "87b27e6f647cf34707144fde9bcd773b1904d0a4ff38edbbba55d56082f14ef5",
+          "sourceSha256": "090ea553abbd4dbe0fe39cd0e75009867f803d2f4c8fe8828f62b3c123076c1a",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-640.webp",
+          "bytes": 68824,
+          "sha256": "588b531e6cbc9e969fbadbcf15702b9f30bc1eb4016c6a48cc0fb39d027d3e39",
+          "sourceSha256": "090ea553abbd4dbe0fe39cd0e75009867f803d2f4c8fe8828f62b3c123076c1a",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-960.webp",
+          "bytes": 140866,
+          "sha256": "4b0b6e36851d38a81c002420ebed8d144388265e2d728a8084076fd5871563bf",
+          "sourceSha256": "090ea553abbd4dbe0fe39cd0e75009867f803d2f4c8fe8828f62b3c123076c1a",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-230449-1e9a300b-1600.webp",
+          "bytes": 305734,
+          "sha256": "64eece2422bbf49ee33a9bce2329774c87e6f82b02e4f44ff18a5c85932d8aed",
+          "sourceSha256": "090ea553abbd4dbe0fe39cd0e75009867f803d2f4c8fe8828f62b3c123076c1a",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1.png",
+      "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1.png",
+      "name": "tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1.png",
+      "label": "tier your face in the film no really 20261011 231948 b6ed77e1",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 3460825,
+      "sha256": "28f357e7058c821aa8de5fc6855c39192feb9595366fee9be354f6f4d1b95039",
+      "width": 2000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-320.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-480.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-640.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-960.webp",
+        "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-320.webp",
+          "bytes": 20362,
+          "sha256": "08f4506ee7dce4abbecd6135d444ec04aa00ba326209094de90c6c809b76c54b",
+          "sourceSha256": "28f357e7058c821aa8de5fc6855c39192feb9595366fee9be354f6f4d1b95039",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-480.webp",
+          "bytes": 41868,
+          "sha256": "9ce054d7e1bf736396c6d2a2b5c689b99f6342d314bafcf1b970b4ac9c475744",
+          "sourceSha256": "28f357e7058c821aa8de5fc6855c39192feb9595366fee9be354f6f4d1b95039",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-640.webp",
+          "bytes": 69718,
+          "sha256": "b2d5657dd6d53d48b8f0228bfb03aa01633e7d17afb6813176afd310719bbc58",
+          "sourceSha256": "28f357e7058c821aa8de5fc6855c39192feb9595366fee9be354f6f4d1b95039",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-960.webp",
+          "bytes": 143332,
+          "sha256": "d9dca0365854c91a7275ed043a8bdec47d4ea8762e1717ae3bc2554dabd815b1",
+          "sourceSha256": "28f357e7058c821aa8de5fc6855c39192feb9595366fee9be354f6f4d1b95039",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-1600.webp",
+          "publicPath": "/assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-231948-b6ed77e1-1600.webp",
+          "bytes": 312902,
+          "sha256": "c3a12e837ffcb88e5e0898fa56c57e698a1501ee3e50d29c58bcda2e7035bc37",
+          "sourceSha256": "28f357e7058c821aa8de5fc6855c39192feb9595366fee9be354f6f4d1b95039",
+          "width": 1600
         }
       ],
       "warnings": [],
