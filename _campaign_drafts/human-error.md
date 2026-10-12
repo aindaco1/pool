@@ -44,6 +44,10 @@ long_content:
     src: "/assets/images/campaigns/human-error/content-pool-3-20261012-174224-882a02c7.png"
     alt: ""
     caption: "The Producers of Human Error"
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pool-4-20261012-190526-26337ccc.png"
+    alt: ""
+    caption: "Some of the crew of Human Error"
   - type: "text"
     body: |
       ### Ben Arndt & A.M. Cinematics
@@ -119,7 +123,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-12T18:55:28.161Z"
+_pool_draft_saved_at: "2026-10-12T19:05:31.246Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
