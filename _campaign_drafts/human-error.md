@@ -30,6 +30,13 @@ long_content:
   - type: "text"
     body: |
       ***Human Error* is a short film** set in 1962 that follows two officers within a remote nuclear launch site as they receive contradicting orders from command control. With the fate of the world potentially hanging in the balance, the two men find themselves at odds with one another as they debate what to do next.
+  - type: "text"
+    align: "center"
+    body: |
+      ## Why This Story?
+  - type: "text"
+    body: |
+      **The possibility of nuclear annihilation has been reduced to an accepted backdrop of modern life. How do we capture the headspace of those living through the atomic bomb’s conception?**
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -80,7 +87,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-11T23:21:51.876Z"
+_pool_draft_saved_at: "2026-10-12T01:50:37.480Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
