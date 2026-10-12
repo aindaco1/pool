@@ -49,7 +49,7 @@ long_content:
       ### Ben Arndt & A.M. Cinematics
   - type: "text"
     body: |
-      **Ben Arndt is a filmmaker based in Albuquerque, New Mexico, with a BFA in film production from the University of New Mexico.** In 2020 Ben Arndt co-founded the production company and youtube channel **A.M. Cinematics** with his childhood friend Casper Montoya. The shared youtube channel has earned nearly a million views, with content based on conversations around art, pop culture, and original creative work.
+      **Ben Arndt is a filmmaker based in Albuquerque, New Mexico, with a BFA in film production from the University of New Mexico.** In 2020 Ben Arndt co-founded the production company and youtube channel **[A.M. Cinematics](https://www.youtube.com/@A.M.Cinematics)** with his childhood friend Casper Montoya. The shared youtube channel has earned nearly a million views, with content based on conversations around art, pop culture, and original creative work.
       
       Some of Ben's previous films includes *Breakups Suck*, which screened at the oscar qualifying Santa Fe International Film Festival, the Austin Film Festival & Writers Conference, and was covered by *Movie Maker Magazine*.
       
@@ -117,7 +117,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-12T18:46:23.801Z"
+_pool_draft_saved_at: "2026-10-12T18:50:01.836Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
