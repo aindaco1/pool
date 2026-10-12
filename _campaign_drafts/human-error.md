@@ -38,6 +38,14 @@ long_content:
     body: |
       **I was born and raised in New Mexico, the home of the Manhattan Project, and as such I've had a life long interest in nuclear history.** I believe that the possibility of nuclear annihilation has been reduced to an accepted backdrop of modern life, and with this short film I want to capture the cultural fears and anxieties of those living through the atomic bomb’s conception. - *Ben Arndt*
   - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pitch-5-20261012-193150-53e37bab.png"
+    alt: ""
+    caption: "FailSafe 1964"
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pitch-7-20261012-193213-3ba96a48.png"
+    alt: ""
+    caption: "Dr. Strange Love 1964"
+  - type: "image"
     src: "/assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431.png"
     alt: ""
   - type: "image"
@@ -67,7 +75,7 @@ long_content:
   - type: "text"
     align: "center"
     body: |
-      ## Where Does My Money Go?
+      ## Where Does my Money Go?
   - type: "text"
     body: |
       **Your support will go towards feeding cast and crew, equipment rentals, and  art production.** Some of the other expected expenses of this project include equipment insurance, costuming costs, and festival fees when the film is completed.
@@ -123,7 +131,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-12T19:17:07.859Z"
+_pool_draft_saved_at: "2026-10-12T19:32:20.851Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
