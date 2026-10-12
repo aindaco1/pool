@@ -66,7 +66,9 @@ long_content:
       ## Where Does My Money Go?
   - type: "text"
     body: |
-      **Your support will go towards feeding cast and crew, equipment rentals, and  art production.** *Human Error* doesn't have any massive studios or investors behind it, so it means we'll be heavily relying on your support to make this film into a reality.
+      **Your support will go towards feeding cast and crew, equipment rentals, and  art production.** Some of the other expected expenses of this project include equipment insurance, costuming costs, and festival fees when the film is completed.
+      
+      *Human Error* doesn't have any big name studios or investors behind it, so it means we'll be relying on your support to make this film into a reality!
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -117,7 +119,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-12T18:50:01.836Z"
+_pool_draft_saved_at: "2026-10-12T18:55:28.161Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
