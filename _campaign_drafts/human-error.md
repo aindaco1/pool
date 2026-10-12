@@ -36,7 +36,7 @@ long_content:
       ## Why This Story?
   - type: "text"
     body: |
-      **The possibility of nuclear annihilation has been reduced to an accepted backdrop of modern life. How do we capture the headspace of those living through the atomic bomb’s conception?**
+      **I was born and raised in New Mexico, the home of the Manhattan Project, and as such I've had a life long interest in nuclear history.** I believe that the possibility of nuclear annihilation has been reduced to an accepted backdrop of modern life, and with this short film I want to capture the cultural fears and anxieties of those living through the atomic bomb’s conception. - *Ben Arndt*
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -87,7 +87,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-12T01:50:37.480Z"
+_pool_draft_saved_at: "2026-10-12T04:22:39.048Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
