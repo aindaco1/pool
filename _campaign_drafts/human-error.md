@@ -14,7 +14,7 @@ charged: false
 hero_image: "/assets/images/campaigns/human-error/hero-square-20261001-214226-c299d41d.png"
 hero_image_wide: "/assets/images/campaigns/human-error/hero-wide-20261001-214059-6cad1bd4.png"
 creator_image: "/assets/images/campaigns/human-error/creator-20261003-233404-a4598241.png"
-creator_name: "Anna Buan"
+creator_name: "A.M. Cinematics"
 category: "Short Film"
 short_blurb: "Set during the height of the cold war, two officers within a remote nuclear launch site receive contradicting orders from command control."
 show_ongoing: false
@@ -136,7 +136,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-13T22:30:05.674Z"
+_pool_draft_saved_at: "2026-10-13T22:36:47.206Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png"
