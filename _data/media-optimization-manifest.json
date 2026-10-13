@@ -15340,6 +15340,31 @@
       ]
     },
     {
+      "path": "assets/videos/campaigns/human-error/video-20261013-222949-ad50d8ee.mp4",
+      "publicPath": "/assets/videos/campaigns/human-error/video-20261013-222949-ad50d8ee.mp4",
+      "name": "video-20261013-222949-ad50d8ee.mp4",
+      "label": "video 20261013 222949 ad50d8ee",
+      "type": "video",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 11761223,
+      "sha256": "92f4d6dfcaea42305f874f870fc257fecb0a0f69eb862f08e31e46312bd709d4",
+      "width": 1280,
+      "height": 720,
+      "durationMs": 46672,
+      "optimizationStatus": "missing_derivatives",
+      "expectedDerivatives": [
+        "assets/videos/campaigns/human-error/video-20261013-222949-ad50d8ee.webm"
+      ],
+      "missingDerivatives": [
+        "assets/videos/campaigns/human-error/video-20261013-222949-ad50d8ee.webm"
+      ],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/videos/campaigns/sunder/content-video-insert-a1-20261009-180045-5ca086bf.mp4",
       "publicPath": "/assets/videos/campaigns/sunder/content-video-insert-a1-20261009-180045-5ca086bf.mp4",
       "name": "content-video-insert-a1-20261009-180045-5ca086bf.mp4",
