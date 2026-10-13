@@ -19429,6 +19429,11 @@ function adminPreviewAsset(value, env = {}) {
   return adminPreviewUrl(value, env);
 }
 
+function renderAdminPreviewBackground(value, className, env = {}, loading = 'lazy') {
+  const src = adminPreviewAsset(value, env);
+  return src ? `<img class="${className}" src="${escapeAdminPreviewAttribute(src)}" alt="" aria-hidden="true" loading="${loading}" decoding="async">` : '';
+}
+
 function adminPreviewPercent(value) {
   const number = Math.round(Number(value || 0));
   if (!Number.isFinite(number)) return 0;
@@ -19600,7 +19605,7 @@ function renderAdminCampaignPreviewHero(campaign = {}, env = {}) {
     : '';
 }
 
-function renderAdminCampaignPreviewProgress(campaign = {}, state = 'live', lang = 'en') {
+function renderAdminCampaignPreviewProgress(campaign = {}, state = 'live', lang = 'en', env = {}) {
   const text = adminPreviewText(lang);
   const goal = Number(campaign.goal_amount || 0) || 0;
   const pledged = Number(campaign.pledged_amount || 0) || 0;
@@ -19617,6 +19622,7 @@ function renderAdminCampaignPreviewProgress(campaign = {}, state = 'live', lang 
       ? adminPreviewInterpolate(state === 'post' ? text.ended : text.ends, { date: formatAdminPreviewDate(campaign.goal_deadline, lang) })
       : '';
   return `<div class="progress-wrap" data-campaign-slug="${escapeAdminPreviewAttribute(campaign.slug || '')}" data-goal="${escapeAdminPreviewAttribute(goal)}" data-pledged="${escapeAdminPreviewAttribute(pledged)}" data-max-threshold="${escapeAdminPreviewAttribute(max)}">
+    ${renderAdminPreviewBackground(campaign.progress_background, 'progress-wrap__bg', env)}
     <div class="progress-bar">
       <span class="u-width-pct-${pct}" data-progress-width="${pct}"></span>
       <div class="progress-marker progress-marker--milestone u-left-pct-${oneThirdPct}${pledged >= oneThird ? ' progress-marker--achieved' : ''}" data-progress-left="${oneThirdPct}"><span class="progress-marker__dot"></span><span class="progress-marker__label"><span class="progress-marker__amount">${escapeAdminPreviewHtml(formatAdminPreviewMoneyShort(oneThird))}</span><span class="progress-marker__desc">1/3</span></span></div>
@@ -19655,7 +19661,7 @@ function renderAdminCampaignPreviewTier(campaign = {}, tier = {}, lang = 'en', e
   </div>`;
 }
 
-function renderAdminCampaignPreviewSupportItems(campaign = {}, lang = 'en') {
+function renderAdminCampaignPreviewSupportItems(campaign = {}, lang = 'en', env = {}) {
   if (!Array.isArray(campaign.support_items) || campaign.support_items.length === 0) return '';
   const text = adminPreviewText(lang);
   const items = campaign.support_items.map((item) => {
@@ -19665,7 +19671,7 @@ function renderAdminCampaignPreviewSupportItems(campaign = {}, lang = 'en') {
     return `<div class="support-item" id="support-${escapeAdminPreviewAttribute(item?.id || '')}">
       <div class="support-item__info">
         <div class="support-item__header"><strong>${escapeAdminPreviewHtml(item?.label || '')}</strong><span class="support-item__amount">${escapeAdminPreviewHtml(formatAdminPreviewMoney(current))} / ${escapeAdminPreviewHtml(formatAdminPreviewMoney(target))}</span></div>
-        <div class="support-item__progress"><span class="u-width-pct-${percent}" data-progress-width="${percent}"></span></div>
+        <div class="support-item__progress">${renderAdminPreviewBackground(campaign.progress_background, 'support-item__progress-bg', env)}<span class="u-width-pct-${percent}" data-progress-width="${percent}"></span></div>
         ${item?.need ? `<p class="support-item__need">${escapeAdminPreviewHtml(item.need)}</p>` : ''}
       </div>
       <div class="support-item__actions">
@@ -19696,7 +19702,7 @@ function renderAdminCampaignPreviewTiers(campaign = {}, lang = 'en', env = {}) {
         <div class="custom-amount__info"><h5 id="custom-amount-heading">${escapeAdminPreviewHtml(text.customAmountHeading)}</h5><p id="custom-amount-desc">${escapeAdminPreviewHtml(text.customAmountDescription)}</p></div>
         <div class="custom-amount__actions"><div class="custom-amount__input-wrap"><span class="custom-amount__currency" aria-hidden="true">$</span><input type="number" id="custom-amount-input" class="custom-amount__input" min="1" step="1" placeholder="25" disabled aria-disabled="true"></div><button class="poolcart-add-item custom-amount__btn" id="custom-amount-btn" type="button" disabled aria-disabled="true">${escapeAdminPreviewHtml(text.customAmountButton)}</button></div>
       </div>
-      ${renderAdminCampaignPreviewSupportItems(campaign, lang)}
+      ${renderAdminCampaignPreviewSupportItems(campaign, lang, env)}
     </div>
   </section>`;
 }
@@ -19768,6 +19774,7 @@ function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en')
       : [];
   const blocksHtml = blocks.map((block, index) => renderAdminCampaignPreviewContentBlock(block, index, errors, env)).join('\n');
   const heroHtml = renderAdminCampaignPreviewHero(campaign, env);
+  const campaignBackground = renderAdminPreviewBackground(campaign.campaign_background, 'campaign-background__image', env, 'eager');
   const communityHtml = Array.isArray(campaign.decisions) && campaign.decisions.length
     ? `<section class="community-teaser" id="community-teaser" aria-labelledby="community-teaser-heading"><h3 id="community-teaser-heading">${escapeAdminPreviewHtml(text.supporterCommunity)}</h3><p class="teaser-locked">${escapeAdminPreviewHtml(text.supportersOnly)}</p><a href="#" class="btn btn--secondary btn--locked" aria-disabled="true" tabindex="-1">${escapeAdminPreviewHtml(text.supportersOnlyCta)}</a></section>`
     : '';
@@ -19784,6 +19791,7 @@ function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en')
 </head>
 <body class="campaign-preview-render">
   <main class="campaign-container campaign-preview-readonly" data-campaign-slug="${escapeAdminPreviewAttribute(campaign.slug || '')}" data-single-tier-only="${campaign.single_tier_only === true ? 'true' : 'false'}" data-state="${escapeAdminPreviewAttribute(state)}" tabindex="-1">
+    ${campaignBackground ? `<div class="campaign-background" aria-hidden="true">${campaignBackground}</div>` : ''}
     <header class="campaign-header">
       <h1>${escapeAdminPreviewHtml(title)}</h1>
       ${shortBlurb ? `<p class="campaign-blurb">${renderAdminPreviewInlineMarkdown(shortBlurb, errors, 'shortBlurb')}</p>` : ''}
@@ -19792,7 +19800,7 @@ function buildAdminCampaignPagePreviewHtml(campaign = {}, env = {}, lang = 'en')
     <div class="campaign-content">
       <header class="hero">
         ${heroHtml}
-        ${renderAdminCampaignPreviewProgress(campaign, state, currentLang)}
+        ${renderAdminCampaignPreviewProgress(campaign, state, currentLang, env)}
       </header>
       <section class="content">${blocksHtml ? `<div class="long-content">${blocksHtml}</div>` : ''}</section>
       ${communityHtml}

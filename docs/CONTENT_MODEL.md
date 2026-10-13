@@ -89,6 +89,8 @@ explicit; leaving a description empty does not mark the image decorative.
 - **`hero_image_wide`** (optional): Wide image for campaign detail page (falls back to `hero_image`)
 - **`hero_video`** (optional): Uploaded MP4, WebM, or MOV path, or supported video-provider URL, for campaign detail (local video uses `hero_image_wide` or `hero_image` as its poster; YouTube uses the video's main thumbnail in the dashboard, protected preview, and published page)
 - **`creator_image`** (optional): Square image for creator (48px circle in sidebar)
+- **`campaign_background`** (optional): Decorative background behind the campaign page, also shown in the full-page protected preview
+- **`progress_background`** (optional): Decorative image behind campaign funding and support-item progress bars, also shown in the full-page protected preview
 - **Tier `image`** (optional): Wide image shown above tier name
 
 **Video requirements:** WebM is preferred for uploaded campaign videos, with 16:9 and max 1920x1080 recommended. The admin dashboard accepts hero video uploads up to 100 MB or YouTube/Vimeo URLs, and previews existing video files or embeds through the same content-security policy as the public campaign page. Public hero and content videos declare the MIME type matching the file extension; playback still requires browser-supported codecs. Local content video blocks may specify an optional `poster`; when omitted, public/admin editor views generate a transient poster from the video's first frame and keep the playable video lazy-loaded until play.

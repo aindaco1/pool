@@ -356,6 +356,12 @@ only the site origin as their referrer. Missing high-resolution YouTube thumbnai
 back to the standard thumbnail. The dashboard's editing thumbnails continue
 to open external video links.
 
+The full-page preview renders the saved **Campaign background** behind the page
+and **Progress background** behind the funding bar and support-item bars, using
+the published page's decorative-image styles. Clearing either setting removes
+it from the next saved preview. Uploaded image URLs still need their normal
+static asset deployment before another browser can load them.
+
 ### Campaign Settings
 
 Campaign settings include identity, dates, goal amount, charged/read-only state, runner report emails, shipping overrides, hero media, creator image, backgrounds, and other campaign front matter.

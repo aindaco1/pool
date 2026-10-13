@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Render saved campaign and progress backgrounds in protected campaign previews,
+  including support-item bars, with the same decorative styling as public pages.
+
 - Follow replacement deployments when GitHub cancels a pending duplicate, so
   campaign Publish does not falsely report a failed build. Distinguish genuine
   cancellation from failure and skip Pages builds for draft-only saves.

@@ -7113,7 +7113,7 @@ Preserved Markdown body.
     }) as typeof fetch;
     const request = async (body?: any, route = '/admin/campaigns/draft') => {
       env.RATELIMIT.store.clear();
-      const response = await worker.fetch(new Request('https://pledge.pool.test' + route + (body ? '' : '?campaignSlug=hand-relations'), {
+      const response = await worker.fetch(new Request('https://pledge.pool.test' + route + (body ? '' : `${route.includes('?') ? '&' : '?'}campaignSlug=hand-relations`), {
         method: body ? 'POST' : 'GET', headers: { Cookie: session.cookie, 'Content-Type': 'application/json', 'x-pool-admin-csrf': session.csrfToken },
         ...(body ? { body: JSON.stringify(body) } : {})
       }), env, session.ctx);
@@ -7346,6 +7346,46 @@ featured_tier_id: featured`;
     expect(source).not.toContain('body: "  "');
     expect(source).not.toContain('<b>');
     expect(source).not.toContain('Unused description');
+  });
+
+  it.each(['en', 'es'])('previews saved campaign and progress backgrounds without publishing (%s)', async (lang) => {
+    const w = await workspace(false, 'creator@example.com');
+    const initial = await w.request();
+    const fields = {
+      campaign_background: '/assets/images/campaigns/hand-relations/background.png',
+      progress_background: '/assets/images/campaigns/hand-relations/progress.png',
+      support_items: [{ id: 'sound', label: 'Sound', target: 500, current: 100 }]
+    };
+    const changes = Object.entries(fields).map(([path, value]) => ({ path, value, campaignSlug: 'hand-relations' }));
+    const saved = await w.save(initial.body.campaign.baseRevision, changes);
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const preview = await w.request(undefined, `/admin/campaign-preview/hand-relations?lang=${lang}`);
+    expect(preview.status).toBe(200);
+    expect(preview.headers.get('Cache-Control')).toContain('no-store');
+    const doc = new DOMParser().parseFromString(preview.body.preview.html, 'text/html');
+    expect(doc.documentElement.lang).toBe(lang);
+    const backgrounds = [
+      ['.campaign-container > .campaign-background .campaign-background__image', fields.campaign_background],
+      ['.progress-wrap > .progress-wrap__bg', fields.progress_background],
+      ['.support-item__progress > .support-item__progress-bg', fields.progress_background]
+    ];
+    for (const [selector, path] of backgrounds) {
+      const image = doc.querySelector(selector);
+      expect(image, selector).not.toBeNull();
+      expect(image?.getAttribute('src')).toBe(`https://pool.test${path}`);
+      expect(image?.getAttribute('alt')).toBe('');
+      expect(image?.getAttribute('aria-hidden')).toBe('true');
+    }
+    expect(doc.querySelector('.support-item__btn')?.hasAttribute('disabled')).toBe(true);
+    expect(w.files.get('_campaigns/hand-relations.md')?.content).toBe(w.source);
+
+    const cleared = await w.save(saved.body.baseRevision, changes.slice(0, 2).map(change => ({ ...change, value: '' })));
+    expect(cleared.status).toBe(200);
+    const empty = await w.request(undefined, '/admin/campaign-preview/hand-relations');
+    const emptyDoc = new DOMParser().parseFromString(empty.body.preview.html, 'text/html');
+    expect(emptyDoc.querySelector('.campaign-background, .progress-wrap__bg, .support-item__progress-bg')).toBeNull();
+    expect(emptyDoc.querySelector('.progress-bar')).not.toBeNull();
+    expect(emptyDoc.querySelector('.support-item__progress')).not.toBeNull();
   });
 
   it('saves, reloads, previews, and publishes empty campaign image fields', async () => {
