@@ -34,9 +34,10 @@ long_content:
     align: "center"
     body: |
       ## Why This Story?
-  - type: "text"
-    body: |
-      **I was born and raised in New Mexico, the home of the Manhattan Project, and as such I've had a life long interest in nuclear history.** I believe that the possibility of nuclear annihilation has been reduced to an accepted backdrop of modern life, and with this short film I want to capture the cultural fears and anxieties of those living through the atomic bomb’s conception. - *Ben Arndt*
+  - type: "quote"
+    text: |
+      **I was born and raised in New Mexico, the home of the Manhattan Project, and as such I've had a life long interest in nuclear history.** I believe that the possibility of nuclear annihilation has been reduced to an accepted backdrop of modern life, and with this short film I want to capture the cultural fears and anxieties of those living through the atomic bomb’s conception.
+    author: "Ben Arndt"
   - type: "image"
     src: "/assets/images/campaigns/human-error/content-pitch-5-20261012-193150-53e37bab.png"
     alt: ""
@@ -64,7 +65,7 @@ long_content:
     body: |
       **Ben Arndt is a filmmaker based in Albuquerque, New Mexico, with a BFA in film production from the University of New Mexico.** In 2020 Ben Arndt co-founded the production company and youtube channel **[A.M. Cinematics](https://www.youtube.com/@A.M.Cinematics)** with his childhood friend Casper Montoya. The shared youtube channel has earned nearly a million views, with content based on conversations around art, pop culture, and original creative work.
       
-      Some of Ben's previous films includes *Breakups Suck*, which screened at the oscar qualifying Santa Fe International Film Festival, the Austin Film Festival & Writers Conference, and was covered by *Movie Maker Magazine*.
+      Some of Ben's previous films includes *Breakups Suck*, which screened at the oscar qualifying Santa Fe International Film Festival, the Austin Film Festival & Writers Conference, and was covered by *[Movie Maker Magazine](https://www.moviemaker.com/breakups-suck-ben-arndt/)*.
       
       *Human Error* will be the latest film created under the A.M. Cinematics and DustWave name!
   - type: "text"
@@ -89,7 +90,7 @@ long_content:
   - type: "video"
     provider: "youtube"
     video_id: "sseRnI-E2qo"
-    caption: "Proof of concept/Teaser for HUMAN ERROR's crowdfunding campaign"
+    caption: "Proof of concept/teaser for HUMAN ERROR's crowdfunding campaign"
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -140,7 +141,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-14T06:20:27.470Z"
+_pool_draft_saved_at: "2026-10-14T06:24:38.829Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261014-011629-4e76a7ed.png"
