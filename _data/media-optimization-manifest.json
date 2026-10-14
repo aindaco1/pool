@@ -2369,6 +2369,64 @@
       "references": []
     },
     {
+      "path": "assets/images/campaigns/human-error/background-20261014-064707-75f442a0.png",
+      "publicPath": "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0.png",
+      "name": "background-20261014-064707-75f442a0.png",
+      "label": "background 20261014 064707 75f442a0",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 6565008,
+      "sha256": "fbba846c4c96ea7876c541e6115d86c7e8ba0bcbd0d9f45710cf65f8357a0b77",
+      "width": 1512,
+      "height": 2016,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-320.webp",
+        "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-480.webp",
+        "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-640.webp",
+        "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0-320.webp",
+          "bytes": 29712,
+          "sha256": "42b009c433b289162e008cb5f7a84ddc8ad7d34c0f0fc5c456a9720f8e8fd837",
+          "sourceSha256": "fbba846c4c96ea7876c541e6115d86c7e8ba0bcbd0d9f45710cf65f8357a0b77",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0-480.webp",
+          "bytes": 84588,
+          "sha256": "be47267956fd43045b108a17f12ed2c2665655991fb399b6df69a9f2dc84d1ba",
+          "sourceSha256": "fbba846c4c96ea7876c541e6115d86c7e8ba0bcbd0d9f45710cf65f8357a0b77",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0-640.webp",
+          "bytes": 169900,
+          "sha256": "f6600a13af876e9e02f6041c987657de2f9b0bde750cd296bb1b40495e583992",
+          "sourceSha256": "fbba846c4c96ea7876c541e6115d86c7e8ba0bcbd0d9f45710cf65f8357a0b77",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/background-20261014-064707-75f442a0-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0-960.webp",
+          "bytes": 425390,
+          "sha256": "233628fbb720bc28bab5ad0bfba379b65cabe674f86dcc315e3400dbf4957b6b",
+          "sourceSha256": "fbba846c4c96ea7876c541e6115d86c7e8ba0bcbd0d9f45710cf65f8357a0b77",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
       "publicPath": "/assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
       "name": "content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
