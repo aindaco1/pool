@@ -89,6 +89,7 @@ long_content:
   - type: "video"
     provider: "youtube"
     video_id: "sseRnI-E2qo"
+    caption: "Proof of concept/Teaser for HUMAN ERROR's crowdfunding campaign"
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -139,7 +140,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-14T06:15:59.072Z"
+_pool_draft_saved_at: "2026-10-14T06:20:27.470Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261014-011629-4e76a7ed.png"
