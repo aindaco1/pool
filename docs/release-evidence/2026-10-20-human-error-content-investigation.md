@@ -174,7 +174,8 @@ protection applies.
   passed. No local credentials were loaded into the isolated worktree.
 - The complete pre-merge gate runs in GitHub's isolated environment because
   local ports 4000 and 8787 belong to an existing Podman stack.
-- Complete hosted pre-merge results are recorded after completion.
+- Hosted pre-merge status is tracked on the pull request; no application
+  deployment is claimed by this record.
 
 Synthetic conflict-state screenshots:
 [desktop](2026-10-20-draft-conflict-en-1280.png),

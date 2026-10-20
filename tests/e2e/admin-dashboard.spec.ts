@@ -3098,6 +3098,11 @@ test.describe('Admin Dashboard', () => {
       for (const width of language === 'es' ? [390] : [1280, 834, 390]) {
         await page.setViewportSize({ width, height: 1000 });
         await page.locator('#admin-content-status').scrollIntoViewIfNeeded();
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+          await Promise.all(document.getAnimations().filter(animation =>
+            animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {})));
+        });
         await page.screenshot({ path: `tmp/campaign-draft-conflict-${language}-${width}.png` });
       }
       await page.setViewportSize({ width: 1280, height: 720 });
