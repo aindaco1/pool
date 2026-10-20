@@ -69,7 +69,10 @@ function editor(storage: Record<string, string> = {}, projectSave = false) {
     w.dispatchEvent(event);
     return event.defaultPrevented;
   };
-  return { w, get, load, edit, warns, save: () => w.document.getElementById('admin-campaign-save') as HTMLButtonElement };
+  return { w, get, load, edit, warns,
+    setServer: (campaign: Partial<typeof savedCampaign>) => { savedCampaign = { ...savedCampaign, ...campaign }; },
+    server: () => savedCampaign,
+    save: () => w.document.getElementById('admin-campaign-save') as HTMLButtonElement };
 }
 
 afterEach(() => { windows.splice(0).forEach(dom => dom.window.close()); });
@@ -240,6 +243,58 @@ describe('campaign draft recovery', () => {
 
 
 describe('project Save and existing browser drafts', () => {
+  it.each(['load again', 'edit and refresh'])('does not rebase conflicting browser work after %s', async (action) => {
+    const original = editor({}, true);
+    await original.load();
+    original.edit('Older local paragraph');
+    const browserDraft = original.w.localStorage.getItem(key)!;
+    const newer = { longContent: [{ type: 'text', body: 'Another creator’s complete campaign' }],
+      baseRevision: 'draft:collaborator-sha', hasWorkingCopy: true };
+    let current = editor({ [key]: browserDraft }, true);
+    current.setServer(newer);
+    await current.load();
+    if (action === 'load again') {
+      await current.load();
+    } else {
+      current.get('short-blurb').value = 'A newer description';
+      current.get('short-blurb').dispatchEvent(new current.w.Event('input', { bubbles: true }));
+      current = editor({ [key]: current.w.localStorage.getItem(key)! }, true);
+      current.setServer(newer);
+      await current.load();
+    }
+    current.save().click();
+    await vi.waitFor(() => expect(current.w.fetch.mock.calls.some(([url, options]: any[]) =>
+      url.includes('/admin/campaigns/draft') && options?.method === 'POST')).toBe(true));
+    const sent = current.w.fetch.mock.calls.find(([url, options]: any[]) =>
+      url.includes('/admin/campaigns/draft') && options?.method === 'POST');
+    expect(JSON.parse(sent[1].body).baseRevision).toBe('live:server-sha');
+    expect(current.server().longContent).toEqual(newer.longContent);
+    expect(current.get('long-content').value).toContain('Older local paragraph');
+    expect(JSON.parse(current.w.localStorage.getItem(key)!).publishedSnapshot).toBe(JSON.parse(browserDraft).publishedSnapshot);
+  });
+
+  it.each(['draft:older-sha', ''])('rejects a recovered draft with a newer snapshot but stale or missing revision (%s)', async revision => {
+    const original = editor({}, true);
+    const newer = { longContent: [{ type: 'text', body: 'Another creator’s complete campaign' }],
+      baseRevision: 'draft:collaborator-sha', hasWorkingCopy: true };
+    original.setServer(newer);
+    await original.load();
+    original.edit('Older local paragraph');
+    const draft = JSON.parse(original.w.localStorage.getItem(key)!);
+    // Older clients could persist today's baseline together with an older revision.
+    draft.baseRevision = revision;
+    const raw = JSON.stringify(draft);
+    const current = editor({ [key]: raw }, true);
+    current.setServer(newer);
+    await current.load();
+    expect(current.w.localStorage.getItem(key)).toBe(raw);
+    expect(current.get('status').textContent).toContain('Compare them with the saved project');
+    current.save().click();
+    await vi.waitFor(() => expect(current.get('status').textContent).toContain('A newer version was saved elsewhere'));
+    expect(current.server().longContent).toEqual(newer.longContent);
+    expect(JSON.parse(current.w.localStorage.getItem(key)!).baseRevision).toBe(revision);
+  });
+
   it('restores a legacy browser draft and preserves its exact bytes before writing', async () => {
     const legacy = editor();
     await legacy.load();
