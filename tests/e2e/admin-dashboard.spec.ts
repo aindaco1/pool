@@ -143,7 +143,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     }
     if (url.pathname === '/admin/auth/start') {
       calls.authStart.push(body);
-      return fulfillJson({ success: true, sent: true, loginUrl: 'http://127.0.0.1:4000/admin/?admin_login=test-token' });
+      return fulfillJson({ success: true, sent: true, loginUrl: SITE_BASE + '/admin/?admin_login=test-token' });
     }
     if (url.pathname === '/admin/auth/exchange') {
       calls.authExchange.push(body);
@@ -3061,6 +3061,65 @@ test.describe('Admin Dashboard', () => {
     expect(calls.contentPublish).toHaveLength(0);
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('pool-admin-content-draft:en:hand-relations') || '{}').longContent[0].body)).toContain('Campaign text that must survive a refresh.');
   });
+
+  for (const language of ['en', 'es']) {
+    test(`keeps a conflicting browser draft from overwriting another creator through Preview after refresh (${language})`, async ({ page }) => {
+      const calls = await routeAdminWorker(page, { role: 'campaign_user' });
+      await page.route(`${WORKER_BASE}/admin/session`, route => route.fulfill({
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ user: { email: 'creator@example.com', role: 'campaign_user', campaignSlugs: ['hand-relations'] }, csrfToken: 'csrf-test-token' })
+      }));
+      await page.goto((language === 'es' ? '/es' : '') + '/admin/');
+      await page.locator('[data-campaign-settings-panel="hand-relations"] [data-campaign-settings-subtab="content"]').click();
+      const body = page.locator('#admin-content-blocks [data-content-field="body"]').first();
+      await expect(body).toContainText('Existing body');
+      await body.fill('Older local paragraph');
+      const storedKey = `pool-admin-content-draft:${language}:hand-relations`;
+      const original = await page.evaluate(key => localStorage.getItem(key), storedKey);
+      const saves: any[] = [];
+      const collaborator = { slug: 'hand-relations', title: 'Hand Relations', shortBlurb: 'Existing blurb.',
+        longContent: [{ type: 'text', body: 'Another creator’s complete campaign' }],
+        baseRevision: 'draft:collaborator', hasWorkingCopy: true, hasUnpublishedChanges: true };
+      await page.route(`${WORKER_BASE}/admin/campaigns/draft**`, async route => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({ headers: JSON_HEADERS, body: JSON.stringify({ campaign: collaborator }) });
+          return;
+        }
+        const submitted = route.request().postDataJSON();
+        saves.push(submitted);
+        const stale = submitted.baseRevision !== collaborator.baseRevision;
+        await route.fulfill({ status: stale ? 409 : 200, headers: JSON_HEADERS,
+          body: JSON.stringify(stale ? { code: 'campaign_revision_conflict', error: 'Project changed; edits kept.' } : { success: true, ...collaborator }) });
+      });
+      page.on('dialog', dialog => dialog.accept());
+      await page.reload();
+      await expect(body).toContainText('Older local paragraph');
+      await expect(page.locator('#admin-content-status')).toContainText(language === 'es' ? 'Compáralos con el proyecto guardado' : 'Compare them with the saved project');
+      for (const width of language === 'es' ? [390] : [1280, 834, 390]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await page.locator('#admin-content-status').scrollIntoViewIfNeeded();
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+          await Promise.all(document.getAnimations().filter(animation =>
+            animation.effect?.getTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => {})));
+        });
+        await page.screenshot({ path: `tmp/campaign-draft-conflict-${language}-${width}.png` });
+      }
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await body.fill('Older local paragraph with another edit');
+      await page.reload();
+      await expect(body).toContainText('Older local paragraph with another edit');
+      await page.locator('#admin-campaign-preview-publish').click();
+      await expect.poll(() => saves.length).toBe(1);
+      expect(saves[0].baseRevision).toBe('live:e2e');
+      await expect(page.locator('#admin-campaign-status')).toContainText(language === 'es' ? 'Se guardó una versión más reciente' : 'A newer version was saved elsewhere');
+      expect(calls.previewPublish).toHaveLength(0);
+      expect(calls.projectPublish).toHaveLength(0);
+      const after = await page.evaluate(key => JSON.parse(localStorage.getItem(key) || '{}'), storedKey);
+      expect(after.publishedSnapshot).toBe(JSON.parse(original!).publishedSnapshot);
+      expect(after.longContent[0].body).toContain('another edit');
+    });
+  }
 
   test('saves revisions before sharing a preview while keeping Publish separate', async ({ page }) => {
     const calls = await signInWithMagicToken(page);

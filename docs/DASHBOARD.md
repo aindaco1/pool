@@ -399,6 +399,16 @@ The existing browser draft key and format remain compatible. Loading never rewri
 
 Local drafts belong to the exact site origin, browser profile, and editor language. They are not synchronized to another browser or device and are not server backups. An unpublished draft retains its base revision so another author's server changes cannot be silently overwritten. If only preview flags changed and the server content still matches the draft's original baseline, the current server revision is used. A conflict involving changed content requires comparing the preserved draft with the current campaign before reapplying edits; repeatedly reloading does not discard the draft or bypass the conflict.
 
+The draft's revision and original content baseline stay together after a conflict,
+including after further typing, browser Save draft, another content load, or a
+page refresh. A saved working copy requires the original revision to match;
+matching content alone does not authorize replacing a different working-copy
+revision. Older browser drafts with a stale or missing revision remain preserved
+and cannot overwrite that shared working copy. The editor identifies the conflict
+on load, and Save or Preview fails the existing server revision check until the
+content is compared and reapplied to the current project. The same-content
+preview-metadata exception applies only before a working copy exists.
+
 Uploaded video blocks can include an explicit poster image. When no poster is set, the dashboard and public campaign page generate an in-browser poster from the video's first frame while keeping the playable video itself lazy-loaded until the user presses play.
 
 Content safety rules:

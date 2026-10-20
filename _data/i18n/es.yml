@@ -1591,6 +1591,7 @@ admin:
   content_preview_pending_media: "Los medios seleccionados se previsualizan en el editor. Se subiran antes de publicar o enviar y despues se actualizara la vista móvil."
   content_draft_saved: "Borrador guardado en este navegador. Estos cambios aún no se han publicado."
   content_draft_restored: "Borrador del navegador restaurado. Estos cambios aún no se han publicado."
+  content_draft_revision_conflict: "El proyecto guardado cambió desde que se inició este borrador del navegador. Tus cambios se conservan. Compáralos con el proyecto guardado antes de guardar; recargar no resolverá el conflicto."
   content_draft_save_failed: "No se pudo guardar este borrador en tu navegador. Mantén esta página abierta y copia el contenido antes de salir."
   content_draft_read_failed: "No se pudo leer un borrador existente del navegador. Se ha conservado sin cambios. Mantén esta página abierta y contacta con soporte antes de editar."
   content_draft_pending_media: "Texto guardado en este navegador. Los archivos multimedia seleccionados aún no están guardados. Mantén esta página abierta hasta guardar el proyecto."

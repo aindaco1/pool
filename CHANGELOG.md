@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Update Vite development tooling to 8.3.4 to resolve launch-editor security
+  advisories blocking the full dependency gate.
+
+- Keep conflicting campaign browser drafts tied to their original revision and
+  content baseline across edits and reloads. Prevent Save or Preview from
+  silently overwriting a newer shared working copy; show localized conflict
+  guidance while preserving browser recovery data.
+
 - Render saved campaign and progress backgrounds in protected campaign previews,
   including support-item bars, with the same decorative styling as public pages.
 

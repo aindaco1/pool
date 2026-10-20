@@ -9643,6 +9643,7 @@
       loadedContentCampaignSlug = slug;
       loadedContentBaseRevision = data?.campaign?.baseRevision || '';
       if (campaignSave) campaignWorkingStates[slug] = Object.assign({}, campaignWorkingStates[slug] || {}, data.campaign);
+      var draftRevisionConflict = false;
       if (localDraft.campaignSlug) {
         setContentFields(localDraft);
         if (!pendingBlocks && localDraft.publishedSnapshot === currentContentSnapshot()) {
@@ -9655,12 +9656,21 @@
           }
           restoreContentMetadataToSettings(localDraft);
           // Keep the original optimistic-lock revision for unpublished local edits.
-          if (contentNeedsPublishing() && localDraft.baseRevision && localDraft.publishedSnapshot !== contentPublishedSnapshot) {
+          var workingRevisionChanged = campaignSave && data.campaign.hasWorkingCopy &&
+            (localDraft.baseRevision || '') !== data.campaign.baseRevision;
+          if (contentNeedsPublishing() && (workingRevisionChanged ||
+              (localDraft.baseRevision && localDraft.publishedSnapshot !== contentPublishedSnapshot))) {
             // Older browser drafts used the raw public file SHA. Upgrade only an
             // exact match; a changed public source must still produce a conflict.
             var legacyRevisionMatches = campaignSave && !data.campaign.hasWorkingCopy &&
               'live:' + localDraft.baseRevision === data.campaign.baseRevision;
-            loadedContentBaseRevision = legacyRevisionMatches ? data.campaign.baseRevision : localDraft.baseRevision;
+            loadedContentBaseRevision = legacyRevisionMatches ? data.campaign.baseRevision : (localDraft.baseRevision || '');
+            if (!legacyRevisionMatches) {
+              // The revision and its content baseline must travel together. Pairing
+              // an old draft with today's baseline lets a later reload rebase it.
+              contentPublishedSnapshot = localDraft.publishedSnapshot || '';
+              draftRevisionConflict = loadedContentBaseRevision !== data.campaign.baseRevision;
+            }
           }
         }
       }
@@ -9669,6 +9679,8 @@
       updateContentDirty();
       setText(contentStatus, contentDraftReadFailed
         ? t('content_draft_read_failed', 'An existing browser draft could not be read. It has been left untouched. Keep this page open and contact support before editing.')
+        : draftRevisionConflict
+          ? t('content_draft_revision_conflict', 'The saved project changed since this browser draft was started. Your edits are preserved. Compare them with the saved project before saving; reloading will not resolve the conflict.')
         : contentNeedsPublishing()
           ? t('content_draft_restored', 'Browser draft restored. These changes have not been published.')
           : '');
