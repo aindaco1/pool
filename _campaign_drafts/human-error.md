@@ -23,6 +23,74 @@ stretch_hidden: true
 custom_late_support: false
 runner_report_emails: []
 long_content:
+  - type: "image"
+    align: "center"
+    src: "/assets/images/campaigns/human-error/content-pool-1-20261011-222007-a462a203.png"
+    alt: ""
+  - type: "text"
+    body: |
+      ***Human Error* is a short film** **set in 1962** that follows two officers within a remote nuclear launch site as they receive contradicting orders from command control. With the fate of the world potentially hanging in the balance, the two men find themselves at odds with one another as they clash on what to do next.
+  - type: "text"
+    align: "center"
+    body: |
+      ## Why This Story?
+  - type: "quote"
+    text: |
+      **I was born and raised in New Mexico, the home of the Manhattan Project, and as such I've had a life long interest in nuclear history.** I believe that the possibility of nuclear annihilation has been reduced to an accepted backdrop of modern life, and with this short film I want to capture the cultural fears and anxieties of those living through the atomic bomb’s conception.
+    author: "Ben Arndt"
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pitch-5-20261012-193150-53e37bab.png"
+    alt: ""
+    caption: "FailSafe 1964"
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pitch-7-20261012-193213-3ba96a48.png"
+    alt: ""
+    caption: "Dr. Strange Love 1964"
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pool-2-20261013-062640-feb573f4.png"
+    alt: ""
+    caption: "Let's meet the team behind this project"
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pool-3-20261013-062649-9731b99b.png"
+    alt: ""
+    caption: "The Producers of Human Error"
+  - type: "image"
+    src: "/assets/images/campaigns/human-error/content-pool-4-20261013-062703-95536c36.png"
+    alt: ""
+    caption: "Some of the crew of Human Error"
+  - type: "text"
+    body: |
+      ### Ben Arndt & A.M. Cinematics
+  - type: "text"
+    body: |
+      **Ben Arndt is a filmmaker based in Albuquerque, New Mexico, with a BFA in film production from the University of New Mexico.** In 2020 Ben Arndt co-founded the production company and youtube channel **[A.M. Cinematics](https://www.youtube.com/@A.M.Cinematics)** with his childhood friend Casper Montoya. The shared youtube channel has earned nearly a million views, with content based on conversations around art, pop culture, and original creative work.
+      
+      Some of Ben's previous films includes *Breakups Suck*, which screened at the oscar qualifying Santa Fe International Film Festival, the Austin Film Festival & Writers Conference, and was covered by [**Movie Maker Magazine**](https://www.moviemaker.com/breakups-suck-ben-arndt/).
+      
+      *Human Error* will be the latest film created under the A.M. Cinematics and DustWave name!
+  - type: "text"
+    body: |
+      ### DUSTWAVE
+  - type: "text"
+    body: |
+      **DustWave is an independent art collective working out of Albuquerque, New Mexico.** Aside from creating amazing open source crowdfunding softwares like The Pool, DustWave also runs community fundraising and networking events, and fosters a local creative scene with the intention of bringing together artists to create independent art. You can learn more about their mission statement, and see some of the cool work they do [**here!**](https://dustwave.xyz/)
+  - type: "text"
+    align: "center"
+    body: |
+      ## Where Does my Money Go?
+  - type: "text"
+    body: |
+      **Your support will go towards feeding cast and crew, equipment rentals, and  art production.** Some of the other expected expenses of this project include equipment insurance, costuming costs, and festival fees when the film is completed.
+      
+      *Human Error* doesn't have any big name studios or investors behind it, so it means we'll be relying on your support to make this film into a reality!
+  - type: "text"
+    align: "center"
+    body: |
+      ## Proof of Concept
+  - type: "video"
+    provider: "youtube"
+    video_id: "sseRnI-E2qo"
+    caption: "Proof of concept/teaser for HUMAN ERROR's crowdfunding campaign"
   - type: "text"
     body: |
       Follow along and see updates on the [A.M. Cinematics](https://www.instagram.com/a.m._cinematics_?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw==) Instagram or the [Dust Wave](https://dustwave.xyz/) website.
@@ -76,7 +144,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-18T05:34:18.470Z"
+_pool_draft_saved_at: "2026-10-20T21:30:51Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261014-011629-4e76a7ed.png"
