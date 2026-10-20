@@ -182,3 +182,15 @@ Synthetic conflict-state screenshots:
 [tablet](2026-10-20-draft-conflict-en-834.png),
 [mobile](2026-10-20-draft-conflict-en-390.png), and
 [Spanish mobile](2026-10-20-draft-conflict-es-390.png).
+
+### Dependency gate remediation
+
+The first hosted run failed the root full dependency audit on the pre-existing
+Vite 8.3.2 development dependency. Production audits and both Worker audits
+passed. The advisory database lists Vite 8.3.3 as patched for
+[GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm),
+[GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv), and
+[GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw).
+The branch updates Vite to 8.3.4 with the required lockfile dependencies;
+the root full audit then passed with zero findings. This development-tool
+patch is separate from the campaign overwrite mechanism.
