@@ -47,15 +47,15 @@ long_content:
     alt: ""
     caption: "Dr. Strange Love 1964"
   - type: "image"
-    src: "/assets/images/campaigns/human-error/content-pool-2-20261013-062640-feb573f4.png"
+    src: "/assets/images/campaigns/human-error/content-pool-2-20261021-181047-f9aa603c.png"
     alt: ""
     caption: "Let's meet the team behind this project"
   - type: "image"
-    src: "/assets/images/campaigns/human-error/content-pool-3-20261013-062649-9731b99b.png"
+    src: "/assets/images/campaigns/human-error/content-pool-3-20261021-181059-fb5f8d43.png"
     alt: ""
     caption: "The Producers of Human Error"
   - type: "image"
-    src: "/assets/images/campaigns/human-error/content-pool-4-20261013-062703-95536c36.png"
+    src: "/assets/images/campaigns/human-error/content-pool-4-20261021-181113-8c5334d3.png"
     alt: ""
     caption: "Some of the crew of Human Error"
   - type: "text"
@@ -93,7 +93,7 @@ long_content:
     caption: "Proof of concept/teaser for HUMAN ERROR's crowdfunding campaign"
   - type: "text"
     body: |
-      Follow along and see updates on the [A.M. Cinematics](https://www.instagram.com/a.m._cinematics_?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw==) Instagram or the [Dust Wave](https://dustwave.xyz/) website.
+      #### Follow along and see updates on the [*A.M. Cinematics*](https://www.instagram.com/a.m._cinematics_?utm_source=ig_web_button_share_sheet&stkn=ZDNlZDc0MzIxNw==) Instagram or the [*Dust Wave*](https://dustwave.xyz/) website.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -144,7 +144,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-20T21:30:51Z"
+_pool_draft_saved_at: "2026-10-21T18:11:18.809Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261014-011629-4e76a7ed.png"
