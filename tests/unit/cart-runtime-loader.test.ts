@@ -4,6 +4,7 @@ const runtimeScriptKeys = [
   'editor-codec',
   'add-on-utils',
   'shipping-option-utils',
+  'script-loader',
   'stripe-checkout-sidecar',
   'cart-provider',
   'cart',
@@ -55,6 +56,9 @@ function installRuntimeScriptHarness(providerClick = vi.fn()) {
           break;
         case 'shipping-option-utils':
           (window as any).DustWaveShippingOptionUtils = {};
+          break;
+        case 'script-loader':
+          (window as any).DustWaveScriptLoader = {};
           break;
         case 'stripe-checkout-sidecar':
           (window as any).PoolStripeCheckoutSidecar = {};
@@ -113,6 +117,7 @@ describe('cart runtime loader', () => {
     delete (window as any).PoolCartProvider;
     delete (window as any).PoolAddOnUtils;
     delete (window as any).DustWaveShippingOptionUtils;
+    delete (window as any).DustWaveScriptLoader;
     delete (window as any).PoolStripeCheckoutSidecar;
     delete (window as any).__PoolCartRuntimeCartUiLoaded;
     delete (window as any).__PoolBuyButtonsLoaded;
@@ -129,6 +134,7 @@ describe('cart runtime loader', () => {
     delete (window as any).PoolCartProvider;
     delete (window as any).PoolAddOnUtils;
     delete (window as any).DustWaveShippingOptionUtils;
+    delete (window as any).DustWaveScriptLoader;
     delete (window as any).PoolStripeCheckoutSidecar;
     delete (window as any).__PoolCartRuntimeCartUiLoaded;
     delete (window as any).__PoolBuyButtonsLoaded;

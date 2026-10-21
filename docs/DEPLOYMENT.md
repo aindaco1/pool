@@ -45,6 +45,25 @@ Routine **Refresh Production Pages** runs, including scheduled campaign-state
 refreshes, do not deploy the Worker. The manual Worker-only fallback from the
 repository root is `npm run deploy:worker`.
 
+For maintenance releases, set the boolean `skip_diary_check` input to `true`
+when dispatching either deployment workflow. This publishes the selected
+revision without invoking the post-deploy diary check or its supporter
+broadcasts. For example:
+
+```bash
+gh workflow run deploy-production.yml --ref main \
+  -f ref=REVIEWED_COMMIT_SHA -f reason=maintenance -f skip_diary_check=true
+```
+
+Automatic main-branch Pages pushes invoke the diary check only when published
+content under `_campaigns/` changed between the push's exact before and after
+commits. Tooling, application code and saved drafts alone do not trigger it.
+The comparison fetches an exact missing commit when a checkout is shallow and
+fails the build if that comparison cannot be established. Scheduled refreshes
+and ordinary manual/campaign dispatches retain the diary check; the manual
+skip input defaults to `false`. A maintenance skip does not pause later
+scheduled diary checks or other existing notification processing.
+
 Campaign publishing dispatches **Refresh Production Pages** with the saved
 commit in its optional `ref` input. Both jobs use that revision; the run title
 records it as `Deploy <sha>` so dashboard progress can track the correct build

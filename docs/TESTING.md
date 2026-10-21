@@ -156,7 +156,17 @@ npm test                   # Run all tests
 
 `./scripts/test-e2e.sh --podman` is the fully automated browser path. Use `./scripts/test-checkout.sh --podman` when you specifically want to drive the checkout manually in a real browser.
 
-The local Worker test path prefers Node 24, matching GitHub Actions. Run `nvm use` from the repository root to select the supported Node 24.15 baseline. The host scripts fall back to Node 22.22.2 or newer if a fork has that installed; unsupported odd-numbered Node releases are rejected by npm so jsdom and the test runner do not silently run outside their declared engine ranges.
+The local Worker test path uses patched Node releases, matching GitHub Actions.
+Run `nvm install` and `nvm use` from the repository root for Node 24.22.1.
+Host launchers preserve a patched Node already on PATH; otherwise they select
+an installed NVM version at least 22.23.4, 24.22.1, or 26.12.1 on those major
+lines. They stop if none is available, rather than replacing a repaired runtime
+with an older cached version. The selector tests include that downgrade case,
+the exact fixed patch boundaries, and paths containing spaces.
+
+Worker and Playwright container builds copy the verified Node 24.22.1 executable;
+their new image tags bypass old local images, and entrypoints check the runtime
+before installing dependencies. Existing running containers must be restarted.
 
 For the accessibility-focused browser slice, use:
 

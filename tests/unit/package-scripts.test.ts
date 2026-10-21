@@ -75,8 +75,8 @@ describe('package release scripts', () => {
     const workerNodeVersion = readFileSync(join(repoRoot, 'worker', '.nvmrc'), 'utf8').trim();
     const npmConfig = readFileSync(join(repoRoot, '.npmrc'), 'utf8');
 
-    expect(packageJson.engines.node).toBe('^22.22.2 || ^24.15.0 || ^26.0.0');
-    expect(rootNodeVersion).toBe('24.15.0');
+    expect(packageJson.engines.node).toBe('^22.23.4 || ^24.22.1 || ^26.12.1');
+    expect(rootNodeVersion).toBe('24.22.1');
     expect(workerNodeVersion).toBe(rootNodeVersion);
     expect(npmConfig).toContain('engine-strict=true');
   });
