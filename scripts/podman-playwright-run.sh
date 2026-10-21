@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PLAYWRIGHT_IMAGE="localhost/pool-dev-playwright:latest"
+PLAYWRIGHT_IMAGE="localhost/pool-dev-playwright:node-24.22.1"
 PLAYWRIGHT_NODE_MODULES_VOLUME="pool-dev-playwright-node-modules"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_STACK_STARTED=false

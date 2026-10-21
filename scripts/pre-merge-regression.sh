@@ -50,21 +50,7 @@ prefer_podman_path() {
   return 1
 }
 
-prefer_current_node_path() {
-  local candidate=""
-  for candidate in \
-    "$HOME/.nvm/versions/node/v24.*/bin" \
-    "$HOME/.nvm/versions/node/v22.*/bin"
-  do
-    for resolved in $candidate; do
-      if [[ -x "$resolved/node" ]]; then
-        export PATH="$resolved:$PATH"
-        return 0
-      fi
-    done
-  done
-  return 1
-}
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/node-runtime.sh"
 
 stabilize_podman_connection() {
   prefer_podman_path || true
@@ -379,7 +365,7 @@ stop_worker() {
 
 start_worker() {
   (
-    prefer_current_node_path || true
+    prefer_current_node_path || exit 1
     cd worker && npx wrangler dev --env dev --port 8787 >/tmp/pool-premerge-worker.log 2>&1
   ) &
   WORKER_PID=$!
@@ -545,7 +531,7 @@ export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
 export POOL_EMAIL_DRY_RUN="${POOL_EMAIL_DRY_RUN:-true}"
 SMOKE_ADMIN_SECRET="${ADMIN_SECRET}"
 
-prefer_current_node_path || true
+prefer_current_node_path || exit 1
 stabilize_podman_connection
 
 if [[ -f worker/.dev.vars ]]; then
