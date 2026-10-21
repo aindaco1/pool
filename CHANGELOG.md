@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v1.2.24 - 2026-10-21
+
+- Adopt Platform 0.44.0 with shared retryable Stripe loading, identity-safe media
+  selection and patched-Node bootstrap. Preserve checkout and editor policy.
+- Preserve paired browser-draft revisions and snapshots through the shared recovery helper.
+- Skip diary broadcasts for source-only and explicitly marked maintenance deployments.
+- Retain the patched runtime/tooling trust baseline for the eMudhra incident.
 
 - Update Vite development tooling to 8.3.4 to resolve launch-editor security
   advisories blocking the full dependency gate.

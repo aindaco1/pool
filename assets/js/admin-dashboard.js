@@ -7859,17 +7859,18 @@
     return selectedContentCampaignSlug();
   }
 
-  function applyContentMediaLibrarySelection(button, mediaPath) {
+  function applyContentMediaLibrarySelection(resolved, mediaPath) {
     var path = String(mediaPath || '').trim();
     if (!path) return false;
-    var resolved = contentMediaUploadTarget(button);
     if (!resolved) return false;
+    var index = resolved.selection.index();
+    if (index < 0) return false;
     pushContentHistory();
     clearPendingContentUpload(resolved.target, resolved.field);
     resolved.target[resolved.field || 'src'] = path;
     lastContentMutation = 'field';
     syncContentJsonFromBlocks();
-    renderContentBlocks(resolved.index);
+    renderContentBlocks(index);
     writeContentDraft();
     setText(contentEditorStatusTarget(), t('content_media_library_selected', 'Existing image selected.'));
     return true;
@@ -7982,6 +7983,16 @@
     if (!(button instanceof HTMLButtonElement)) return;
     var root = contentBlocksRoot;
     var field = activeContentJsonField;
+    var resolved = contentMediaUploadTarget(button);
+    if (!resolved) return;
+    var originalSource = resolved.target[resolved.field || 'src'];
+    resolved.selection = window.DustWaveAdminShellEditorMedia.captureMediaTarget({
+      item: resolved.block, target: resolved.target,
+      getItems: function() { return contentBlocks; },
+      isAttached: function() { return root.isConnected && contentBlocksRoot === root; },
+      isCurrent: function() { return resolved.target[resolved.field || 'src'] === originalSource; },
+      contains: function(item, member) { return item.type !== 'gallery' || item.images.indexOf(member) >= 0; }
+    });
     var campaignSlug = activeContentMediaCampaignSlug();
     if (!campaignSlug) {
       setText(contentEditorStatusTarget(), t('content_media_library_campaign_required', 'Choose a campaign before selecting existing media.'));
@@ -8152,7 +8163,7 @@
       }
       if (selected.dataset.mediaType !== targetKind) throw new Error(t('content_media_library_type_mismatch', 'Choose a matching media type.'));
       var applied = runContentEditorAction(root, field, function() {
-        return applyContentMediaLibrarySelection(button, selected.value);
+        return applyContentMediaLibrarySelection(resolved, selected.value);
       });
       if (!applied) throw new Error(t('content_media_library_apply_failed', 'Unable to apply the selected media.'));
     });
@@ -9658,20 +9669,19 @@
           // Keep the original optimistic-lock revision for unpublished local edits.
           var workingRevisionChanged = campaignSave && data.campaign.hasWorkingCopy &&
             (localDraft.baseRevision || '') !== data.campaign.baseRevision;
-          if (contentNeedsPublishing() && (workingRevisionChanged ||
-              (localDraft.baseRevision && localDraft.publishedSnapshot !== contentPublishedSnapshot))) {
-            // Older browser drafts used the raw public file SHA. Upgrade only an
-            // exact match; a changed public source must still produce a conflict.
-            var legacyRevisionMatches = campaignSave && !data.campaign.hasWorkingCopy &&
-              'live:' + localDraft.baseRevision === data.campaign.baseRevision;
-            loadedContentBaseRevision = legacyRevisionMatches ? data.campaign.baseRevision : (localDraft.baseRevision || '');
-            if (!legacyRevisionMatches) {
-              // The revision and its content baseline must travel together. Pairing
-              // an old draft with today's baseline lets a later reload rebase it.
-              contentPublishedSnapshot = localDraft.publishedSnapshot || '';
-              draftRevisionConflict = loadedContentBaseRevision !== data.campaign.baseRevision;
-            }
-          }
+          var baseline = window.DustWaveDraftRecovery.recoverDraftBaseline({
+            draftRevision: localDraft.baseRevision || '',
+            draftSnapshot: localDraft.publishedSnapshot,
+            currentRevision: loadedContentBaseRevision,
+            currentSnapshot: contentPublishedSnapshot,
+            needsPublishing: contentNeedsPublishing(),
+            workingRevisionChanged: workingRevisionChanged,
+            legacyRevisionMatches: campaignSave && !data.campaign.hasWorkingCopy &&
+              'live:' + localDraft.baseRevision === data.campaign.baseRevision
+          });
+          loadedContentBaseRevision = baseline.revision;
+          contentPublishedSnapshot = baseline.snapshot;
+          draftRevisionConflict = baseline.conflict;
         }
       }
       setActivePreviewForCampaign(slug, data?.campaign?.activePreview || null);

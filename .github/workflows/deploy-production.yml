@@ -11,6 +11,11 @@ on:
         description: 'Release or recovery reason'
         required: false
         default: 'manual production deployment'
+      skip_diary_check:
+        description: 'Publish maintenance changes without checking or broadcasting diary entries'
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: read
 
@@ -150,7 +155,7 @@ jobs:
         run: npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz --attempts=6 --retry-delay-ms=5000
 
       - name: Check for new diary entries
-        if: success()
+        if: success() && !inputs.skip_diary_check
         env:
           ADMIN_SECRET: ${{ secrets.ADMIN_BROADCAST_SECRET || secrets.ADMIN_SECRET }}
           DIARY_CHECK_BYPASS_SECRET: ${{ secrets.DIARY_CHECK_BYPASS_SECRET }}

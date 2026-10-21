@@ -20,6 +20,11 @@ on:
         description: 'Reason for manual rebuild'
         required: false
         default: 'manual'
+      skip_diary_check:
+        description: 'Publish maintenance changes without checking or broadcasting diary entries'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -31,6 +36,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      campaign_content_changed: ${{ steps.campaign_content.outputs.campaign_content_changed }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,6 +59,14 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+
+      - name: Determine whether published campaign content changed
+        id: campaign_content
+        if: github.event_name == 'push'
+        run: node scripts/campaign-content-changed.mjs
+        env:
+          POOL_DIARY_BEFORE: ${{ github.event.before }}
+          POOL_DIARY_AFTER: ${{ github.sha }}
 
       - name: Setup Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
@@ -139,7 +154,7 @@ jobs:
         run: npm run test:crawl-endpoints -- --base=https://pool.dustwave.xyz --attempts=6 --retry-delay-ms=5000
 
       - name: Check for new diary entries
-        if: success()
+        if: success() && !inputs.skip_diary_check && (github.event_name != 'push' || needs.build.outputs.campaign_content_changed == 'true')
         env:
           ADMIN_SECRET: ${{ secrets.ADMIN_BROADCAST_SECRET || secrets.ADMIN_SECRET }}
           DIARY_CHECK_BYPASS_SECRET: ${{ secrets.DIARY_CHECK_BYPASS_SECRET }}

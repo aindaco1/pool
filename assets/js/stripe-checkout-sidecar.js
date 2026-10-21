@@ -2,7 +2,7 @@
   'use strict';
 
   const STRIPE_JS_URL = 'https://js.stripe.com/clover/stripe.js';
-  let stripeJsPromise = null;
+
 
   function readThemeVar(name, fallback) {
     try {
@@ -113,46 +113,14 @@
     return value instanceof HTMLElement;
   }
 
-  function ensureStripeJs() {
-    if (typeof window.Stripe === 'function') {
-      return Promise.resolve(window.Stripe);
-    }
-
-    if (stripeJsPromise) return stripeJsPromise;
-
-    stripeJsPromise = new Promise((resolve, reject) => {
-      const existingScript = document.querySelector('script[data-pool-stripe-js="true"]');
-      const handleLoad = function() {
-        if (typeof window.Stripe === 'function') {
-          resolve(window.Stripe);
-          return;
-        }
-
-        stripeJsPromise = null;
-        reject(new Error('Stripe.js loaded without exposing Stripe.'));
-      };
-      const handleError = function() {
-        stripeJsPromise = null;
-        reject(new Error('Failed to load Stripe.js.'));
-      };
-
-      if (existingScript) {
-        existingScript.addEventListener('load', handleLoad, { once: true });
-        existingScript.addEventListener('error', handleError, { once: true });
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = STRIPE_JS_URL;
-      script.async = true;
-      script.dataset.poolStripeJs = 'true';
-      script.addEventListener('load', handleLoad, { once: true });
-      script.addEventListener('error', handleError, { once: true });
-      document.head.appendChild(script);
-    });
-
-    return stripeJsPromise;
-  }
+  const ensureStripeJs = globalThis.DustWaveScriptLoader.createScriptLoader({
+    document: document, src: STRIPE_JS_URL,
+    selector: 'script[data-pool-stripe-js="true"]',
+    mark: script => { script.dataset.poolStripeJs = 'true'; },
+    getValue: () => typeof window.Stripe === 'function' ? window.Stripe : null,
+    missingValueError: 'Stripe.js loaded without exposing Stripe.',
+    loadError: 'Failed to load Stripe.js.'
+  });
 
   async function mountCustomCheckout(options) {
     const publishableKey = String(options?.publishableKey || '');

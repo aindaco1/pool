@@ -51,6 +51,7 @@ function editor(storage: Record<string, string> = {}, projectSave = false) {
     'shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js',
     'shared/dust-wave-platform/packages/admin-shell/src/unsaved-changes-browser.js',
     'shared/dust-wave-platform/packages/admin-shell/src/editor-codec-browser.js',
+    'shared/dust-wave-platform/packages/admin-shell/src/draft-recovery-browser.js',
     'shared/dust-wave-platform/packages/admin-shell/src/editor-media-browser.js',
     'shared/dust-wave-platform/packages/admin-shell/src/feedback-browser.js',
     'assets/js/admin-dashboard.js'
