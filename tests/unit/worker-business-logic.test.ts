@@ -24,6 +24,7 @@ const mockStripeClient = {
     create: vi.fn()
   },
   paymentMethods: {
+    retrieve: vi.fn(),
     attach: vi.fn()
   }
 };
@@ -5067,6 +5068,51 @@ describe('Worker business logic hardening', () => {
         reservationId: 'order-recover-1'
       })
     }));
+  });
+
+  it.each(['complete', 'webhook'])('does not persist an unchargeable pledge after a customer attachment conflict in %s', async (path) => {
+    const env = createEnv({ CHECKOUT_PROVIDER: 'first_party', CHECKOUT_UI_MODE: 'custom',
+      CHECKOUT_INTENT_SECRET: 'checkout_secret', CHECKOUT_INTENTS: new MockCheckoutIntentNamespace(),
+      TIER_INVENTORY_COORDINATOR: new MockTierInventoryNamespace(), TAX_PROVIDER: 'offline_rules' });
+    const ctx = { waitUntil: () => {} };
+    const start = await worker.fetch(new Request('https://pool.test/checkout-intent/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: [{ id: 'sunder__blu-ray', quantity: 1 }], email: 'buyer@example.com',
+        shippingAddress: { country: 'US', postalCode: '80205' } })
+    }), env, ctx);
+    expect(start.status).toBe(200);
+    const { orderId } = await start.json();
+    const metadata = mockStripeClient.checkout.sessions.create.mock.calls.at(-1)?.[0].metadata;
+    const session = { id: 'cs_test_default_123', status: 'complete', mode: 'setup', metadata,
+      customer_email: 'buyer@example.com', customer: null, setup_intent: 'seti_123',
+      collected_information: { shipping_details: { name: 'Supporter', address: {
+        line1: '123 Test St', city: 'Denver', state: 'CO', postal_code: '80205', country: 'US'
+      } } } };
+    mockStripeClient.checkout.sessions.retrieve.mockResolvedValue(session);
+    mockStripeClient.setupIntents.retrieve.mockResolvedValue({ payment_method: 'pm_saved', customer: null });
+    mockStripeClient.paymentMethods.retrieve.mockResolvedValue({ id: 'pm_saved', customer: null });
+    mockStripeClient.customers.create.mockResolvedValue({ id: 'cus_shared' });
+    mockStripeClient.paymentMethods.attach.mockRejectedValue(new Error('idempotency_key_in_use'));
+    const complete = () => worker.fetch(new Request(`https://pool.test/${path === 'webhook' ? 'webhooks/stripe' : 'checkout-intent/complete'}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_test' },
+      body: JSON.stringify(path === 'webhook'
+        ? { id: 'evt_customer_conflict', type: 'checkout.session.completed', livemode: false, data: { object: session } }
+        : { orderId, sessionId: session.id })
+    }), env, ctx);
+    const failed = await complete();
+    expect(failed.status).toBeGreaterThanOrEqual(500);
+    expect(await env.PLEDGES.get(`pledge:${orderId}`)).toBeNull();
+    expect(mockSendSupporterEmail).not.toHaveBeenCalled();
+    expect(mockStripeClient.customers.create).toHaveBeenCalledWith({ email: 'buyer@example.com' }, { idempotencyKey: `customer:checkout:${orderId}` });
+    // A later retry discovers the successful attachment from the competing path.
+    mockStripeClient.paymentMethods.retrieve.mockResolvedValue({ id: 'pm_saved', customer: 'cus_shared' });
+    const retried = await complete();
+    expect(await retried.clone().json()).not.toHaveProperty('error');
+    expect(retried.status).toBe(200);
+    expect(await env.PLEDGES.get(`pledge:${orderId}`, { type: 'json' })).toMatchObject({
+      stripeCustomerId: 'cus_shared', stripePaymentMethodId: 'pm_saved', charged: false
+    });
+    expect(mockStripeClient.paymentIntents.create).not.toHaveBeenCalled();
   });
 
   it.each(['webhook', 'legacy-webhook', 'complete', 'legacy-complete'])('persists the accepted physical quote through %s when Stripe supplies a fuller address', async (path) => {

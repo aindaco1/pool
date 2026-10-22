@@ -2,6 +2,12 @@
 
 ## v1.2.24 - 2026-10-21
 
+- Reuse the saved Stripe customer across browser/webhook checkout completion and
+  reject incomplete payment identities before pledge persistence. Repair missing
+  customer links from verified existing attachments without changing pledge totals.
+- Re-read settlement batches under the campaign lock, reject duplicate order IDs,
+  exclude paid/cancelled pledges, and queue card-update emails for batch failures.
+
 - Adopt Platform 0.44.0 with shared retryable Stripe loading, identity-safe media
   selection and patched-Node bootstrap. Preserve checkout and editor policy.
 - Preserve paired browser-draft revisions and snapshots through the shared recovery helper.

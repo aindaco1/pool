@@ -263,6 +263,13 @@ Stripe sends `checkout.session.completed`. The Worker:
 
 This makes duplicate webhooks safe and transient failures retryable.
 
+Browser completion and webhook completion use the same customer-creation and
+payment-method attachment idempotency keys. When a saved payment method already
+belongs to a Stripe customer, that attachment is reused. If Stripe cannot confirm
+the customer attachment, completion fails retryably before pledge persistence;
+it never saves an active pledge with a missing payment identity.
+
+
 The custom checkout sidecar also has a guarded recovery path:
 
 ```text
@@ -335,6 +342,9 @@ Current behavior:
 - `SETTLEMENT_COORDINATOR` locks one campaign at a time.
 - `settlement-job:{slug}` tracks batched progress.
 - Each batch processes a bounded set of pledge order IDs.
+- Batch order IDs must be distinct. Pledges are re-read under the campaign lock;
+  already-charged and cancelled pledges are excluded before grouping.
+
 - Active uncharged pledges are grouped by supporter email within the campaign.
 - The most recent saved payment method for the supporter/campaign group is used.
 - The Worker creates one off-session Stripe PaymentIntent per supporter/campaign group.
@@ -354,6 +364,26 @@ POST /admin/settle/:slug
 ```
 
 Use `ADMIN_SETTLEMENT_SECRET` for settlement automation when configured. It is narrower than `ADMIN_SECRET`.
+
+### Repairing a missing customer link
+
+`POST /admin/backfill-customers/:slug` requires admin authorization and shares the
+campaign settlement lock. It repairs only active, uncharged pledges with a saved
+payment method and no customer ID. It preserves the rest of each pledge record.
+
+For an investigated set, pass `orderIds` (1–5 IDs from that campaign),
+`existingOnly: true`, and `dryRun: true`. The response lists the customer already
+attached to each saved payment method in Stripe. Dry runs never create customers,
+attach methods, or charge payments. If the attachment is missing, the result
+contains an error requiring investigation. Repeat with `dryRun: false` to save
+only those verified links. `existingOnly: true` prevents customer creation during
+the repair; omitting it allows creation for a genuinely unattached payment method.
+
+Before settlement, reconcile each selected order against Stripe payments and
+persisted settlement groups, including any separate paid orders for the same
+email. Preview the exact order list with `/admin/settle-batch` and `dryRun: true`,
+then submit the same list. Repair does not itself charge or send emails. Normal
+settlement queues receipts on success or a card-update email on payment failure.
 
 ## Data Model
 
