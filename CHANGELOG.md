@@ -2,6 +2,9 @@
 
 ## v1.2.24 - 2026-10-21
 
+- Isolate Pool pending email jobs and queue scheduling from other products sharing
+  KV, preserving receipt identities and delivery evidence during recovery.
+
 - Reuse the saved Stripe customer across browser/webhook checkout completion and
   reject incomplete payment identities before pledge persistence. Repair missing
   customer links from verified existing attachments without changing pledge totals.
