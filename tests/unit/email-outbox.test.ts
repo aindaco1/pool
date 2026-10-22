@@ -3,6 +3,7 @@ import {
   CAMPAIGN_EMAIL_SUPPRESSION_PREFIX,
   EMAIL_DELIVERY_PREFIX,
   EMAIL_OUTBOX_PREFIX,
+  EMAIL_OUTBOX_QUEUE_STATE_KEY,
   enqueueEmailOutbox,
   processEmailOutbox,
   processResendWebhook,
@@ -83,6 +84,52 @@ describe('durable Resend email outbox', () => {
     expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${first.jobId}`, { type: 'json' })).toMatchObject({
       status: 'accepted', providerId: 'email_123'
     });
+  });
+
+  it('delivers a Pool receipt without reading or changing another product shared-KV queue', async () => {
+    const kv = new MemoryKV();
+    const env = baseEnv(kv);
+    const otherJobKey = `email-outbox:v1:${'b'.repeat(64)}`;
+    const otherJob = JSON.stringify({
+      version: 1, jobId: 'b'.repeat(64), kind: 'store_order', status: 'pending',
+      payload: { email: 'store-customer@example.com' }, nextAttemptAt: '2026-10-22T06:00:00Z'
+    });
+    // A different product can mark its own queue idle or defer its work.
+    const otherQueue = JSON.stringify({ version: 1, hasPending: false, nextDueAt: '2028-01-01T00:00:00Z' });
+    await kv.put(otherJobKey, otherJob);
+    await kv.put('email-outbox-queue:v1', otherQueue);
+    const queued = await enqueueEmailOutbox(env, {
+      kind: 'charge_success', dedupeKey: 'receipt-order', campaignSlug: 'campaign', payload: {
+        email: 'supporter@example.com', campaignSlug: 'campaign', campaignTitle: 'Campaign',
+        subtotal: 2500, tax: 150, shipping: 356, tipAmount: 125, tipPercent: 5,
+        amount: 3131, token: 'test-token', hasDecisions: false, preferredLang: 'en',
+        pledgeItems: { tierName: 'Supporter', tierQty: 1, additionalTiers: [], supportItems: [], customAmount: 0 }
+      }
+    });
+    expect(EMAIL_OUTBOX_PREFIX).toBe('pool:email-outbox:v1:');
+    expect(EMAIL_OUTBOX_QUEUE_STATE_KEY).toBe('pool:email-outbox-queue:v1');
+    expect(await kv.get(`email-outbox:v1:${queued.jobId}`)).toBeNull();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'receipt_123' }), {
+      status: 200, headers: { 'Content-Type': 'application/json' }
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await processEmailOutbox(env, { now: new Date('2027-07-12T12:00:00Z') });
+    expect(result).toMatchObject({ checked: 1, sent: 1, failed: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.resend.com/emails');
+    expect(new Headers(init.headers).get('Idempotency-Key')).toBe(`pool/${queued.jobId}`);
+    const receipt = JSON.parse(String(init.body));
+    expect(receipt.to).toBe('supporter@example.com');
+    expect(receipt.html).toContain('$31.31');
+    expect(receipt.text).toContain('$31.31');
+    expect(await kv.get(otherJobKey)).toBe(otherJob);
+    expect(await kv.get('email-outbox-queue:v1')).toBe(otherQueue);
+    expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${queued.jobId}`, { type: 'json' })).toMatchObject({
+      status: 'accepted', providerId: 'receipt_123'
+    });
+    await processEmailOutbox(env, { now: new Date('2027-07-12T12:01:00Z') });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('defers retryable provider failures without changing the frozen content', async () => {

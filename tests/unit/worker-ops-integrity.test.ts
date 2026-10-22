@@ -646,7 +646,7 @@ describe('worker operational integrity', () => {
     expect(await response.json()).toMatchObject({ markedAsSent: false, sent: 1 });
     vi.setSystemTime(new Date('2026-04-21T13:03:00Z'));
     await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
-    const jobs = [...(env.PLEDGES as PaginatedKVNamespace).store.keys()].filter(key => key.startsWith('email-outbox:v1:'));
+    const jobs = [...(env.PLEDGES as PaginatedKVNamespace).store.keys()].filter(key => key.startsWith('pool:email-outbox:v1:'));
     expect(jobs).toHaveLength(2);
     expect(await env.PLEDGES.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).toBeTruthy();
   });
@@ -667,12 +667,12 @@ describe('worker operational integrity', () => {
     });
     // Legacy report-only trigger keeps the queued payload available for inspection.
     await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
-    const queued = [...kv.store.entries()].filter(([key]) => key.startsWith('email-outbox:v1:'));
+    const queued = [...kv.store.entries()].filter(([key]) => key.startsWith('pool:email-outbox:v1:'));
     expect(queued).toHaveLength(1);
     expect(await kv.get('cron:campaign-runner-reports:2026-04-21')).toBeNull();
     vi.setSystemTime(new Date('2026-04-21T13:03:00Z'));
     await worker.scheduled({ cron: '0 13 * * *' }, env, { waitUntil: () => {} });
-    expect([...kv.store.entries()].filter(([key]) => key.startsWith('email-outbox:v1:'))).toEqual(queued);
+    expect([...kv.store.entries()].filter(([key]) => key.startsWith('pool:email-outbox:v1:'))).toEqual(queued);
     expect(await kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).toBeTruthy();
     expect(await kv.get('cron:campaign-runner-reports:2026-04-21')).toBeTruthy();
     expect(mockSendCampaignRunnerReportEmail).not.toHaveBeenCalled();

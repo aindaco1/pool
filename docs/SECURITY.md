@@ -61,7 +61,7 @@ Use this alongside [ETHICAL_RISK.md](./ETHICAL_RISK.md) when a change creates ne
 | `abandoned-cart-health:v1` | PLEDGES | Aggregate checkout reminder queue/outcome health counters | **Low** - operational aggregate |
 | `supporter-email-retry:{orderId}` | PLEDGES | Queued supporter confirmation email retry payload | **Medium** - supporter email payload |
 | `supporter-email-retry-queue:v1` | PLEDGES | Supporter email retry idle/pending and next-attempt marker | **Low** - operational state |
-| `email-outbox:v1:{hash}` | PLEDGES | Frozen provider payload and recipient while delivery is pending; 30-day TTL | **High** - transient email content + PII |
+| `pool:email-outbox:v1:{hash}` | PLEDGES | Frozen provider payload and recipient while delivery is pending; 30-day TTL | **High** - transient email content + PII |
 | `email-delivery:v1:{hash}` | PLEDGES | Minimal provider ID, content hash, category, status, timing; 400-day TTL | **Low** - delivery evidence |
 | `email-suppression:v1:{emailHash}` | PLEDGES | Hashed permanent-bounce/complaint/provider suppression; 400-day TTL | **Medium** - consent/deliverability metadata |
 | `campaign-email-suppression:v1:{slug}:{emailHash}` | PLEDGES | Hashed one-click campaign update suppression | **Medium** - consent metadata |

@@ -322,7 +322,7 @@ Current behavior:
 
 ## Delivery And Retry
 
-Production sends use `email-outbox:v1:*` records. The canonical
+Production sends use `pool:email-outbox:v1:*` records. The canonical
 `email.outbox_enabled` setting mirrors to `EMAIL_OUTBOX_ENABLED`; keep it enabled
 for production delivery. Test mode can use immediate fixture sends unless the
 outbox is explicitly enabled. Persistence happens before the Resend side
@@ -334,6 +334,19 @@ effect, and the minute scheduler drains bounded batches. Each job:
 - respects `Retry-After`, quota responses, and bounded exponential delay
 - refuses blind retry after an ambiguous response outlives Resend's 24-hour idempotency window
 - expires transient payload data after 30 days and retains only minimal `email-delivery:v1:*` evidence for 400 days
+
+The pending-job prefix and `pool:email-outbox-queue:v1` marker are Pool-specific,
+including when another product shares the PLEDGES namespace. Pool never drains
+the legacy unqualified queue. Existing job IDs, provider idempotency keys, and
+`email-delivery:v1:*` evidence remain stable across this storage-key change.
+
+For an upgrade with pending legacy jobs, inspect only verified Pool job IDs and
+check delivery evidence plus Resend before moving them. Preserve the complete
+job record (including its frozen payload and attempt history), copy it to the
+Pool prefix, verify the copy, then remove that exact legacy key. Rebuild the
+Pool queue marker from those jobs. Do not scan-and-adopt another product's jobs,
+reset attempt history, recreate accepted messages, or change the shared legacy
+queue marker. Keep private recovery evidence outside the repository.
 
 `sendPreparedResendEmail` is the central provider helper. It:
 

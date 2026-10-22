@@ -18,8 +18,9 @@ import {
   validOutboxJobId
 } from '../../shared/dust-wave-platform/packages/worker-core/src/outbox.js';
 
-export const EMAIL_OUTBOX_PREFIX = 'email-outbox:v1:';
-export const EMAIL_OUTBOX_QUEUE_STATE_KEY = 'email-outbox-queue:v1';
+// Pool can share KV with other products; each scheduler must own its queue keys.
+export const EMAIL_OUTBOX_PREFIX = 'pool:email-outbox:v1:';
+export const EMAIL_OUTBOX_QUEUE_STATE_KEY = 'pool:email-outbox-queue:v1';
 export const EMAIL_DELIVERY_PREFIX = 'email-delivery:v1:';
 export const EMAIL_SUPPRESSION_PREFIX = 'email-suppression:v1:';
 export const CAMPAIGN_EMAIL_SUPPRESSION_PREFIX = 'campaign-email-suppression:v1:';
