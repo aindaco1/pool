@@ -62,7 +62,7 @@ import { renderEditorInlineMarkdown as renderSharedInlineMarkdown } from "../../
  *   POST /admin/settle/:slug        - Settle campaign: charge pledges if funded + deadline passed
  *   POST /admin/settle-batch        - Settle specific pledges by order ID (batched, max 6)
  *   POST /admin/settle-dispatch/:slug - Dispatch batched settlement (self-chains until complete)
- *   POST /admin/backfill-customers/:slug - Create Stripe customers for pledges missing them
+ *   POST /admin/backfill-customers/:slug - Repair missing Stripe customer links
  *   POST /admin/campaign-index/rebuild/:slug - Rebuild campaign pledge index from KV
  *   GET  /admin/cron/status         - Check cron heartbeat status
  *   POST /admin/recover-checkout   - Recover missed Stripe webhook (creates pledge from session)
@@ -98,6 +98,7 @@ import {
 } from './email-outbox.js';
 import { handleGetVotes, handlePostVote } from './routes/votes.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
+import { resolvePaymentCustomer } from './payment-customer.js';
 import {
   MEDIA_MANIFEST_PATH,
   classifyMediaPath,
@@ -7625,21 +7626,10 @@ async function handleFirstPartyCheckoutComplete(request, env, ctx) {
     const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
     const paymentMethodId = setupIntent.payment_method;
 
-    if (!customerId && setupIntent.customer) {
-      customerId = setupIntent.customer;
-    }
-
-    if (!customerId) {
-      try {
-        const newCustomer = await stripe.customers.create({ email }, { idempotencyKey: `customer:checkout:${orderId}` });
-        if (newCustomer.id) {
-          await stripe.paymentMethods.attach(paymentMethodId, { customer: newCustomer.id }, { idempotencyKey: `payment-method:attach:${orderId}` });
-          customerId = newCustomer.id;
-        }
-      } catch (custErr) {
-        console.error('Failed to create Stripe customer during checkout completion:', custErr.message);
-      }
-    }
+    customerId = await resolvePaymentCustomer(stripe, {
+      orderId, email, paymentMethodId,
+      customerId: customerId || setupIntent.customer
+    });
 
     if (metadata.checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length) {
       const recoveryResponse = await processFirstPartyCheckoutBundle({
@@ -7753,6 +7743,10 @@ async function persistFirstPartyCheckoutBundle({
 }) {
   if (!bundleManifest?.campaigns?.length) {
     return jsonResponse({ error: 'Missing checkout bundle data' }, 409);
+  }
+
+  if (!stripeObjectId(customerId) || !stripeObjectId(paymentMethodId)) {
+    return jsonResponse({ error: 'Saved payment identity is incomplete', retryable: true }, 503);
   }
 
   if (String(checkoutSnapshotVersion || '') !== String(CHECKOUT_INTENT_VERSION)) {
@@ -8216,25 +8210,14 @@ async function handleStripeWebhook(request, env, ctx) {
       const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
       const paymentMethodId = setupIntent.payment_method;
 
-      // Resolve customerId from SetupIntent if not on session (happens when /start
-      // fell back to customer_email instead of creating a Stripe customer)
-      if (!customerId && setupIntent.customer) {
-        customerId = setupIntent.customer;
-        console.log('📨 Resolved customerId from SetupIntent:', customerId);
-      }
-
-      // Last resort: create a customer and attach the payment method
-      if (!customerId) {
-        try {
-          const newCustomer = await stripe.customers.create({ email }, { idempotencyKey: `customer:webhook:${orderId}` });
-          if (newCustomer.id) {
-            await stripe.paymentMethods.attach(paymentMethodId, { customer: newCustomer.id }, { idempotencyKey: `payment-method:attach:${orderId}` });
-            customerId = newCustomer.id;
-            console.log('📨 Created fallback customer:', customerId);
-          }
-        } catch (custErr) {
-          console.error('📨 Failed to create fallback customer:', custErr.message);
-        }
+      try {
+        customerId = await resolvePaymentCustomer(stripe, {
+          orderId, email, paymentMethodId,
+          customerId: customerId || setupIntent.customer
+        });
+      } catch (error) {
+        console.error('Checkout customer resolution failed:', error.message);
+        return finishWebhook(jsonResponse({ error: 'Saved payment identity is incomplete', retryable: true }, 503), 'customer_resolution_failed');
       }
 
       if (checkoutProvider === 'first_party' && bundleManifest?.campaigns?.length > 0 && isPaymentUpdate !== 'true') {
@@ -9763,97 +9746,7 @@ async function settleCampaign(campaignSlug, env, options = {}) {
         await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
       }
 
-      // Send payment failed email so supporter can update their payment method
-      try {
-        const token = await generateToken(env.MAGIC_LINK_SECRET, {
-          orderId: supporter.pledges[0].orderId,
-          email: supporter.email,
-          campaignSlug
-        });
-
-        // Calculate combined subtotal, tax, and items for failed payment email
-        let failedSubtotal = 0;
-        let failedTax = 0;
-        let failedShipping = 0;
-        let failedTipAmount = 0;
-        const failedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], addOns: [], customAmount: 0 };
-        
-        for (const pledge of supporter.pledges) {
-          failedSubtotal += pledge.subtotal || pledge.amount || 0;
-          failedTax += pledge.tax || 0;
-          failedShipping += pledge.shipping || 0;
-          failedTipAmount += getStoredTipAmount(env, pledge);
-          
-          if (pledge.tierName) {
-            if (!failedItems.tierName) {
-              failedItems.tierName = pledge.tierName;
-              failedItems.tierQty = pledge.tierQty || 1;
-            } else if (failedItems.tierName === pledge.tierName) {
-              failedItems.tierQty += pledge.tierQty || 1;
-            } else {
-              const existingTier = failedItems.additionalTiers.find(t => t.name === pledge.tierName);
-              if (existingTier) {
-                existingTier.qty += pledge.tierQty || 1;
-              } else {
-                failedItems.additionalTiers.push({ name: pledge.tierName, qty: pledge.tierQty || 1 });
-              }
-            }
-          }
-          
-          for (const addTier of (pledge.additionalTiers || [])) {
-            const tierData = campaign?.tiers?.find(t => t.id === addTier.id);
-            const tierName = tierData?.name || addTier.id;
-            const existingTier = failedItems.additionalTiers.find(t => t.name === tierName);
-            if (existingTier) {
-              existingTier.qty += addTier.qty || 1;
-            } else {
-              failedItems.additionalTiers.push({ name: tierName, qty: addTier.qty || 1 });
-            }
-          }
-          
-          for (const supportItem of (pledge.supportItems || [])) {
-            const itemData = campaign?.support_items?.find(si => si.id === supportItem.id);
-            const label = itemData?.label || supportItem.id;
-            const existingItem = failedItems.supportItems.find(s => s.label === label);
-            if (existingItem) {
-              existingItem.amount += supportItem.amount || 0;
-            } else {
-              failedItems.supportItems.push({ label, amount: supportItem.amount || 0 });
-            }
-          }
-
-          for (const addOn of (pledge.bundleAddOns || [])) {
-            const existingAddOn = failedItems.addOns.find((entry) => (
-              entry.productId === addOn.productId && entry.variantId === addOn.variantId
-            ));
-            if (existingAddOn) {
-              existingAddOn.quantity += addOn.quantity || 1;
-            } else {
-              failedItems.addOns.push({ ...addOn });
-            }
-          }
-          
-          failedItems.customAmount += pledge.customAmount || 0;
-        }
-
-        await sendPaymentFailedEmail(env, {
-          email: supporter.email,
-          campaignSlug,
-          campaignTitle,
-          preferredLang: supporter.pledges[0]?.preferredLang || DEFAULT_I18N_LANG,
-          subtotal: failedSubtotal,
-          tax: failedTax,
-          shipping: failedShipping,
-          tipAmount: failedTipAmount,
-          tipPercent: derivePlatformTipPercent(failedSubtotal, failedTipAmount, 0, getMaxPlatformTipPercent(env)),
-          amount: supporter.totalAmount,
-          token,
-          pledgeItems: failedItems
-        });
-        console.log('📧 Sent payment failed email to:', supporter.email);
-      } catch (emailErr) {
-        console.error('Failed to send payment failed email:', emailErr.message);
-      }
+      await notifySettlementPaymentFailure(env, campaignSlug, campaign, supporter);
     }
   }
 
@@ -10212,6 +10105,100 @@ async function handlePerformanceObservability(request, env) {
   }, 200, env);
 }
 
+async function notifySettlementPaymentFailure(env, campaignSlug, campaign, supporter) {
+  const campaignTitle = campaign?.title || campaignSlug;
+  try {
+    const token = await generateToken(env.MAGIC_LINK_SECRET, {
+      orderId: supporter.pledges[0].orderId,
+      email: supporter.email,
+      campaignSlug
+    });
+
+    // Calculate combined subtotal, tax, and items for failed payment email
+    let failedSubtotal = 0;
+    let failedTax = 0;
+    let failedShipping = 0;
+    let failedTipAmount = 0;
+    const failedItems = { tierName: null, tierQty: 0, additionalTiers: [], supportItems: [], addOns: [], customAmount: 0 };
+
+    for (const pledge of supporter.pledges) {
+      failedSubtotal += pledge.subtotal || pledge.amount || 0;
+      failedTax += pledge.tax || 0;
+      failedShipping += pledge.shipping || 0;
+      failedTipAmount += getStoredTipAmount(env, pledge);
+
+      if (pledge.tierName) {
+        if (!failedItems.tierName) {
+          failedItems.tierName = pledge.tierName;
+          failedItems.tierQty = pledge.tierQty || 1;
+        } else if (failedItems.tierName === pledge.tierName) {
+          failedItems.tierQty += pledge.tierQty || 1;
+        } else {
+          const existingTier = failedItems.additionalTiers.find(t => t.name === pledge.tierName);
+          if (existingTier) {
+            existingTier.qty += pledge.tierQty || 1;
+          } else {
+            failedItems.additionalTiers.push({ name: pledge.tierName, qty: pledge.tierQty || 1 });
+          }
+        }
+      }
+
+      for (const addTier of (pledge.additionalTiers || [])) {
+        const tierData = campaign?.tiers?.find(t => t.id === addTier.id);
+        const tierName = tierData?.name || addTier.id;
+        const existingTier = failedItems.additionalTiers.find(t => t.name === tierName);
+        if (existingTier) {
+          existingTier.qty += addTier.qty || 1;
+        } else {
+          failedItems.additionalTiers.push({ name: tierName, qty: addTier.qty || 1 });
+        }
+      }
+
+      for (const supportItem of (pledge.supportItems || [])) {
+        const itemData = campaign?.support_items?.find(si => si.id === supportItem.id);
+        const label = itemData?.label || supportItem.id;
+        const existingItem = failedItems.supportItems.find(s => s.label === label);
+        if (existingItem) {
+          existingItem.amount += supportItem.amount || 0;
+        } else {
+          failedItems.supportItems.push({ label, amount: supportItem.amount || 0 });
+        }
+      }
+
+      for (const addOn of (pledge.bundleAddOns || [])) {
+        const existingAddOn = failedItems.addOns.find((entry) => (
+          entry.productId === addOn.productId && entry.variantId === addOn.variantId
+        ));
+        if (existingAddOn) {
+          existingAddOn.quantity += addOn.quantity || 1;
+        } else {
+          failedItems.addOns.push({ ...addOn });
+        }
+      }
+
+      failedItems.customAmount += pledge.customAmount || 0;
+    }
+
+    await sendPaymentFailedEmail(env, {
+      email: supporter.email,
+      campaignSlug,
+      campaignTitle,
+      preferredLang: supporter.pledges[0]?.preferredLang || DEFAULT_I18N_LANG,
+      subtotal: failedSubtotal,
+      tax: failedTax,
+      shipping: failedShipping,
+      tipAmount: failedTipAmount,
+      tipPercent: derivePlatformTipPercent(failedSubtotal, failedTipAmount, 0, getMaxPlatformTipPercent(env)),
+      amount: supporter.totalAmount,
+      token,
+      pledgeItems: failedItems
+    });
+    console.log('📧 Sent payment failed email to:', supporter.email);
+  } catch (emailErr) {
+    console.error('Failed to send payment failed email:', emailErr.message);
+  }
+}
+
 async function handleSettleBatch(request, env) {
   const auth = requireAdmin(request, env, 'settlement');
   if (!auth.ok) return auth.response;
@@ -10236,82 +10223,88 @@ async function handleSettleBatch(request, env) {
     return jsonResponse({ error: 'PLEDGES KV not configured' }, 500);
   }
 
-  const stripe = createPoolStripeClient(env, { intent: 'settlement_batch' });
-  const results = { charged: 0, skipped: 0, failed: 0, needsAttention: 0, errors: [], details: [] };
-
-  // Read all pledges in this batch
-  const pledges = [];
-  const batchRead = await readPoolPledgesByOrderIds(env, orderIds);
-  const pledgesByOrderId = new Map(
-    batchRead.pledges.map((pledge) => [String(pledge?.orderId || ''), pledge])
-  );
-  for (const orderId of orderIds) {
-    const pledge = pledgesByOrderId.get(String(orderId || ''));
-    if (!pledge) {
-      results.details.push({ orderId, status: 'not_found' });
-      results.skipped++;
-      continue;
-    }
-    if (pledge.charged || pledge.pledgeStatus === 'charged') {
-      results.details.push({ orderId, status: 'already_charged' });
-      results.skipped++;
-      continue;
-    }
-    if (!pledge.stripeCustomerId || !pledge.stripePaymentMethodId) {
-      results.details.push({ orderId, status: 'missing_stripe_ids' });
-      results.skipped++;
-      continue;
-    }
-    pledges.push(pledge);
+  if (orderIds.some((id) => typeof id !== 'string' || !id.trim()) ||
+      new Set(orderIds).size !== orderIds.length) {
+    return jsonResponse({ error: 'orderIds must be distinct non-empty strings' }, 400);
   }
-
-  if (pledges.length === 0) {
-    return jsonResponse({ ...results, message: 'No chargeable pledges in batch' });
-  }
-
-  // Group by email for aggregation
-  const byEmail = {};
-  for (const pledge of pledges) {
-    const email = pledge.email.toLowerCase();
-    if (!byEmail[email]) {
-      byEmail[email] = { pledges: [], totalAmount: 0 };
-    }
-    byEmail[email].pledges.push(pledge);
-    byEmail[email].totalAmount += pledge.amount || 0;
-  }
-
-  if (dryRun) {
-    return jsonResponse({
-      dryRun: true,
-      supporters: Object.entries(byEmail).map(([email, data]) => ({
-        email,
-        totalAmount: data.totalAmount,
-        pledgeCount: data.pledges.length,
-        orderIds: data.pledges.map(p => p.orderId)
-      }))
-    });
-  }
-
-  // Fetch campaign data once (for email template)
-  const campaignSlug = pledges[0].campaignSlug;
-  const campaignSlugs = new Set(pledges.map((pledge) => pledge.campaignSlug));
-  if (campaignSlugs.size !== 1) {
+  const initialRead = await readPoolPledgesByOrderIds(env, orderIds);
+  const campaignSlugs = new Set(initialRead.pledges.filter(Boolean).map((pledge) => pledge.campaignSlug));
+  if (campaignSlugs.size > 1) {
     return jsonResponse({ error: 'Settlement batches must contain pledges from one campaign' }, 400);
   }
-
+  if (!campaignSlugs.size) return jsonResponse({ charged: 0, skipped: orderIds.length, failed: 0, message: 'No pledges found' });
+  const campaignSlug = [...campaignSlugs][0];
   const requestedLockOwner = String(body.settlementLockOwner || body.lockOwner || '').trim();
   const settlementLock = await acquireSettlementLock(env, campaignSlug, {
-    owner: requestedLockOwner,
-    reason: 'settle-batch'
+    owner: requestedLockOwner, reason: 'settle-batch'
   });
-  if (!settlementLock.ok) {
-    return settlementLockResponse(campaignSlug, settlementLock, env);
-  }
+  if (!settlementLock.ok) return settlementLockResponse(campaignSlug, settlementLock, env);
   const releaseBatchLock = !requestedLockOwner;
-  const campaign = await getCampaign(env, campaignSlug);
-  const campaignTitle = campaign?.title || campaignSlug;
-
   try {
+    const stripe = createPoolStripeClient(env, { intent: 'settlement_batch' });
+    const results = { charged: 0, skipped: 0, failed: 0, needsAttention: 0, errors: [], details: [] };
+
+    // Read all pledges in this batch
+    const pledges = [];
+    const batchRead = await readPoolPledgesByOrderIds(env, orderIds);
+    const pledgesByOrderId = new Map(
+      batchRead.pledges.map((pledge) => [String(pledge?.orderId || ''), pledge])
+    );
+    for (const orderId of orderIds) {
+      const pledge = pledgesByOrderId.get(String(orderId || ''));
+      if (!pledge) {
+        results.details.push({ orderId, status: 'not_found' });
+        results.skipped++;
+        continue;
+      }
+      if (pledge.charged || pledge.pledgeStatus === 'charged') {
+        results.details.push({ orderId, status: 'already_charged' });
+        results.skipped++;
+        continue;
+      }
+      if (pledge.campaignSlug !== campaignSlug || !['active', 'payment_failed'].includes(pledge.pledgeStatus)) {
+        results.details.push({ orderId, status: 'not_chargeable' });
+        results.skipped++;
+        continue;
+      }
+      if (!pledge.stripeCustomerId || !pledge.stripePaymentMethodId) {
+        results.details.push({ orderId, status: 'missing_stripe_ids' });
+        results.skipped++;
+        continue;
+      }
+      pledges.push(pledge);
+    }
+
+    if (pledges.length === 0) {
+      return jsonResponse({ ...results, message: 'No chargeable pledges in batch' });
+    }
+
+    // Group by email for aggregation
+    const byEmail = {};
+    for (const pledge of pledges) {
+      const email = pledge.email.toLowerCase();
+      if (!byEmail[email]) {
+        byEmail[email] = { pledges: [], totalAmount: 0 };
+      }
+      byEmail[email].pledges.push(pledge);
+      byEmail[email].totalAmount += pledge.amount || 0;
+    }
+
+    if (dryRun) {
+      return jsonResponse({
+        dryRun: true,
+        supporters: Object.entries(byEmail).map(([email, data]) => ({
+          email,
+          totalAmount: data.totalAmount,
+          pledgeCount: data.pledges.length,
+          orderIds: data.pledges.map(p => p.orderId)
+        }))
+      });
+    }
+
+    const campaign = await getCampaign(env, campaignSlug);
+    const campaignTitle = campaign?.title || campaignSlug;
+
     for (const [email, data] of Object.entries(byEmail)) {
       // Use most recently updated payment method
       let customerId, paymentMethodId;
@@ -10440,6 +10433,7 @@ async function handleSettleBatch(request, env) {
           pledge.updatedAt = new Date().toISOString();
           await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
         }
+        await notifySettlementPaymentFailure(env, campaignSlug, campaign, { email, ...data });
       }
     }
 
@@ -10501,78 +10495,64 @@ async function handleBackfillCustomers(request, campaignSlug, env) {
   const body = parsedBody.body || {};
   const dryRun = body.dryRun === true;
 
-  const orderIds = await getCampaignOrderIds(env, campaignSlug);
-  if (!orderIds) {
+  if (body.orderIds !== undefined && (!Array.isArray(body.orderIds) ||
+      body.orderIds.length === 0 || body.orderIds.length > BATCH_SIZE ||
+      body.orderIds.some((id) => typeof id !== 'string' || !id.trim()))) {
+    return jsonResponse({ error: 'orderIds must contain 1 to 5 order IDs' }, 400);
+  }
+  const indexedOrderIds = await getCampaignOrderIds(env, campaignSlug);
+  if (!indexedOrderIds) {
     return jsonResponse({
       error: `Campaign pledge index missing for ${campaignSlug}. Run /admin/rebuild/${campaignSlug} first.`,
       campaignSlug,
       requiresRebuild: true
     }, 409);
   }
-
-  // Find pledges missing stripeCustomerId
-  const needsBackfill = [];
-
-  const { pledges: indexedPledges } = await readPoolPledgesByOrderIds(env, orderIds);
-  for (const pledge of indexedPledges) {
-    const key = `pledge:${pledge?.orderId || ''}`;
-    if (pledge &&
-        pledge.campaignSlug === campaignSlug &&
-        pledge.pledgeStatus === 'active' &&
-        !pledge.charged &&
-        !pledge.stripeCustomerId &&
-        pledge.stripePaymentMethodId) {
-      needsBackfill.push({ key, pledge });
-    }
+  const orderIds = body.orderIds ? [...new Set(body.orderIds)] : indexedOrderIds;
+  if (orderIds.some((id) => !indexedOrderIds.includes(id))) {
+    return jsonResponse({ error: 'Order ID is not in this campaign' }, 400);
   }
 
-  if (needsBackfill.length === 0) {
-    return jsonResponse({ message: 'All pledges have customer IDs', remaining: 0 });
-  }
-
-  const batch = needsBackfill.slice(0, BATCH_SIZE);
-  const results = { processed: 0, failed: 0, remaining: needsBackfill.length - batch.length, errors: [] };
-
-  if (dryRun) {
-    return jsonResponse({
-      dryRun: true,
-      needsBackfill: needsBackfill.length,
-      batchSize: batch.length,
-      pledges: needsBackfill.map(p => ({ orderId: p.pledge.orderId, email: p.pledge.email }))
-    });
-  }
-
-  for (const { key, pledge } of batch) {
-    try {
-      // Create a Stripe customer for this pledge
-      const customer = await stripe.customers.create({
-        email: pledge.email,
-        metadata: { source: 'backfill', orderId: pledge.orderId, campaignSlug }
-      }, { idempotencyKey: `customer:backfill:${pledge.orderId}` });
-
-      if (!customer.id) {
-        throw new Error(customer.error?.message || 'Customer creation failed');
+  // Share the settlement lock and read inside it so repair cannot overwrite a charge.
+  const lock = await acquireSettlementLock(env, campaignSlug, { reason: 'customer-backfill' });
+  if (!lock.ok) return settlementLockResponse(campaignSlug, lock, env);
+  try {
+    const { pledges } = await readPoolPledgesByOrderIds(env, orderIds);
+    const needsBackfill = pledges.filter((pledge) => pledge &&
+      pledge.campaignSlug === campaignSlug && pledge.pledgeStatus === 'active' &&
+      !pledge.charged && !pledge.stripeCustomerId && pledge.stripePaymentMethodId);
+    const batch = needsBackfill.slice(0, BATCH_SIZE);
+    const results = {
+      dryRun, processed: 0, failed: 0, remaining: needsBackfill.length - batch.length,
+      needsBackfill: needsBackfill.length, batchSize: batch.length, pledges: [], errors: []
+    };
+    for (const indexedPledge of batch) {
+      try {
+        // Preserve the raw record; bulk reporting reads normalize financial fields.
+        const pledge = await env.PLEDGES.get(`pledge:${indexedPledge.orderId}`, { type: 'json' });
+        if (!pledge || pledge.campaignSlug !== campaignSlug || pledge.pledgeStatus !== 'active' ||
+            pledge.charged || pledge.stripeCustomerId || !pledge.stripePaymentMethodId) continue;
+        // Existing attachments are authoritative. Dry runs never create or attach.
+        const customerId = await resolvePaymentCustomer(stripe, {
+          orderId: pledge.orderId, email: pledge.email,
+          paymentMethodId: pledge.stripePaymentMethodId,
+          allowCreate: !dryRun && body.existingOnly !== true
+        });
+        results.pledges.push({ orderId: pledge.orderId, customerId });
+        if (!dryRun) {
+          pledge.stripeCustomerId = customerId;
+          await env.PLEDGES.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+          results.processed++;
+        }
+      } catch (err) {
+        results.failed++;
+        results.errors.push({ orderId: indexedPledge.orderId, error: err.message });
       }
-
-      // Attach the existing payment method to the new customer
-      await stripe.paymentMethods.attach(pledge.stripePaymentMethodId, {
-        customer: customer.id
-      }, { idempotencyKey: `payment-method:backfill:${pledge.orderId}` });
-
-      // Update pledge in KV
-      pledge.stripeCustomerId = customer.id;
-      await env.PLEDGES.put(key, JSON.stringify(pledge));
-
-      console.log(`🔧 Backfilled customer for ${pledge.orderId}: ${customer.id}`);
-      results.processed++;
-    } catch (err) {
-      console.error(`❌ Backfill failed for ${pledge.orderId}:`, err.message);
-      results.failed++;
-      results.errors.push({ orderId: pledge.orderId, error: err.message });
     }
+    return jsonResponse(results);
+  } finally {
+    await releaseSettlementLockQuietly(env, campaignSlug, lock, 'customer-backfill');
   }
-
-  return jsonResponse(results);
 }
 
 async function handleTestSetup(request, env) {

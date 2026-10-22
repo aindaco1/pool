@@ -15,6 +15,7 @@ const mockStripeClient = {
     create: vi.fn()
   },
   paymentMethods: {
+    retrieve: vi.fn(),
     attach: vi.fn()
   },
   paymentIntents: {
@@ -27,6 +28,7 @@ const mockSendAnnouncementEmail = vi.fn(async () => {});
 const mockSendCampaignRunnerReportEmail = vi.fn(async () => {});
 const mockSendMilestoneEmail = vi.fn(async () => {});
 const mockSendSupporterEmail = vi.fn(async () => {});
+const mockSendPaymentFailedEmail = vi.fn(async () => {});
 const mockSendLaunchReminderEmail = vi.fn(async () => ({ sent: true }));
 
 vi.mock('../../worker/src/stripe.js', () => ({
@@ -42,7 +44,7 @@ vi.mock('../../worker/src/token.js', () => ({
 vi.mock('../../worker/src/email.js', () => ({
   RESEND_RATE_LIMIT_DELAY_MS: 0,
   sendSupporterEmail: mockSendSupporterEmail,
-  sendPaymentFailedEmail: vi.fn(async () => {}),
+  sendPaymentFailedEmail: mockSendPaymentFailedEmail,
   sendPledgeModifiedEmail: vi.fn(async () => {}),
   sendPledgeCancelledEmail: vi.fn(async () => {}),
   sendDiaryUpdateEmail: vi.fn(async () => {}),
@@ -268,7 +270,8 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   mockStripeClient.customers.create.mockImplementation(async ({ email }: { email: string }) => ({ id: `cus_${email}` }));
-  mockStripeClient.paymentMethods.attach.mockResolvedValue({});
+  mockStripeClient.paymentMethods.retrieve.mockImplementation(async (id: string) => ({ id, customer: null }));
+  mockStripeClient.paymentMethods.attach.mockImplementation(async (id: string, { customer }: { customer: string }) => ({ id, customer }));
   mockStripeClient.paymentIntents.create.mockResolvedValue({ id: 'pi_test', status: 'succeeded' });
   mockStripeClient.paymentIntents.retrieve.mockResolvedValue({ id: 'pi_test', status: 'succeeded', amount: 0, currency: 'usd' });
   vi.useRealTimers();
@@ -1377,6 +1380,116 @@ describe('worker operational integrity', () => {
     expect(await kv.get('campaign-charged:hand-relations')).toBeNull();
     const job = await kv.get('settlement-job:hand-relations', { type: 'json' });
     expect(job.totalNeedsAttention).toBeGreaterThan(0);
+  });
+
+  it('repairs only selected unpaid customer links and preserves the rest of each pledge', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+    const base = { email: 'supporter@example.com', campaignSlug: 'hand-relations',
+      pledgeStatus: 'active', charged: false, stripeCustomerId: null,
+      stripePaymentMethodId: 'pm_saved', amount: 50300, history: [{ type: 'created' }] };
+    const unpaid = { ...base, orderId: 'unpaid' };
+    const paid = { ...base, orderId: 'paid', charged: true, pledgeStatus: 'charged',
+      amount: 100000, stripePaymentIntentId: 'pi_already_paid' };
+    await kv.put('campaign-pledges:hand-relations', JSON.stringify(['unpaid', 'paid', 'unselected']));
+    for (const pledge of [unpaid, paid, { ...base, orderId: 'unselected' }]) {
+      await kv.put(`pledge:${pledge.orderId}`, JSON.stringify(pledge));
+    }
+    mockStripeClient.paymentMethods.retrieve.mockResolvedValue({ id: 'pm_saved', customer: 'cus_existing' });
+    const repair = (dryRun: boolean) => worker.fetch(new Request('https://pool.test/admin/backfill-customers/hand-relations', {
+      method: 'POST', headers: { Authorization: 'Bearer admin-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: ['unpaid', 'paid'], existingOnly: true, dryRun })
+    }), env, { waitUntil: () => {} });
+    const dryRun = await repair(true);
+    expect(await dryRun.json()).toMatchObject({ processed: 0, failed: 0, pledges: [{ orderId: 'unpaid', customerId: 'cus_existing' }] });
+    expect(await kv.get('pledge:unpaid', { type: 'json' })).toEqual(unpaid);
+    const live = await repair(false);
+    expect(await live.json()).toMatchObject({ processed: 1, failed: 0 });
+    expect(await kv.get('pledge:unpaid', { type: 'json' })).toEqual({ ...unpaid, stripeCustomerId: 'cus_existing' });
+    expect(await kv.get('pledge:paid', { type: 'json' })).toEqual(paid);
+    expect(await kv.get('pledge:unselected', { type: 'json' })).toEqual({ ...base, orderId: 'unselected' });
+    expect(mockStripeClient.customers.create).not.toHaveBeenCalled();
+    expect(mockStripeClient.paymentMethods.attach).not.toHaveBeenCalled();
+    expect(mockStripeClient.paymentIntents.create).not.toHaveBeenCalled();
+    expect((env.SETTLEMENT_COORDINATOR as MockSettlementNamespace).locks.size).toBe(0);
+  });
+
+  it('does not repair customer links while settlement holds the campaign lock', async () => {
+    const env = createEnv();
+    await env.PLEDGES.put('campaign-pledges:hand-relations', JSON.stringify(['unpaid']));
+    (env.SETTLEMENT_COORDINATOR as MockSettlementNamespace).forceLock('hand-relations');
+    const response = await worker.fetch(new Request('https://pool.test/admin/backfill-customers/hand-relations', {
+      method: 'POST', headers: { Authorization: 'Bearer admin-secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ existingOnly: true })
+    }), env, { waitUntil: () => {} });
+    expect(response.status).toBe(409);
+    expect(mockStripeClient.paymentMethods.retrieve).not.toHaveBeenCalled();
+  });
+
+  it('charges only the unpaid order once when a supporter has a separate paid pledge', async () => {
+    const env = createEnv();
+    const kv = env.PLEDGES as PaginatedKVNamespace;
+    const base = { email: 'supporter@example.com', campaignSlug: 'hand-relations',
+      stripeCustomerId: 'cus_existing', stripePaymentMethodId: 'pm_saved', createdAt: '2026-01-01' };
+    const paid = { ...base, orderId: 'paid', amount: 100000, charged: true,
+      pledgeStatus: 'charged', stripePaymentIntentId: 'pi_already_paid' };
+    await kv.put('pledge:paid', JSON.stringify(paid));
+    await kv.put('pledge:unpaid', JSON.stringify({ ...base, orderId: 'unpaid', amount: 50300, charged: false, pledgeStatus: 'active' }));
+    const settle = (orderIds: string[], dryRun = false) => worker.fetch(new Request('https://pool.test/admin/settle-batch', {
+      method: 'POST', headers: { Authorization: 'Bearer admin-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds, dryRun })
+    }), env, { waitUntil: () => {} });
+    expect((await settle(['unpaid', 'unpaid'])).status).toBe(400);
+    expect(mockStripeClient.paymentIntents.create).not.toHaveBeenCalled();
+    expect(await (await settle(['unpaid', 'paid'], true)).json()).toMatchObject({
+      supporters: [{ totalAmount: 50300, orderIds: ['unpaid'] }]
+    });
+    expect(await (await settle(['unpaid', 'paid'])).json()).toMatchObject({ charged: 1, skipped: 1 });
+    expect(mockStripeClient.paymentIntents.create).toHaveBeenCalledTimes(1);
+    expect(mockStripeClient.paymentIntents.create.mock.calls[0][0]).toMatchObject({ amount: 50300, metadata: { orderIds: 'unpaid' } });
+    expect(await (await settle(['unpaid', 'paid'])).json()).toMatchObject({ charged: 0, skipped: 2 });
+    expect(mockStripeClient.paymentIntents.create).toHaveBeenCalledTimes(1);
+    expect(await kv.get('pledge:paid', { type: 'json' })).toEqual(paid);
+  });
+
+  it('re-reads pledge state after acquiring the settlement lock', async () => {
+    const env = createEnv();
+    const pledge = { orderId: 'unpaid', email: 'supporter@example.com', campaignSlug: 'hand-relations',
+      stripeCustomerId: 'cus_existing', stripePaymentMethodId: 'pm_saved', amount: 50300,
+      charged: false, pledgeStatus: 'active' };
+    await env.PLEDGES.put('pledge:unpaid', JSON.stringify(pledge));
+    const coordinator = env.SETTLEMENT_COORDINATOR as MockSettlementNamespace;
+    const originalGet = coordinator.get.bind(coordinator);
+    coordinator.get = (id) => {
+      const stub = originalGet(id);
+      return { fetch: async (input, init) => {
+        // Another batch finishes between the initial lookup and this lock claim.
+        await env.PLEDGES.put('pledge:unpaid', JSON.stringify({ ...pledge, charged: true, pledgeStatus: 'charged' }));
+        return stub.fetch(input, init);
+      } };
+    };
+    const response = await worker.fetch(new Request('https://pool.test/admin/settle-batch', {
+      method: 'POST', headers: { Authorization: 'Bearer admin-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: ['unpaid'] })
+    }), env, { waitUntil: () => {} });
+    expect(await response.json()).toMatchObject({ charged: 0, skipped: 1 });
+    expect(mockStripeClient.paymentIntents.create).not.toHaveBeenCalled();
+  });
+
+  it('queues the card-update email when a batched payment fails', async () => {
+    const env = createEnv();
+    await env.PLEDGES.put('pledge:unpaid', JSON.stringify({ orderId: 'unpaid', email: 'supporter@example.com',
+      campaignSlug: 'hand-relations', stripeCustomerId: 'cus_existing', stripePaymentMethodId: 'pm_saved',
+      amount: 50300, subtotal: 50000, charged: false, pledgeStatus: 'active', customAmount: 50000 }));
+    mockStripeClient.paymentIntents.create.mockRejectedValueOnce(new Error('Your card was declined'));
+    const response = await worker.fetch(new Request('https://pool.test/admin/settle-batch', {
+      method: 'POST', headers: { Authorization: 'Bearer admin-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: ['unpaid'] })
+    }), env, { waitUntil: () => {} });
+    expect(await response.json()).toMatchObject({ charged: 0, failed: 1 });
+    expect(mockSendPaymentFailedEmail).toHaveBeenCalledWith(env, expect.objectContaining({
+      email: 'supporter@example.com', amount: 50300, token: 'token', pledgeItems: expect.objectContaining({ customAmount: 50000 })
+    }));
+    expect(await env.PLEDGES.get('pledge:unpaid', { type: 'json' })).toMatchObject({ charged: false, pledgeStatus: 'payment_failed' });
   });
 
   it('backfills customers across paginated pledge KV pages', async () => {
