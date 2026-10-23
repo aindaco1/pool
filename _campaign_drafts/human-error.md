@@ -51,7 +51,7 @@ long_content:
     alt: ""
     caption: "Let's meet the team behind this project"
   - type: "image"
-    src: "/assets/images/campaigns/human-error/content-pool-3-20261021-181059-fb5f8d43.png"
+    src: "/assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6.png"
     alt: ""
     caption: "The Producers of Human Error"
   - type: "image"
@@ -144,7 +144,7 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-21T18:11:18.809Z"
+_pool_draft_saved_at: "2026-10-23T21:31:34.979Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261014-011629-4e76a7ed.png"
