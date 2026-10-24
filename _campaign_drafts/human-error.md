@@ -144,9 +144,9 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "462cc171fc3f23f1af1d48d3e28355ebe89531222631497eec561150dcf2aa90"
-_pool_draft_saved_at: "2026-10-23T21:31:34.979Z"
+_pool_draft_saved_at: "2026-10-24T05:32:21.228Z"
 instagram: "https://www.instagram.com/a.m._cinematics_/"
 campaign_background: "/assets/images/campaigns/human-error/background-20261014-064707-75f442a0.png"
 progress_background: "/assets/images/campaigns/human-error/progress-20261014-011629-4e76a7ed.png"
-hero_video: "/assets/videos/campaigns/human-error/video-20261013-222949-ad50d8ee.mp4"
+hero_video: "https://www.youtube.com/watch?v=jMDxMuPo_88"
 ---
