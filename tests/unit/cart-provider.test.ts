@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+
+// Most checkout fixtures render immediately. Delayed rendering is covered by
+// browser regressions that hold Stripe's ready event independently of mount().
+function readyCheckoutMount(implementation: (options: any) => Promise<any>) {
+  return vi.fn(async (options: any) => {
+    const result = await implementation(options);
+    options?.onReady?.();
+    return result;
+  });
+}
+
 const WORKER_BASE = 'https://worker.test';
 const SHIPPING_COUNTRIES = [
   { value: 'US', label: 'United States' },
@@ -48,6 +59,13 @@ const ADD_ON_CONFIG = {
 };
 
 describe('cart provider shim', () => {
+  function fillCheckoutEmail() {
+    const field = document.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement;
+    expect(field).toBeTruthy();
+    field.value = 'supporter@example.com';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
   async function clearProviderCart(provider: any) {
     const existingItems = provider?.store?.getState?.()?.cart?.items?.items || [];
     for (const item of existingItems) {
@@ -59,6 +77,8 @@ describe('cart provider shim', () => {
 
   beforeEach(() => {
     vi.resetModules();
+    // Browser tests cover the actual drawer reveal; jsdom has no scrolling layout.
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     localStorage.clear();
     sessionStorage.clear();
     window.location.hash = '';
@@ -742,7 +762,7 @@ describe('cart provider shim', () => {
       throw new Error(`Unexpected fetch: ${url}`);
     }));
     (window as any).PoolStripeCheckoutSidecar = {
-      mount: vi.fn(async () => ({
+      mount: readyCheckoutMount(async () => ({
         supportsLinkAuthenticationElement: false,
         supportsShippingAddressElement: false,
         updateEmail: vi.fn(async () => ({})),
@@ -925,7 +945,7 @@ describe('cart provider shim', () => {
 
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async ({ onChange }) => {
+      mount: readyCheckoutMount(async ({ onChange }) => {
         if (typeof onChange === 'function') {
           onChange({ session: { canConfirm: true } });
         }
@@ -1023,7 +1043,7 @@ describe('cart provider shim', () => {
       throw new Error('No shipping quote expected before address completion');
     }));
     (window as any).PoolStripeCheckoutSidecar = {
-      mount: vi.fn(async () => ({
+      mount: readyCheckoutMount(async () => ({
         supportsLinkAuthenticationElement: false,
         supportsShippingAddressElement: false,
         updateEmail: vi.fn(async () => ({})),
@@ -1089,7 +1109,7 @@ describe('cart provider shim', () => {
       throw new Error('No shipping quote expected before address completion');
     }));
     (window as any).PoolStripeCheckoutSidecar = {
-      mount: vi.fn(async () => ({
+      mount: readyCheckoutMount(async () => ({
         supportsLinkAuthenticationElement: false,
         supportsShippingAddressElement: false,
         updateEmail: vi.fn(async () => ({})),
@@ -1155,7 +1175,7 @@ describe('cart provider shim', () => {
       throw new Error('No shipping quote expected before address completion');
     }));
     (window as any).PoolStripeCheckoutSidecar = {
-      mount: vi.fn(async () => ({
+      mount: readyCheckoutMount(async () => ({
         supportsLinkAuthenticationElement: false,
         supportsShippingAddressElement: false,
         updateEmail: vi.fn(async () => ({})),
@@ -1264,7 +1284,7 @@ describe('cart provider shim', () => {
     vi.stubGlobal('fetch', fetchMock);
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async ({ onChange }) => {
+      mount: readyCheckoutMount(async ({ onChange }) => {
         if (typeof onChange === 'function') {
           onChange({ session: { canConfirm: true } });
         }
@@ -1342,7 +1362,7 @@ describe('cart provider shim', () => {
     await vi.waitFor(() => {
       const shippingLabel = root?.querySelector('[data-cart-checkout-summary-shipping-label]') as HTMLElement | null;
       const shippingAmount = root?.querySelector('[data-cart-checkout-summary-shipping]') as HTMLElement | null;
-      expect(Boolean(shippingLabel) || Boolean(shippingAmount)).toBe(false);
+      expect((shippingLabel || shippingAmount)?.closest('[data-cart-checkout-summary-shipping-row]')).toHaveProperty('hidden', true);
     });
 
     const backButton = root?.querySelector('[data-cart-back]') as HTMLButtonElement | null;
@@ -1446,7 +1466,7 @@ describe('cart provider shim', () => {
     vi.stubGlobal('fetch', fetchMock);
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async ({ onChange }) => {
+      mount: readyCheckoutMount(async ({ onChange }) => {
         if (typeof onChange === 'function') {
           onChange({ session: { canConfirm: true } });
         }
@@ -1875,7 +1895,7 @@ describe('cart provider shim', () => {
     expect(root?.textContent).not.toContain('Review your pledge');
     expect(root?.textContent).not.toContain('Checkout preview');
     expect(root?.textContent).toContain('Next step');
-    expect(root?.textContent).toContain("Continue to Stripe's secure payment platform to enter your payment information and email address -- this finalizes your pledge.");
+    expect(root?.textContent).toContain("Continue to Stripe's secure payment platform to enter your payment information and email address.");
     expect(root?.textContent).not.toContain('What happens next');
     expect(root?.textContent).toContain('Pledge summary');
     expect(root?.textContent).toContain('Drawer Item');
@@ -2198,7 +2218,7 @@ describe('cart provider shim', () => {
     const confirm = vi.fn(async () => ({ type: 'success' }));
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async ({ onChange }) => {
+      mount: readyCheckoutMount(async ({ onChange }) => {
         if (typeof onChange === 'function') {
           onChange({ session: { canConfirm: true } });
         }
@@ -2336,7 +2356,7 @@ describe('cart provider shim', () => {
     });
   });
 
-  it('remounts the custom checkout payment element after checkout rerenders', async () => {
+  it('refreshes the setup session when checkout totals change without replacing the form', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
@@ -2389,6 +2409,7 @@ describe('cart provider shim', () => {
         });
       }
 
+      if (url.endsWith('/checkout-intent/abandon')) return new Response(JSON.stringify({ success: true }));
       throw new Error(`Unexpected fetch: ${url}`);
     }));
 
@@ -2432,15 +2453,18 @@ describe('cart provider shim', () => {
     const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
+    fillCheckoutEmail();
 
     await vi.waitFor(() => {
       expect(mountSpy).toHaveBeenCalledTimes(1);
     });
 
+    const originalEmail = root?.querySelector('[data-cart-custom-checkout-email]');
     await readyApi.api.cart.update({ tipPercent: 6 });
 
     await vi.waitFor(() => {
       expect(mountSpy).toHaveBeenCalledTimes(2);
+      expect(root?.querySelector('[data-cart-custom-checkout-email]')).toBe(originalEmail);
     });
   });
 
@@ -2497,7 +2521,7 @@ describe('cart provider shim', () => {
       if (url === `${WORKER_BASE}/checkout-intent/abandon`) {
         expect(init?.method).toBe('POST');
         expect(String(init?.body || '')).toContain('pool-intent-custom-error-123');
-        return new Response(JSON.stringify({ ok: true }), {
+        return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
@@ -2508,7 +2532,7 @@ describe('cart provider shim', () => {
     vi.stubGlobal('fetch', fetchMock);
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async () => {
+      mount: readyCheckoutMount(async () => {
         throw new Error('Invalid createPaymentElement');
       })
     };
@@ -2534,6 +2558,7 @@ describe('cart provider shim', () => {
     const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
+    fillCheckoutEmail();
 
     const shippingName = root?.querySelector('[data-cart-custom-shipping-field="name"]') as HTMLInputElement | null;
     const shippingLine1 = root?.querySelector('[data-cart-custom-shipping-field="line1"]') as HTMLInputElement | null;
@@ -2559,6 +2584,7 @@ describe('cart provider shim', () => {
   expect((window as any).PoolStripeCheckoutSidecar.mount).toHaveBeenCalled();
 
   expect(sessionStorage.getItem('pool_active_custom_checkout_order_id')).toBeNull();
+  expect(root?.querySelector('[data-cart-start-checkout]')?.textContent).toBe('Retry loading payment');
 });
 
   it('localizes physical checkout shipping labels from runtime messages', async () => {
@@ -2640,7 +2666,7 @@ describe('cart provider shim', () => {
       expect(root?.textContent).toContain('Codigo postal');
       expect(root?.textContent).toContain('Pais');
       expect(root?.textContent).toContain('Correo electronico');
-      expect(root?.textContent).toContain('Metodo de pago');
+      expect(root?.querySelector('[data-cart-payment-slot]')).toHaveProperty('hidden', true);
       expect(root?.textContent).not.toContain('Ingresa tu direccion de envio para calcular el envio final antes de guardar tu metodo de pago.');
     });
   });
@@ -2675,7 +2701,7 @@ describe('cart provider shim', () => {
 
       if (url === `${WORKER_BASE}/checkout-intent/abandon`) {
         expect(init?.method).toBe('POST');
-        return new Response(JSON.stringify({ ok: true }), {
+        return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
         });
@@ -2686,7 +2712,7 @@ describe('cart provider shim', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const mount = vi.fn(async () => ({
+    const mount = readyCheckoutMount(async () => ({
       supportsShippingAddressElement: false,
       updateEmail: vi.fn(async () => ({})),
       updateShippingAddress: vi.fn(async () => ({})),
@@ -2728,6 +2754,7 @@ describe('cart provider shim', () => {
     const continueButton = getRoot()?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
+    fillCheckoutEmail();
 
     await vi.waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
@@ -2847,7 +2874,7 @@ describe('cart provider shim', () => {
       type: 'error',
       error: { message: 'Your card number is incomplete.' }
     }));
-    const targetMount = vi.fn(async ({ onChange, paymentContainer }) => {
+    const targetMount = readyCheckoutMount(async ({ onChange, paymentContainer }) => {
       if (typeof onChange === 'function') {
         onChange({ session: { canConfirm: true } });
       }
@@ -2866,7 +2893,7 @@ describe('cart provider shim', () => {
         unmount: vi.fn()
       };
     });
-    const mount = vi.fn(async (options) => {
+    const mount = readyCheckoutMount(async (options) => {
       if (options?.clientSecret !== targetClientSecret) {
         return {
           supportsLinkAuthenticationElement: false,
@@ -2912,13 +2939,13 @@ describe('cart provider shim', () => {
     const getLiveRoot = () => document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
     await vi.waitFor(() => {
       const liveRoot = getLiveRoot();
-      expect(liveRoot?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
       expect(liveRoot?.querySelector('[data-cart-custom-checkout-email]')).toBeTruthy();
     });
 
     const emailField = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
     if (!emailField) throw new Error('Missing custom checkout email field');
     emailField.value = 'supporter@example.com';
+    emailField.dispatchEvent(new Event('input', { bubbles: true }));
 
     await vi.waitFor(() => {
       const liveRoot = getLiveRoot();
@@ -3065,7 +3092,7 @@ describe('cart provider shim', () => {
     expect(root.querySelector('svg')).toBeNull();
   });
 
-  it('routes missing-email checkout attempts back to the email field', async () => {
+  it('keeps setup unprepared while the email field is empty', async () => {
     (window as any).POOL_CONFIG = {
       cartRuntime: 'first_party',
       checkoutProvider: 'first_party',
@@ -3135,7 +3162,7 @@ describe('cart provider shim', () => {
       }
     }));
 
-    const mount = vi.fn(async ({ onChange, paymentContainer }) => {
+    const mount = readyCheckoutMount(async ({ onChange, paymentContainer }) => {
       if (typeof onChange === 'function') {
         onChange({ session: { canConfirm: true } });
       }
@@ -3184,39 +3211,15 @@ describe('cart provider shim', () => {
     const getLiveRoot = () => document.querySelector('[data-pool-cart-root]') as HTMLElement | null;
 
     await vi.waitFor(() => {
-      expect(getLiveRoot()?.textContent).toContain('Contact');
-      expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeTruthy();
+      expect(getLiveRoot()?.querySelector('[data-cart-custom-checkout-email]')).toBeTruthy();
+      expect(getLiveRoot()?.querySelector('[data-cart-start-checkout]')).toHaveProperty('disabled', true);
+      expect(getLiveRoot()?.querySelector('[data-cart-checkout-next]')?.textContent).toContain('Enter an email address');
     });
-
-    const emailField = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email]') as HTMLInputElement | null;
-    if (!emailField) throw new Error('Missing custom checkout email field');
-
-    await vi.waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(`${WORKER_BASE}/checkout-intent/start`, expect.any(Object));
-      expect(mount).toHaveBeenCalled();
-    }, { timeout: 10000 });
-
-    await vi.waitFor(() => {
-      const liveConfirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-      expect(liveConfirmButton).not.toBeNull();
-      expect(liveConfirmButton?.disabled).toBe(false);
-    }, { timeout: 10000 });
-
-    const confirmButton = getLiveRoot()?.querySelector('[data-cart-confirm-custom-checkout]') as HTMLButtonElement | null;
-    if (!confirmButton) throw new Error('Missing custom checkout confirm button');
-    confirmButton?.click();
-
-    await vi.waitFor(() => {
-      expect(confirm).not.toHaveBeenCalled();
-      const error = getLiveRoot()?.querySelector('[data-cart-custom-checkout-email-error]') as HTMLElement | null;
-      expect(error?.hidden).toBe(false);
-      expect(error?.textContent).toContain('Enter an email address to continue.');
-    });
-
-    expect(getLiveRoot()?.textContent).not.toContain('Provide an email address using updateEmail()');
-    const checkoutError = getLiveRoot()?.querySelector('[data-cart-checkout-error]') as HTMLElement | null;
-    expect(checkoutError?.hidden).toBe(true);
-  }, 15000);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/checkout-intent/start'))).toBe(false);
+    expect(mount).not.toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+  });
 
   it('collects a full New Mexico tax location in custom checkout before starting a digital-only pledge', async () => {
     (window as any).POOL_CONFIG = {
@@ -3283,7 +3286,7 @@ describe('cart provider shim', () => {
 
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async ({ onChange }) => {
+      mount: readyCheckoutMount(async ({ onChange }) => {
         if (typeof onChange === 'function') {
           onChange({ session: { canConfirm: true } });
         }
@@ -3317,6 +3320,7 @@ describe('cart provider shim', () => {
     const continueButton = root?.querySelector('[data-cart-continue]') as HTMLButtonElement | null;
     if (!continueButton) throw new Error('Missing continue button');
     continueButton.click();
+    fillCheckoutEmail();
 
     await vi.waitFor(() => {
       expect(root?.textContent).toContain('Tax location');
@@ -3676,7 +3680,7 @@ describe('cart provider shim', () => {
     vi.stubGlobal('fetch', fetchMock);
     (window as any).PoolStripeCheckoutSidecar = {
       ensureStripeJs: vi.fn(async () => (window as any).Stripe),
-      mount: vi.fn(async ({ onChange }) => {
+      mount: readyCheckoutMount(async ({ onChange }) => {
         if (typeof onChange === 'function') {
           onChange({ session: { canConfirm: true } });
         }
@@ -4011,6 +4015,7 @@ describe('cart provider shim', () => {
       expect(shippingRow).toBeTruthy();
       expect(root?.querySelector('[data-cart-summary-tax]')?.textContent).toBe('$2.76');
       expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$49.31');
+      expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('$9.80');
       const shippingOption = root?.querySelector('[data-cart-custom-shipping-option]') as HTMLSelectElement | null;
       expect(shippingOption).toBeTruthy();
       expect(shippingOption?.value).toBe('standard');
@@ -4024,6 +4029,7 @@ describe('cart provider shim', () => {
 
     await vi.waitFor(() => {
       expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$53.26');
+      expect(root?.querySelector('[data-cart-summary-shipping]')?.textContent).toBe('$13.75');
     });
   });
 
@@ -4331,7 +4337,7 @@ describe('cart provider shim', () => {
       throw new Error('No shipping quote expected before address completion');
     }));
     (window as any).PoolStripeCheckoutSidecar = {
-      mount: vi.fn(async () => ({
+      mount: readyCheckoutMount(async () => ({
         supportsLinkAuthenticationElement: false,
         supportsShippingAddressElement: false,
         updateEmail: vi.fn(async () => ({})),

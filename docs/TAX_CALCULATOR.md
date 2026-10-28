@@ -242,3 +242,35 @@ Check:
 - [PODMAN.md](./PODMAN.md)
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [worker/README.md](../worker/README.md)
+
+
+## Shared US postal and local-rate data
+
+Platform tax-core 0.4.0 supplies exact ZIP/state consistency, optional city
+suggestions, and a conservative OpenSalesTax ZIP snapshot. Pool's `offline_rules`
+and non-New-Mexico `nm_grt` path try that snapshot before the existing regional
+fallback. New Mexico retains its address provider; flat, paid ZIP.TAX and
+international policies remain Pool-owned.
+
+All bundled local quotes are estimates. Missing, ambiguous or expired local
+coverage retains the state-only rate and displays "local taxes may be missing",
+including zero rates. This is partial ZIP coverage, not street-level taxability,
+nexus or nationwide local-rate accuracy. Sources, exclusions, licenses and
+90-day source-age expiry are documented in
+[Platform tax-core](../shared/dust-wave-platform/packages/tax-core/README.md).
+Canonical pledge tax details retain estimate, coverage and source-version metadata.
+Existing confirmed pledges and settlement behavior are unchanged.
+
+`POST /address/check` uses country, ZIP, state and city only, is private/no-store,
+origin-checked and rate-limited. Known ZIP/state conflicts block canonical quotes
+and checkout. City alternatives remain optional; unknown and international
+addresses receive no new consistency restriction. No customer data is retained
+by this lookup. The reference files are bundled into the Worker and excluded
+from the static site.
+
+Refresh candidates in Platform with its weekly review workflow or
+`node scripts/update-open-us-tax.mjs --output=/absolute/candidate.json` from
+Pool. This wrapper requires an explicit output. Review source provenance,
+coverage and effective dates; test Platform and both consumers before advancing
+their immutable pins. Roll back the consumer adapter and pin together. No feed
+refresh, merge or deployment occurs automatically at checkout.

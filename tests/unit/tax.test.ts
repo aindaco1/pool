@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTaxProvider, normalizeTaxDestination, quoteTax } from '../../worker/src/tax.js';
 
 describe('tax engine scaffold', () => {
+  beforeEach(() => vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-27T12:00:00Z')));
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -247,5 +249,21 @@ describe('tax engine scaffold', () => {
       valid: false,
       error: 'Billing postal code is required'
     });
+  });
+});
+
+
+describe('shared local-tax adapter in Pool', () => {
+  it('resolves an edited ZIP independently of old state, flags fallback and refuses conflicts', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-27T12:00:00Z'));
+    try {
+      const env = { TAX_PROVIDER: 'offline_rules', TAX_ORIGIN_COUNTRY: 'US' };
+      const quote = await quoteTax(env, { subtotalCents: 2000, destination: { country: 'US', postalCode: '10467', state: 'NY' } });
+      expect(quote).toMatchObject({ provider: 'open_us', estimated: true, coverage: 'zip_local', taxCents: 178, effectiveRate: 0.08875 });
+      expect(quote.breakdown.reduce((sum, row) => sum + row.taxCents, 0)).toBe(quote.taxCents);
+      expect(await quoteTax(env, { subtotalCents: 2000, destination: { country: 'US', postalCode: '80205', state: 'CO' } })).toMatchObject({ estimated: true, coverage: 'state_only' });
+      expect(normalizeTaxDestination({ country: 'US', postalCode: '10467', state: 'NM' }).valid).toBe(false);
+      expect(normalizeTaxDestination({ country: 'US', postalCode: '1046' }).valid).toBe(false);
+    } finally { vi.restoreAllMocks(); }
   });
 });

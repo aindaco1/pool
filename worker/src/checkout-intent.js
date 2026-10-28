@@ -50,6 +50,13 @@ function normalizeTaxDetails(input = {}) {
 
   return {
     provider: String(input.provider || ''),
+    // Leave older signed contributions byte-compatible when no estimate metadata exists.
+    ...(input.estimated === true || input.coverage || input.dataVersion || input.sourceUpdatedAt ? {
+      estimated: input.estimated === true,
+      coverage: input.coverage || null,
+      dataVersion: input.dataVersion || null,
+      sourceUpdatedAt: input.sourceUpdatedAt || null
+    } : {}),
     source: String(input.source || ''),
     effectiveRate: toDecimalNumber(input.effectiveRate),
     destination: normalizeTaxAddress(input.destination),

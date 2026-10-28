@@ -19,6 +19,11 @@ smoke helper, and automated regressions for cart, checkout, and Manage Pledge.
 
 For The Pool, the fallback rate is **$3.00**.
 
+Cart and checkout keep all summary prices in a right-aligned column. On desktop,
+the compact delivery selector sits between the shipping label and amount; on
+phones it sits below the label. Option labels show any upgrade surcharge; the
+separate amount shows the full shipping cost included in the estimated total.
+
 ## System Properties
 
 - use carrier-based pricing instead of the previous flat per-campaign fee

@@ -41,7 +41,7 @@
         borderRadius: radiusMd,
         spacingUnit: '4px',
         fontFamily: fontFamily,
-        fontSizeBase: '13px',
+        fontSizeBase: '16px',
         fontWeightNormal: '400'
       },
       rules: {
@@ -56,7 +56,7 @@
           border: '1px solid ' + colorBorder,
           boxShadow: 'none',
           color: colorText,
-          fontSize: '13px',
+          fontSize: 'var(--fontSizeBase)',
           fontWeight: '400',
           lineHeight: '1.4',
           padding: '10px 12px'
@@ -122,6 +122,53 @@
     loadError: 'Failed to load Stripe.js.'
   });
 
+  const loadStripeInstance = globalThis.DustWaveScriptLoader.createInstanceLoader({
+    load: ensureStripeJs, create: (Stripe, key, options) => Stripe(key, options)
+  });
+
+  function stripeConfig({ publishableKey, locale } = {}) {
+    return {
+      publishableKey: String(publishableKey || ''),
+      locale: String(locale || document.documentElement.lang || 'en').trim().toLowerCase() || 'en'
+    };
+  }
+
+  async function prepareStripe(options) {
+    const { publishableKey, locale } = stripeConfig(options);
+    if (!publishableKey) throw new Error('Missing Stripe publishable key.');
+    return loadStripeInstance(publishableKey, { locale });
+  }
+
+  const checkoutPreparations = new Map();
+
+  function checkoutPreparation(options) {
+    const config = stripeConfig(options);
+    const key = JSON.stringify(config);
+    if (!checkoutPreparations.has(key)) {
+      let provideSecret;
+      // Stripe accepts a future secret. This warms its Checkout SDK without
+      // requesting a server session or mounting speculative payment fields.
+      const clientSecret = new Promise(resolve => { provideSecret = resolve; });
+      const ready = prepareStripe(config).then(async stripe => {
+        if (typeof stripe?.initCheckout !== 'function') throw new Error('Stripe custom checkout is unavailable.');
+        const checkout = await stripe.initCheckout({ clientSecret,
+          elementsOptions: { syncAddressCheckbox: 'shipping', appearance: buildStripeAppearance() }
+        });
+        return { stripe, checkout };
+      });
+      const preparation = { key, ready, provideSecret };
+      checkoutPreparations.set(key, preparation);
+      ready.catch(() => {
+        if (checkoutPreparations.get(key) === preparation) checkoutPreparations.delete(key);
+      });
+    }
+    return checkoutPreparations.get(key);
+  }
+
+  function prepareCheckout(options) {
+    return checkoutPreparation(options).ready.then(() => undefined);
+  }
+
   async function mountCustomCheckout(options) {
     const publishableKey = String(options?.publishableKey || '');
     const clientSecret = String(options?.clientSecret || '');
@@ -143,31 +190,16 @@
       throw new Error('Missing Payment Element container.');
     }
 
-    await ensureStripeJs();
-
-    const stripe = window.Stripe(publishableKey, {
-      locale: locale || 'en'
-    });
-    if (!stripe || typeof stripe.initCheckout !== 'function') {
-      throw new Error('Stripe custom checkout is unavailable.');
-    }
-
-    const checkout = await stripe.initCheckout({
-      clientSecret,
-      elementsOptions: {
-        syncAddressCheckbox: 'shipping',
-        appearance: buildStripeAppearance()
-      }
-    });
+    const preparation = checkoutPreparation({ publishableKey, locale });
+    checkoutPreparations.delete(preparation.key);
+    preparation.provideSecret(clientSecret);
+    const { stripe, checkout } = await preparation.ready;
     if (!checkout || typeof checkout.loadActions !== 'function') {
       throw new Error('Stripe custom checkout did not initialize correctly.');
     }
 
-    const loadActionsResult = await checkout.loadActions();
-    if (loadActionsResult?.type !== 'success' || !loadActionsResult.actions) {
-      throw new Error(loadActionsResult?.error?.message || 'Stripe checkout actions failed to load.');
-    }
-
+    // Mount immediately so Stripe can download/render the fields while session
+    // actions load. Confirmation still waits for actions and the ready event.
     paymentContainer.innerHTML = '';
     const paymentElement = checkout.createPaymentElement({
       layout: {
@@ -182,6 +214,8 @@
         }
       }
     });
+    if (typeof paymentElement.on === 'function' && typeof options?.onReady === 'function') paymentElement.on('ready', options.onReady);
+    if (typeof paymentElement.on === 'function' && typeof options?.onLoadError === 'function') paymentElement.on('loaderror', options.onLoadError);
     paymentElement.mount(paymentContainer);
 
     let linkAuthenticationElement = null;
@@ -220,6 +254,23 @@
       } catch (_error) {
         shippingAddressElement = null;
       }
+    }
+
+    function unmountElements() {
+      for (const element of [paymentElement, linkAuthenticationElement, shippingAddressElement]) {
+        if (typeof element?.unmount === 'function') element.unmount();
+      }
+    }
+
+    let loadActionsResult;
+    try {
+      loadActionsResult = await checkout.loadActions();
+      if (loadActionsResult?.type !== 'success' || !loadActionsResult.actions) {
+        throw new Error(loadActionsResult?.error?.message || 'Stripe checkout actions failed to load.');
+      }
+    } catch (error) {
+      try { unmountElements(); } catch (_error) {}
+      throw error;
     }
 
     if (typeof checkout.on === 'function' && typeof options?.onChange === 'function') {
@@ -261,24 +312,14 @@
           ...(params || {})
         });
       },
-      unmount: function() {
-        if (typeof paymentElement?.unmount === 'function') {
-          paymentElement.unmount();
-        }
-
-        if (typeof linkAuthenticationElement?.unmount === 'function') {
-          linkAuthenticationElement.unmount();
-        }
-
-        if (typeof shippingAddressElement?.unmount === 'function') {
-          shippingAddressElement.unmount();
-        }
-      }
+      unmount: unmountElements
     };
   }
 
   window.PoolStripeCheckoutSidecar = {
     ensureStripeJs,
+    prepareStripe,
+    prepareCheckout,
     mount: mountCustomCheckout
   };
 })();

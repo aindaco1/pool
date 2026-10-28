@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.25 - 2026-10-28
+
+- Share checkout validation and postal/local-tax references with Store while preserving Pool card setup and later settlement.
+- Keep address/email fields and scroll position stable during edits, with automatic payment preparation and a single payment-area reveal.
+- Load Stripe earlier, wait for usable payment fields before enabling submission, and avoid serial preview waits.
+- Align shipping choices and amounts on desktop and mobile; refresh tax and shipping totals after destination changes.
+
 ## v1.2.24 - 2026-10-21
 
 - Isolate Pool pending email jobs and queue scheduling from other products sharing

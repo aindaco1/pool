@@ -21,6 +21,11 @@
 
   var runtimeScripts = [
     {
+      file: '/shared/dust-wave-platform/packages/site-shell/src/checkout-utils-browser.js',
+      key: 'checkout-utils',
+      ready: function() { return Boolean(window.DustWaveCheckoutUtils); }
+    },
+    {
       file: '/shared/dust-wave-platform/packages/admin-shell/src/editor-codec-browser.js',
       key: 'editor-codec',
       ready: function() {

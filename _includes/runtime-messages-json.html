@@ -6,6 +6,14 @@
 {%- capture manage_tip_copy -%}{% include t.html key="runtime.manage.tip_copy" lang=lang %}{%- endcapture -%}
 {
   "cart": {
+    "zipStateMismatch": {{ site.data.i18n[lang].runtime.cart.zip_state_mismatch | default: site.data.i18n.en.runtime.cart.zip_state_mismatch | jsonify }},
+    "citySuggestion": {{ site.data.i18n[lang].runtime.cart.city_suggestion | default: site.data.i18n.en.runtime.cart.city_suggestion | jsonify }},
+    "useCity": {{ site.data.i18n[lang].runtime.cart.use_city | default: site.data.i18n.en.runtime.cart.use_city | jsonify }},
+    "checkingAddress": {{ site.data.i18n[lang].runtime.cart.checking_address | default: site.data.i18n.en.runtime.cart.checking_address | jsonify }},
+    "taxEstimateLabel": {{ site.data.i18n[lang].runtime.cart.tax_estimate_label | default: site.data.i18n.en.runtime.cart.tax_estimate_label | jsonify }},
+    "taxEstimateLocalMissing": {{ site.data.i18n[lang].runtime.cart.tax_estimate_local_missing | default: site.data.i18n.en.runtime.cart.tax_estimate_local_missing | jsonify }},
+    "retryPayment": {{ site.data.i18n[lang].runtime.cart.retry_payment | default: site.data.i18n.en.runtime.cart.retry_payment | jsonify }},
+    "checkoutRefreshError": {{ site.data.i18n[lang].runtime.cart.checkout_refresh_error | default: site.data.i18n.en.runtime.cart.checkout_refresh_error | jsonify }},
     "cartButtonEmpty": {{ site.data.i18n[lang].runtime.cart.cart_button_empty | default: site.data.i18n.en.runtime.cart.cart_button_empty | jsonify }},
     "cartButtonSummaryOne": {{ site.data.i18n[lang].runtime.cart.cart_button_summary_one | default: site.data.i18n.en.runtime.cart.cart_button_summary_one | jsonify }},
     "cartButtonSummaryOther": {{ site.data.i18n[lang].runtime.cart.cart_button_summary_other | default: site.data.i18n.en.runtime.cart.cart_button_summary_other | jsonify }},

@@ -2610,6 +2610,34 @@ describe('Worker business logic hardening', () => {
     expect(tierInventory.calls.some((call) => call.url.endsWith('/release-reservation'))).toBe(true);
   });
 
+  it.each(['http://127.0.0.1:4000', 'https://fork.example'])('keeps checkout release responses readable and private for %s', async (origin) => {
+    const env = createEnv({ CORS_ALLOWED_ORIGIN: origin });
+    const request = (method: string, body?: unknown) => worker.fetch(
+      new Request('https://worker.test/checkout-intent/abandon', {
+        method,
+        headers: { Origin: origin, 'Content-Type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) })
+      }), env, { waitUntil: () => {} }
+    );
+    const preflight = await request('OPTIONS');
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+
+    for (const [body, status] of [[{ orderId: 'pool-intent-release-cors' }, 200], [{}, 400]] as const) {
+      const response = await request('POST', body);
+      expect(response.status).toBe(status);
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    }
+
+    await env.RATELIMIT.put('rl:abandon:pool-intent-release-cors', JSON.stringify({
+      count: 12, reset: Math.floor(Date.now() / 1000) + 60
+    }));
+    const limited = await request('POST', { orderId: 'pool-intent-release-cors' });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+    expect(limited.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+  });
+
   it('abandons a pending checkout intent and releases scarce reservations', async () => {
     const env = createEnv({
       CHECKOUT_PROVIDER: 'first_party',

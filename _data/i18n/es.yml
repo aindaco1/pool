@@ -1929,6 +1929,15 @@ runtime:
     first_party_disabled: "El pago de primera parte no está habilitado para esta compilación."
     start_pledge_error: "Hubo un error al iniciar tu aporte."
     email_required: "Introduce una dirección de correo para continuar."
+    zip_state_mismatch: El código postal %{zip} corresponde a %{states}. Revisa el código postal o el estado.
+    city_suggestion: Para el código postal %{zip}, la ciudad indicada es %{city}. Puedes conservar tu ciudad si es un nombre postal alternativo.
+    use_city: Usar %{city}
+    checking_address: Comprobando el código postal y el estado…
+    tax_estimate_label: Impuesto estimado (%{rate}%)
+    tax_estimate_local_missing: Impuesto estimado (%{rate}%; pueden faltar impuestos locales)
+    retry_payment: "Reintentar cargar el pago"
+    checkout_refresh_error: No pudimos actualizar el proceso. Reintenta antes de iniciar otro compromiso.
+
     email_invalid: "Introduce una dirección de correo válida para continuar."
     shipping_address_required: "Completa una dirección de envío para continuar."
     close_cart: "Cerrar carrito"

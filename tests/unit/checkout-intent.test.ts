@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import {
+  normalizeCheckoutContribution,
   buildCheckoutIntentPayload,
   createCheckoutIntentToken,
   DEFAULT_CHECKOUT_INTENT_TTL_SECONDS,
@@ -269,5 +270,17 @@ describe('checkout completion coordination', () => {
     await call('claim');
     await call('release');
     expect(await (await call('claim')).json()).toMatchObject({ status: 'claimed' });
+  });
+});
+
+
+describe('tax estimate metadata in signed contributions', () => {
+  it('retains new estimate provenance without changing legacy contributions', () => {
+    const taxDetails = { provider: 'offline_rules', effectiveRate: 0.04 };
+    const legacy = normalizeCheckoutContribution({ taxDetails }).taxDetails;
+    expect(legacy).not.toHaveProperty('estimated');
+    expect(legacy).not.toHaveProperty('coverage');
+    const metadata = { estimated: true, coverage: 'zip_local', dataVersion: 'reviewed-snapshot', sourceUpdatedAt: '2026-10-27T00:00:00Z' };
+    expect(normalizeCheckoutContribution({ taxDetails: { ...taxDetails, ...metadata } }).taxDetails).toMatchObject(metadata);
   });
 });

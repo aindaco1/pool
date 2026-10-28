@@ -1,3 +1,4 @@
+import { checkAddressConsistency } from './address-consistency.js';
 import { getGitHubWorkflowRun } from './deployment-status.js';
 import { buildDiaryExcerpt } from './diary.js';
 import { isEmptyTextBlock, normalizeImageAccessibility } from "../../shared/dust-wave-platform/packages/admin-shell/src/editor-media.js";
@@ -5852,6 +5853,21 @@ export default {
         return withObservedOperation(env, ctx, 'shipping_quote', () => handleShippingQuote(request, env));
       }
 
+      if (path === '/address/check' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const trustedOrigin = requireTrustedSiteOrigin(request, env);
+        if (!trustedOrigin.ok) return trustedOrigin.response;
+        const rateLimit = await checkRateLimit(request, env, { ...RATE_LIMITS.tax, privateResponse: true });
+        if (!rateLimit.allowed) return rateLimit.response;
+        const parsed = await parseJsonRequestBody(request, env, { maxBytes: MAX_STANDARD_JSON_BODY_BYTES, privateResponse: true });
+        if (!parsed.ok) return parsed.response;
+        return privateJsonResponse({
+          billing: checkAddressConsistency(parsed.body?.billing),
+          shipping: checkAddressConsistency(parsed.body?.shipping)
+        }, 200, env);
+      }
+
       if (path === '/tax/quote' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
         if (!bodyLimit.ok) return bodyLimit.response;
@@ -6065,16 +6081,17 @@ export default {
         const body = parsedBody.body || {};
         const orderId = String(body?.orderId || '').trim();
         if (!orderId) {
-          return jsonResponse({ error: 'Missing orderId' }, 400);
+          return privateJsonResponse({ error: 'Missing orderId' }, 400, env);
         }
         const rl = await checkRateLimit(request, env, {
           ...RATE_LIMITS.abandon,
-          keyFn: () => orderId
+          keyFn: () => orderId,
+          privateResponse: true
         });
         if (!rl.allowed) return rl.response;
         return withObservedOperation(env, ctx, 'checkout_intent_abandon', async () => {
           const result = await abandonCheckoutIntent(env, orderId);
-          return jsonResponse(result);
+          return privateJsonResponse(result, 200, env);
         });
       }
 

@@ -1943,6 +1943,15 @@ runtime:
     first_party_disabled: "First-party checkout is not enabled for this build."
     start_pledge_error: "There was an error starting your pledge."
     email_required: "Enter an email address to continue."
+    zip_state_mismatch: ZIP code %{zip} belongs to %{states}. Check the ZIP code or state.
+    city_suggestion: For ZIP %{zip}, the listed city is %{city}. You can keep your city if it is an alternate mailing name.
+    use_city: Use %{city}
+    checking_address: Checking ZIP code and state…
+    tax_estimate_label: Estimated tax (%{rate}%)
+    tax_estimate_local_missing: Estimated tax (%{rate}%; local taxes may be missing)
+    retry_payment: "Retry loading payment"
+    checkout_refresh_error: We could not refresh checkout. Please retry before starting another pledge.
+
     email_invalid: "Enter a valid email address to continue."
     shipping_address_required: "Enter a complete shipping address to continue."
     close_cart: "Close cart"
