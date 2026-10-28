@@ -2198,6 +2198,10 @@ function sanitizeStoredTaxDetails(taxDetails, fallback = {}) {
   return {
     provider: String(taxDetails.provider || fallback.provider || 'flat'),
     source: String(taxDetails.source || fallback.source || 'flat_rate'),
+    estimated: taxDetails.estimated === true,
+    coverage: ['zip_local', 'state_only'].includes(taxDetails.coverage) ? taxDetails.coverage : null,
+    dataVersion: typeof taxDetails.dataVersion === 'string' ? taxDetails.dataVersion.slice(0, 120) : null,
+    sourceUpdatedAt: typeof taxDetails.sourceUpdatedAt === 'string' ? taxDetails.sourceUpdatedAt.slice(0, 30) : null,
     effectiveRate: Number(taxDetails.effectiveRate ?? fallback.effectiveRate ?? 0) || 0,
     locationCode: typeof (taxDetails.locationCode ?? fallback.locationCode) === 'string' && String(taxDetails.locationCode ?? fallback.locationCode).trim()
       ? String(taxDetails.locationCode ?? fallback.locationCode).trim()

@@ -274,3 +274,5 @@ Pool. This wrapper requires an explicit output. Review source provenance,
 coverage and effective dates; test Platform and both consumers before advancing
 their immutable pins. Roll back the consumer adapter and pin together. No feed
 refresh, merge or deployment occurs automatically at checkout.
+
+Tax estimate metadata (`estimated`, `coverage`, `dataVersion`, and `sourceUpdatedAt`) survives the Worker response and storage sanitizer. Public quote regressions cover both local ZIP references and the state-only fallback.
