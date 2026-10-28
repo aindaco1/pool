@@ -624,3 +624,53 @@ For processor behavior, prefer Stripe test mode and the Stripe CLI over hand-bui
 - [DASHBOARD.md](./DASHBOARD.md)
 - [EMAIL.md](./EMAIL.md)
 - [worker/README.md](../worker/README.md)
+
+
+## Editable inline checkout and shared helpers
+
+Custom checkout keeps contact and address inputs mounted while preparing payment.
+Complete details trigger preparation after a short pause. Payment fields appear
+below those inputs and scroll into the drawer once per checkout visit, without
+moving keyboard focus; subsequent edits preserve scroll position. US ZIP/state
+conflicts appear once beside the fields, and city corrections remain optional.
+Incomplete email/ZIP edits never prepare payment. Editing prepared details
+invalidates the old preparation, waits for release, then prepares the new details.
+Shipping/tax previews run alongside payment preparation, with identical pending
+preview requests shared. They do not block the replacement payment fields;
+confirmation stays disabled while preview totals are updating. The Worker still
+calculates canonical totals before creating each setup session.
+The sidecar mounts Payment Elements before awaiting Stripe session actions, so
+their downloads/rendering overlap session loading. If session loading fails, the
+sidecar unmounts those elements before the existing release/retry path runs.
+Payment readiness also requires the Payment Element's `ready` event and completed
+contact synchronization. A returned mount call alone does not enable Save. The
+drawer shows the existing localized loading message while Stripe renders; an
+element `loaderror` uses the reservation-release/retry path. Events from obsolete
+setups are ignored. Store notifications do not restart an in-progress mount just
+because its container is still empty.
+
+Opening the cart immediately loads Stripe.js, initializes the configured public
+key, and warms the Checkout SDK with a pending client-secret promise. Checkout
+route entry also warms it when a restored flow bypasses cart opening. No server
+session or speculative Payment Element is created by warmup. A valid canonical
+setup consumes that preparation once and supplies its secret; later sessions get
+fresh preparations. An unused warmup contains no customer details and can serve a
+later visit in the same page. SDK initialization failures remain retryable.
+Platform site-shell shares script loading and SDK instance reuse per key/locale;
+Pool retains Checkout preparation, Elements, sessions and confirmation. Local test builds
+must use the same test publishable key as their Worker in `_config.local.yml`.
+Stripe asset downloads can still delay rendering on a cold or slow connection.
+Late lookup/preparation responses cannot replace current input. Provider failures
+remain visible and offer an explicit retry rather than an automatic retry loop.
+
+Platform site-shell owns email/ZIP readiness, debouncing, stale lookup rejection,
+detail signatures and first-reveal scrolling. Platform tax-core owns postal/local
+rate references; design-core supplies mobile inputs at least 16px. Each consumer
+owns its form markup, localized messages, routes, canonical totals and recovery.
+
+Pool continues to use Stripe Checkout Sessions in setup mode and confirms the
+pledge only after card setup succeeds. Preparing/repreparing does not charge or
+confirm a pledge. Confirmation recovery remains read-only/idempotent; campaign
+settlement and reservation policy stay in Pool. Store's PaymentIntent flow is
+not used. A failed reservation release blocks a replacement setup and can be
+retried from the same form.

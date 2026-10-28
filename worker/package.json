@@ -1,6 +1,6 @@
 {
   "name": "pledge-worker",
-  "version": "1.2.24",
+  "version": "1.2.25",
   "description": "Cloudflare Worker for The Pool pledge management",
   "main": "src/index.js",
   "type": "module",
@@ -13,8 +13,7 @@
     "wrangler": "^4.146.0"
   },
   "overrides": {
-    "sharp": "0.35.5",
-    "undici": "7.30.0"
+    "sharp": "0.35.5"
   },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",

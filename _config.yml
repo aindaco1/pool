@@ -43,12 +43,14 @@ exclude:
   - Containerfile.playwright.dev
   - shared/dust-wave-jekyll-template
   - shared/dust-wave-platform/examples
+  - shared/dust-wave-platform/packages/tax-core/data
+  - shared/dust-wave-platform/packages/tax-core/bin
 
 # Structured platform settings for forks.
 platform:
   name: The Pool
-  version: "1.2.24"
-  release_label: "v1.2.24"
+  version: "1.2.25"
+  release_label: "v1.2.25"
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   pledges_email_from: "The Pool <pledges@pool.dustwave.xyz>"

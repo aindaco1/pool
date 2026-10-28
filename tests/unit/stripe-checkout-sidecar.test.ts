@@ -18,6 +18,118 @@ describe('stripe checkout sidecar helper', () => {
     delete (window as any).Stripe;
   });
 
+  it('prepares one Stripe instance for matching keys/locales and reuses it across setup sessions', async () => {
+    const initCheckout = vi.fn(async () => ({
+      loadActions: async () => ({ type: 'success', actions: {} }),
+      createPaymentElement: () => ({ mount: vi.fn(), unmount: vi.fn() })
+    }));
+    const constructor = vi.fn(() => ({ initCheckout }));
+    (window as any).Stripe = constructor;
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const sidecar = (window as any).PoolStripeCheckoutSidecar;
+    const config = { publishableKey: 'pk_test_first', locale: 'en' };
+    const instances = await Promise.all([sidecar.prepareStripe(config), sidecar.prepareStripe(config)]);
+    expect(instances[0]).toBe(instances[1]);
+    for (const clientSecret of ['first_session', 'replacement_session']) {
+      const mount = await sidecar.mount({ ...config, clientSecret, paymentContainer: document.createElement('div') });
+      mount.unmount();
+    }
+    expect(constructor).toHaveBeenCalledTimes(1);
+    expect(initCheckout).toHaveBeenCalledTimes(2);
+    await sidecar.prepareStripe({ ...config, locale: 'es' });
+    await sidecar.prepareStripe({ ...config, publishableKey: 'pk_test_second' });
+    expect(constructor.mock.calls).toEqual([
+      ['pk_test_first', { locale: 'en' }], ['pk_test_first', { locale: 'es' }], ['pk_test_second', { locale: 'en' }]
+    ]);
+  });
+
+  it('reports readiness only on the rendered event and forwards element load failures', async () => {
+    const handlers: Record<string, (event?: any) => void> = {};
+    (window as any).Stripe = () => ({ initCheckout: async () => ({
+      loadActions: async () => ({ type: 'success', actions: {} }),
+      createPaymentElement: () => ({ on: (event: string, handler: () => void) => { handlers[event] = handler; }, mount: vi.fn() })
+    }) });
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const onReady = vi.fn();
+    const onLoadError = vi.fn();
+    await (window as any).PoolStripeCheckoutSidecar.mount({
+      publishableKey: 'pk_test_first', clientSecret: 'first_session',
+      paymentContainer: document.createElement('div'), onReady, onLoadError
+    });
+    expect(onReady).not.toHaveBeenCalled();
+    handlers.ready();
+    expect(onReady).toHaveBeenCalledTimes(1);
+    const failure = { error: { message: 'Payment element failed to load' } };
+    handlers.loaderror(failure);
+    expect(onLoadError).toHaveBeenCalledExactlyOnceWith(failure);
+  });
+
+  it('warms the checkout SDK without a session and consumes it only once when details are complete', async () => {
+    const secrets: Promise<string>[] = [];
+    const createPaymentElement = vi.fn(() => ({ mount: vi.fn(), unmount: vi.fn() }));
+    const initCheckout = vi.fn(({ clientSecret }) => {
+      secrets.push(clientSecret);
+      return { loadActions: async () => ({ type: 'success', actions: {} }), createPaymentElement };
+    });
+    (window as any).Stripe = () => ({ initCheckout });
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const sidecar = (window as any).PoolStripeCheckoutSidecar;
+    const config = { publishableKey: 'pk_test_first', locale: 'en' };
+    await Promise.all([sidecar.prepareCheckout(config), sidecar.prepareCheckout(config)]);
+    expect(initCheckout).toHaveBeenCalledTimes(1);
+    expect(createPaymentElement).not.toHaveBeenCalled();
+    let supplied = false;
+    secrets[0].then(() => { supplied = true; });
+    await Promise.resolve();
+    expect(supplied).toBe(false);
+    for (const clientSecret of ['first_session', 'replacement_session']) {
+      const mount = await sidecar.mount({ ...config, clientSecret, paymentContainer: document.createElement('div') });
+      mount.unmount();
+    }
+    expect(await Promise.all(secrets)).toEqual(['first_session', 'replacement_session']);
+    expect(initCheckout).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts rendering payment fields while session actions are still loading', async () => {
+    let resolveActions!: (result: any) => void;
+    const pendingActions = new Promise(resolve => { resolveActions = resolve; });
+    const paymentElement = { mount: vi.fn(), unmount: vi.fn() };
+    const checkout = {
+      loadActions: vi.fn(() => pendingActions),
+      createPaymentElement: () => paymentElement
+    };
+    (window as any).Stripe = () => ({ initCheckout: () => checkout });
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const container = document.createElement('div');
+    let mounted = false;
+    const pendingMount = (window as any).PoolStripeCheckoutSidecar.mount({
+      publishableKey: 'pk_test_first', clientSecret: 'first_session', paymentContainer: container
+    }).then((result: any) => { mounted = true; return result; });
+    try {
+      await vi.waitFor(() => expect(paymentElement.mount).toHaveBeenCalledWith(container));
+      expect(checkout.loadActions).toHaveBeenCalledTimes(1);
+      expect(mounted).toBe(false);
+    } finally {
+      resolveActions({ type: 'success', actions: {} });
+      (await pendingMount).unmount();
+    }
+    expect(paymentElement.unmount).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries failed Checkout SDK warmup on the next preparation', async () => {
+    const initCheckout = vi.fn().mockRejectedValueOnce(new Error('SDK unavailable'))
+      .mockResolvedValue({ loadActions: async () => ({ type: 'success', actions: {} }),
+        createPaymentElement: () => ({ mount: vi.fn(), unmount: vi.fn() }) });
+    (window as any).Stripe = () => ({ initCheckout });
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const sidecar = (window as any).PoolStripeCheckoutSidecar;
+    const config = { publishableKey: 'pk_test_retry', locale: 'en' };
+    await expect(sidecar.prepareCheckout(config)).rejects.toThrow('SDK unavailable');
+    const mount = await sidecar.mount({ ...config, clientSecret: 'first_session', paymentContainer: document.createElement('div') });
+    expect(initCheckout).toHaveBeenCalledTimes(2);
+    mount.unmount();
+  });
+
   it('mounts a payment element and optional shipping address element from Stripe custom checkout using theme vars', async () => {
     document.documentElement.style.setProperty('--pool-color-primary', '#123456');
     document.documentElement.style.setProperty('--pool-color-primary-hover', '#102f52');
@@ -95,8 +207,9 @@ describe('stripe checkout sidecar helper', () => {
     });
 
     expect((window as any).Stripe).toHaveBeenCalledWith('pk_test_123', { locale: 'en' });
+    expect(await stripeInstance.initCheckout.mock.calls[0][0].clientSecret).toBe('cs_test_secret_123');
     expect(stripeInstance.initCheckout).toHaveBeenCalledWith({
-      clientSecret: 'cs_test_secret_123',
+      clientSecret: expect.any(Promise),
       elementsOptions: {
         syncAddressCheckbox: 'shipping',
         appearance: {
@@ -111,7 +224,7 @@ describe('stripe checkout sidecar helper', () => {
             borderRadius: '14px',
             spacingUnit: '4px',
             fontFamily: '"Source Sans 3", sans-serif',
-            fontSizeBase: '13px',
+            fontSizeBase: '16px',
             fontWeightNormal: '400'
           },
           rules: {
@@ -126,7 +239,7 @@ describe('stripe checkout sidecar helper', () => {
               border: '1px solid #c8bbaa',
               boxShadow: 'none',
               color: '#223344',
-              fontSize: '13px',
+              fontSize: 'var(--fontSizeBase)',
               fontWeight: '400',
               lineHeight: '1.4',
               padding: '10px 12px'
@@ -309,13 +422,16 @@ describe('stripe checkout sidecar helper', () => {
     expect(email).toBe('corrected@example.com');
   });
 
-  it('fails clearly when Stripe custom checkout actions do not load', async () => {
+  it.each(['error', 'reject'])('cleans up mounted elements when session actions fail (%s)', async (failure) => {
+    const elements = Array.from({ length: 3 }, () => ({ mount: vi.fn(), unmount: vi.fn() }));
     const checkout = {
-      loadActions: vi.fn(async () => ({
-        type: 'error',
-        error: { message: 'checkout unavailable' }
-      })),
-      createPaymentElement: vi.fn()
+      loadActions: vi.fn(async () => {
+        if (failure === 'reject') throw new Error('checkout unavailable');
+        return { type: 'error', error: { message: 'checkout unavailable' } };
+      }),
+      createPaymentElement: () => elements[0],
+      createLinkAuthenticationElement: () => elements[1],
+      createShippingAddressElement: () => elements[2]
     };
     const stripeInstance = {
       initCheckout: vi.fn(async () => checkout)
@@ -330,8 +446,15 @@ describe('stripe checkout sidecar helper', () => {
     await expect((window as any).PoolStripeCheckoutSidecar.mount({
       publishableKey: 'pk_test_123',
       clientSecret: 'cs_test_secret_123',
-      paymentContainer
+      paymentContainer,
+      linkAuthenticationContainer: document.createElement('div'),
+      shippingContainer: document.createElement('div'),
+      useShippingAddressElement: true
     })).rejects.toThrow('checkout unavailable');
+    for (const element of elements) {
+      expect(element.mount).toHaveBeenCalledTimes(1);
+      expect(element.unmount).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('skips the Stripe shipping address element by default', async () => {

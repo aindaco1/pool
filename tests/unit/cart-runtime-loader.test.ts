@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtimeScriptKeys = [
+  'checkout-utils',
   'editor-codec',
   'add-on-utils',
   'shipping-option-utils',
@@ -48,6 +49,9 @@ function installRuntimeScriptHarness(providerClick = vi.fn()) {
     appended.push(script.dataset.poolCartRuntimeScript);
     queueMicrotask(() => {
       switch (script.dataset.poolCartRuntimeScript) {
+        case 'checkout-utils':
+          (window as any).DustWaveCheckoutUtils = {};
+          break;
         case 'editor-codec':
           (window as any).DustWaveAdminShellEditorCodec = { renderEditorInlineMarkdown: vi.fn() };
           break;
@@ -107,6 +111,7 @@ async function flushAsyncWork() {
 
 describe('cart runtime loader', () => {
   beforeEach(() => {
+    delete (window as any).DustWaveCheckoutUtils;
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();

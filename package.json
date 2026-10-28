@@ -1,7 +1,7 @@
 {
   "name": "pool",
-  "version": "1.2.24",
-  "description": "**Dust Wave's open crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)",
+  "version": "1.2.25",
+  "description": "**Dust Wave's open crowdfunding platform** \u2014 [pool.dustwave.xyz](https://pool.dustwave.xyz)",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -94,7 +94,6 @@
     "vitest": "^5.0.3"
   },
   "overrides": {
-    "ip-address": "10.4.0",
-    "undici": "7.30.0"
+    "ip-address": "10.4.0"
   }
 }

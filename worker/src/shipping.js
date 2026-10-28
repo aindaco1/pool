@@ -1,3 +1,5 @@
+import { getAddressConsistencyError } from './address-consistency.js';
+import { isPostalComplete } from '../../shared/dust-wave-platform/packages/site-shell/src/checkout-utils.js';
 import {
   getCampaignShippingFallbackFeeCents,
   getShippingFallbackFeeCents,
@@ -78,6 +80,10 @@ export function normalizeShippingDestination(address = {}) {
   if (!postalCode) {
     return { valid: false, error: 'Shipping postal code is required' };
   }
+
+  if (!isPostalComplete(country, postalCode)) return { valid: false, error: 'Shipping postal code is invalid' };
+  const consistencyError = getAddressConsistencyError({ ...address, country, postalCode });
+  if (consistencyError) return { valid: false, error: consistencyError };
 
   return {
     valid: true,

@@ -107,10 +107,10 @@ async function addCartItemViaClient(page: any, item: Record<string, any>) {
 }
 
 async function fillDefaultCustomCheckoutTaxLocation(page: any) {
+  await page.locator('[data-cart-tax-destination-field="postal_code"]').fill('87048');
   await page.locator('[data-cart-tax-destination-field="line1"]').fill('1228 W La Entrada');
   await page.locator('[data-cart-tax-destination-field="city"]').fill('Corrales');
   await page.locator('[data-cart-tax-destination-field="state"]').fill('NM');
-  await page.locator('[data-cart-tax-destination-field="postal_code"]').fill('87048');
   await page.locator('[data-cart-tax-destination-field="postal_code"]').dispatchEvent('change');
 }
 
@@ -763,12 +763,6 @@ test.describe('Cart Flow', () => {
       await expect(page.locator('[data-cart-custom-checkout-email]')).toBeVisible();
       await page.locator('[data-cart-custom-checkout-email]').fill('canonical-payload@example.com');
       await fillDefaultCustomCheckoutTaxLocation(page);
-      await expect(page.locator('[data-cart-start-checkout]')).toBeVisible();
-      await expect(page.locator('[data-cart-start-checkout]')).toBeEnabled();
-      await page.evaluate(() => {
-        const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
-        button?.click();
-      });
     } else {
       await expect(page.locator('[data-cart-start-checkout]')).toBeVisible();
       await page.evaluate(() => {
@@ -1225,6 +1219,7 @@ test.describe('Checkout Flow', () => {
             }
           }),
           createPaymentElement: () => ({
+            on: (event: string, handler: () => void) => { if (event === 'ready') setTimeout(handler, 0); },
             mount: (node: HTMLElement) => {
               node.innerHTML = '<div data-test-payment-element>Mock payment element</div>';
             },
@@ -1261,6 +1256,7 @@ test.describe('Checkout Flow', () => {
 
     let capturedPayload: any = null;
     let starts = 0;
+    await page.route(`${workerBase}/checkout-intent/abandon`, route => route.fulfill({ json: { success: true } }));
     let recoveryAvailable = confirmationScenario !== 'retry-after-reload';
     await page.route(`${workerBase}/checkout-intent/start`, async (route) => {
       starts += 1;
@@ -1327,14 +1323,6 @@ test.describe('Checkout Flow', () => {
     await emailField.fill('e2e-supporter@example.com');
     await fillDefaultCustomCheckoutTaxLocation(page);
 
-    const continueToPledgeButton = page.locator('[data-cart-start-checkout]');
-    await expect(continueToPledgeButton).toBeVisible();
-    await expect(continueToPledgeButton).toBeEnabled();
-    await page.evaluate(() => {
-      const button = document.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
-      button?.click();
-    });
-
     const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
     await expect(saveButton).toBeVisible();
     await expect(saveButton).toBeEnabled();
@@ -1374,7 +1362,7 @@ test.describe('Checkout Flow', () => {
         }
       ]
     });
-    expect(starts).toBe(1);
+    expect(starts).toBe(confirmationScenario === 'changed-email' ? 2 : 1);
     expect(await page.evaluate(() => sessionStorage.getItem('test-confirm-count'))).toBe('1');
     expect(await page.evaluate(() => sessionStorage.getItem('test-confirm-email'))).toBe(
       confirmationScenario === 'changed-email' ? 'corrected@example.com' : 'e2e-supporter@example.com'
@@ -1398,6 +1386,7 @@ test.describe('Checkout Flow', () => {
             }
           }),
           createPaymentElement: () => ({
+            on: (event: string, handler: () => void) => { if (event === 'ready') setTimeout(handler, 0); },
             mount: (node: HTMLElement) => {
               node.innerHTML = '<div data-test-payment-element>Mock payment element</div>';
             },
@@ -1731,6 +1720,7 @@ test.describe('Checkout Flow', () => {
             }
           }),
           createPaymentElement: () => ({
+            on: (event: string, handler: () => void) => { if (event === 'ready') setTimeout(handler, 0); },
             mount: (node: HTMLElement) => {
               node.innerHTML = '<button type="button" data-test-payment-element>Mock payment element</button>';
             },
@@ -1840,6 +1830,11 @@ test.describe('Checkout Flow', () => {
     await emailField.focus();
     await page.keyboard.type('keyboard-supporter@example.com');
 
+    const postalField = page.locator('[data-cart-tax-destination-field="postal_code"]');
+    await postalField.focus();
+    await page.keyboard.type('87048');
+    await postalField.dispatchEvent('change');
+
     const line1Field = page.locator('[data-cart-tax-destination-field="line1"]');
     await line1Field.focus();
     await page.keyboard.type('1228 W La Entrada');
@@ -1851,18 +1846,6 @@ test.describe('Checkout Flow', () => {
     const stateField = page.locator('[data-cart-tax-destination-field="state"]');
     await stateField.focus();
     await page.keyboard.type('NM');
-
-    const postalField = page.locator('[data-cart-tax-destination-field="postal_code"]');
-    await postalField.focus();
-    await page.keyboard.type('87048');
-    await postalField.dispatchEvent('change');
-
-    const continueToPledgeButton = page.locator('[data-cart-start-checkout]');
-    await expect(continueToPledgeButton).toBeVisible();
-    await expect(continueToPledgeButton).toBeEnabled({ timeout: 15_000 });
-    await continueToPledgeButton.focus();
-    await expect(continueToPledgeButton).toBeFocused();
-    await page.keyboard.press('Enter');
 
     const saveButton = page.locator('[data-cart-confirm-custom-checkout]');
     await expect(saveButton).toBeVisible();
@@ -1891,6 +1874,7 @@ test.describe('Checkout Flow', () => {
             }
           }),
           createPaymentElement: () => ({
+            on: (event: string, handler: () => void) => { if (event === 'ready') setTimeout(handler, 0); },
             mount: (node: HTMLElement) => {
               node.innerHTML = '<div data-test-payment-element>Mock payment element</div>';
             },

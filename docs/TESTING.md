@@ -1022,3 +1022,49 @@ template. [Deployment](DEPLOYMENT.md) owns production wiring.
 requirements; payment, email, tax, and shipping provider credentials are covered
 in their dedicated runbooks. Record provider omissions explicitly; local unit,
 fixture, or browser success is not external acceptance.
+
+
+## Shared checkout regression coverage
+
+Platform `packages/site-shell/test/checkout-utils.test.js` characterizes shared
+email/ZIP readiness, debouncing, A → B → A response races and first-only reveal.
+Platform tax-core tests verify postal aliases, unknown/stale coverage, integer
+component allocation and updater validation. Consumer `platform-pin.test.ts`
+checks the immutable commit, package versions and consumed sources.
+
+Pool's `checkout-edits.spec.ts` covers billing and shipping edits at desktop
+and mobile widths, valid → partial → valid email, ZIP/state changes, optional
+city correction, tax refresh, stale setup responses, release/mount failures,
+first-only scroll, input sizing and password-manager overlays. SDK fixtures expose
+Checkout Session setup only; they never expose Store's PaymentIntent APIs.
+The edit suite also sends release requests to the real Worker handler through a
+separate local HTTP origin so browser CORS is exercised, and checks displayed
+shipping amounts and totals for ZIP and delivery-option changes in both drawers.
+Slow-preview regressions hold tax/shipping responses open after a ZIP/state edit
+and verify that replacement payment fields mount after reservation release, that
+identical pending previews share one request, and that confirmation stays disabled
+until displayed totals finish updating.
+An older held tax response must also leave a newer ZIP/state's totals and payment
+readiness intact when it eventually arrives.
+The cart `90210` → checkout `87048` regression holds Stripe's rendered event after
+mount returns: Save must remain disabled with a loading message until the fields
+are visible. Additional coverage checks an empty container during initialization,
+obsolete ready/error callbacks, element load-error recovery, and key/locale-safe
+Stripe instance reuse. Standard Stripe fixtures explicitly emit `ready`.
+Held session-action coverage verifies that payment fields can render concurrently
+while Save remains disabled, and that an old session finishing after a ZIP edit
+cannot replace the current payment UI. Sidecar unit tests verify cleanup for both
+returned session errors and rejected action-loading promises.
+Worker tests verify local/fork CORS and private caching on release responses.
+`campaign-checkout.spec.ts` retains explicit card-setup confirmation, changed-email,
+preset-email, stale-summary and retry-after-reload contracts. Worker tests reject
+conflicts through direct requests and preserve legacy signed contribution shapes.
+
+### Early Stripe regression coverage
+
+Sidecar tests cover instance reuse between warmup and payment mounting, separation
+by public key/locale, and retries after a failed warmup. Platform tests characterize
+concurrent loading, failed-tag removal and failed-initializer eviction.
+Pool browser tests assert Checkout SDK initialization before complete details,
+zero setup requests/Elements during warmup, and one-time use of the prepared SDK.
+ZIP edits, delayed actions and stale callbacks retain their readiness guarantees.

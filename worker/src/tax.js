@@ -1,3 +1,6 @@
+import { checkAddressConsistency, getAddressConsistencyError, normalizeUsState } from './address-consistency.js';
+import { isPostalComplete } from '../../shared/dust-wave-platform/packages/site-shell/src/checkout-utils.js';
+import { buildOpenUsTaxQuote } from './open-us-tax.js';
 import SalesTax from 'sales-tax';
 
 import { getSalesTaxRate, getShippingOriginCountry } from './provider-config.js';
@@ -53,6 +56,11 @@ export function normalizeTaxDestination(value) {
       error: 'Billing postal code is required'
     };
   }
+
+  if (!isPostalComplete(destination.country, destination.postalCode)) return { valid: false, destination: null, error: 'Billing postal code is invalid' };
+  const consistencyError = getAddressConsistencyError(destination);
+  if (consistencyError) return { valid: false, destination: null, error: consistencyError };
+  if (destination.country === 'US') destination.state = normalizeUsState(destination.state);
 
   return {
     valid: true,
@@ -161,6 +169,8 @@ async function quoteOfflineRulesTax(env = {}, {
   );
 
   const directCharge = result?.charge?.direct !== false;
+  const localQuote = buildOpenUsTaxQuote({ destination: normalizedDestination, subtotalCents, shippingCents, directCharge });
+  if (localQuote) return localQuote;
   const effectiveRate = directCharge ? Math.max(0, Number(result?.rate) || 0) : 0;
   const shippingTaxed = false;
   const taxableShippingCents = shippingTaxed ? Math.max(0, Number(shippingCents) || 0) : 0;
@@ -171,6 +181,8 @@ async function quoteOfflineRulesTax(env = {}, {
   return {
     provider: 'offline_rules',
     source: 'offline_rules',
+    estimated: normalizedDestination.country === 'US',
+    coverage: normalizedDestination.country === 'US' ? 'state_only' : null,
     taxCents,
     effectiveRate,
     taxableSubtotalCents,
@@ -441,7 +453,7 @@ function normalizeJurisdictionDestination(destination) {
     return null;
   }
 
-  return {
+  const normalized = {
     country: String(destination.country || '').trim().toUpperCase(),
     postalCode: String(destination.postalCode || destination.postal_code || '').trim(),
     state: String(destination.state || destination.province || '').trim().toUpperCase(),
@@ -449,6 +461,9 @@ function normalizeJurisdictionDestination(destination) {
     line1: String(destination.line1 || destination.address1 || '').trim(),
     line2: String(destination.line2 || destination.address2 || '').trim()
   };
+  const postal = checkAddressConsistency(normalized);
+  if (!normalized.state && postal.checked && postal.states.length === 1) normalized.state = postal.states[0];
+  return normalized;
 }
 
 function normalizeBooleanish(value) {

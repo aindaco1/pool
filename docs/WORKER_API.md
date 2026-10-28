@@ -63,6 +63,20 @@ or payment acceptance.
 
 ## Routes
 
+### POST /address/check
+
+Check optional `billing` and `shipping` objects containing `country`,
+`postalCode`, `state`, and `city`. Known US ZIPs return `checked`, `postalCode`,
+`states`, `stateMismatch`, and an optional `suggestedCity`; unknown/international
+addresses return `{ "checked": false, "stateMismatch": false }`. A city suggestion
+is advisory. This is not street/deliverability validation.
+
+Requires a trusted storefront Origin, the standard JSON body-size limit, and
+the existing tax rate limit. Responses are private/no-store. The lookup does
+not persist addresses or call a third party. Canonical tax, shipping and checkout
+requests independently reject known ZIP/state conflicts; this feedback endpoint
+cannot authorize payment.
+
 ### POST /checkout-intent/start
 Canonicalize the first-party cart payload and create a Stripe setup-mode Checkout Session for a new pledge.
 
@@ -92,6 +106,15 @@ The Worker rebuilds tier, bundle add-on, custom-support, shipping, and subtotal 
 When a pledge qualifies for shipping upgrades, the Worker also persists the selected limited delivery option (`standard`, `signature_required`, or `adult_signature_required`) so the cart, Manage Pledge, stored pledge total, and supporter emails stay aligned.
 
 Limited-tier reservations and claims are serialized through a per-campaign Durable Object coordinator before the KV inventory snapshot is updated, so concurrent checkout starts, retries, modifications, and webhook completions cannot oversell scarce rewards.
+
+### POST /checkout-intent/abandon
+
+Body: `{ "orderId": "pool-intent-..." }`.
+Releases pending scarce-inventory reservations before editing or leaving checkout.
+The expiring quote remains available for an already-completed Stripe setup to be
+reconciled. Success and validation/rate-limit responses use the configured site
+CORS origin and `private, no-store, max-age=0`, including local and fork origins.
+The browser waits for successful release before preparing replacement payment fields.
 
 ### POST /checkout-intent/complete
 
