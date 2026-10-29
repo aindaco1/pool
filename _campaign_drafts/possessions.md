@@ -41,11 +41,32 @@ long_content:
       **Where We Are Now**
 support_items: []
 campaign_add_ons: []
-tiers: []
+tiers:
+  - id: "thanks"
+    name: "Thanks!"
+    price: 5
+    description: "Thank you from the bottom of our hearts! No on-screen credit will be given."
+    stackable: false
+    category: "digital"
+    late_support: true
+  - id: "special-thanks"
+    name: "Special Thanks!"
+    price: 10
+    description: "Thank you from the bottom of our hearts! Supporters in this tier will receive an on-screen credit for your contribution!"
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "bts-doc"
+    name: "BTS Doc"
+    price: 25
+    description: "Supporters in this tier will receive access to a short BTS documentary after the project has concluded!"
+    stackable: false
+    category: "digital"
+    late_support: false
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-10-29T17:54:25.877Z"
+_pool_draft_saved_at: "2026-10-29T18:05:59.509Z"
 ---
