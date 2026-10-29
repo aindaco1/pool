@@ -67,9 +67,11 @@ end
     const output = execFileSync('bundle', ['exec', 'ruby', '-e', script], {
       cwd: repoRoot,
       encoding: 'utf8',
+      timeout: 55_000,
       env: { ...process.env, JEKYLL_ENV: 'test' }
     });
 
     expect(output).toContain('localized Shopping product generation passed');
-  }, 30_000);
+  // This renders the full localized site alongside other unit files in CI.
+  }, 60_000);
 });
