@@ -89,8 +89,8 @@ exit 0
 `);
   writeFakeCli(binDir, 'stripe', `
 if [ "\${1:-}" = "--version" ]; then echo "stripe version 1.0.0"; exit 0; fi
-if [ "\${1:-}" = "config" ] && [ "\${2:-}" = "--list" ]; then
-  printf '%s\n' "test_mode_api_key = 'rk_test_setup'" "test_mode_key_expires_at = '2099-01-01'"
+if [ "\${1:-}" = "whoami" ] && [ "\${2:-}" = "--format" ]; then
+  echo '{"authenticated":true,"test_mode_key":{"available":true},"live_mode_key":{"available":false}}'
   exit 0
 fi
 if [ "\${1:-}" = "webhook_endpoints" ]; then echo '{"data":[]}'; exit 0; fi
