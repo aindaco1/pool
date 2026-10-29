@@ -23,7 +23,22 @@ stretch_hidden: true
 custom_late_support: false
 runner_report_emails:
   - "tyhernandez11@gmail.com"
-long_content: []
+long_content:
+  - type: "text"
+    body: |
+      **The Project**
+  - type: "text"
+    body: |
+      **Why We're Making This?**
+  - type: "text"
+    body: |
+      **The Visual Approach**
+  - type: "text"
+    body: |
+      **Where's Your Money Going?**
+  - type: "text"
+    body: |
+      **Where We Are Now**
 support_items: []
 campaign_add_ons: []
 tiers: []
@@ -32,5 +47,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-10-29T17:47:37.260Z"
+_pool_draft_saved_at: "2026-10-29T17:54:25.877Z"
 ---
