@@ -5,14 +5,14 @@ lang: es
 translation_key: terms
 permalink: /es/terms/
 description: Revisa las políticas de The Pool sobre aportes, pagos, envío, no devoluciones, entrega, privacidad y contribuciones creativas.
-last_modified_at: 2026-09-06
+last_modified_at: 2026-10-28
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
 
 # Términos y pautas creativas
 
-**Vigentes desde el 6 de septiembre de 2026.** Estos términos rigen el uso de The Pool, un servicio de crowdfunding operado por {{ operator_name }}. Al usar el sitio, enviar un aporte o proporcionar contenido, aceptas estos términos y las condiciones específicas de la campaña que se muestren antes de confirmar el pago. Si una condición específica de campaña entra en conflicto con estos términos, se aplica la más específica para esa campaña, salvo que la ley lo prohíba.
+**Vigentes desde el 28 de octubre de 2026.** Estos términos rigen el uso de The Pool, un servicio de crowdfunding operado por {{ operator_name }}. Al usar el sitio, enviar un aporte o proporcionar contenido, aceptas estos términos y las condiciones específicas de la campaña que se muestren antes de confirmar el pago. Si una condición específica de campaña entra en conflicto con estos términos, se aplica la más específica para esa campaña, salvo que la ley lo prohíba.
 
 ## 1. Elegibilidad y uso aceptable
 
@@ -29,7 +29,9 @@ Debes tener capacidad para celebrar un acuerdo vinculante y proporcionar datos c
 
 ## 3. Precios, pagos, impuestos y cargos opcionales
 
-Los precios se muestran en dólares estadounidenses. El servidor verifica los precios, las variantes seleccionadas, el envío, los impuestos, las propinas, los complementos y los totales de campaña cuando haces o modificas un aporte. Las selecciones de complementos nuevos, incluida una variante distinta, usan los precios actuales del catálogo. Un complemento existente conserva su precio unitario guardado cuando el producto y la variante no cambian, incluso si solo modificas la cantidad. Los cobros de campaña usan los montos guardados de los aportes. Los totales mostrados por el navegador pueden seguir siendo estimados hasta contar con suficiente información del destino.
+Los precios se muestran en dólares estadounidenses. El servidor verifica los precios, las variantes seleccionadas, el envío, los impuestos, las propinas, los complementos y los totales de campaña cuando haces o modificas un aporte. Las selecciones de complementos nuevos, incluida una variante distinta, usan los precios actuales del catálogo. Un complemento existente conserva su precio unitario guardado cuando el producto y la variante no cambian, incluso si solo modificas la cantidad. Los cobros de campaña usan los montos guardados de los aportes. Los totales mostrados por el navegador se actualizan a medida que se dispone de información del destino. Las tasas de impuestos incluidas por código postal de Estados Unidos siguen siendo estimaciones y no cubren todas las jurisdicciones locales. Cuando la cobertura local falta, es ambigua o ha vencido, el proceso de pago puede usar una estimación estatal e indicar que pueden faltar impuestos locales, incluso cuando la tasa estimada es cero. Una dirección completa no garantiza una cobertura completa de impuestos locales.
+
+Cambiar los datos de contacto o dirección durante el proceso de pago actualiza la preparación del pago y los totales mostrados; por sí solo no confirma un aporte ni autoriza un cobro de campaña. Debes corregir los conflictos conocidos entre el código postal y el estado antes de continuar. Las sugerencias de ciudad son opcionales, y la comprobación de dirección no verifica que se pueda entregar en una dirección concreta. Revisa el resumen actualizado antes de confirmar. Actualizar los datos de referencia de impuestos no cambia el precio de un aporte ya confirmado.
 
 Stripe gestiona los números completos de tarjeta y los códigos de seguridad; The Pool no los almacena. Los impuestos sobre ventas y el envío aplicables se muestran durante el proceso de pago cuando pueden calcularse. Las propinas y los complementos opcionales se identifican por separado antes de que confirmes el aporte.
 

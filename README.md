@@ -2,9 +2,9 @@
 
 **Dust Wave's open-source crowdfunding platform** — [pool.dustwave.xyz](https://pool.dustwave.xyz)
 
-The current release is **v1.2.23**. Changes after that tag are recorded under
-**Unreleased** in the [Changelog](CHANGELOG.md); prospective work belongs in the
-[Roadmap](docs/ROADMAP.md).
+The current release is **v1.2.26**. See the [Changelog](CHANGELOG.md) for release
+history and [release evidence](docs/release-evidence/) for validation records.
+Prospective work belongs in the [Roadmap](docs/ROADMAP.md).
 
 The Pool combines a static Jekyll site, a first-party browser cart, and a
 Cloudflare Worker for all-or-nothing creative crowdfunding. Supporters save a

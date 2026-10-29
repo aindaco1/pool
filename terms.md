@@ -4,14 +4,14 @@ title: Terms & Creative Guidelines
 lang: en
 translation_key: terms
 description: Review The Pool's pledge, payment, shipping, no-returns, fulfillment, privacy, and creative-submission policies.
-last_modified_at: 2026-09-06
+last_modified_at: 2026-10-28
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
 
 # Terms & Creative Guidelines
 
-**Effective September 6, 2026.** These terms govern use of The Pool, a crowdfunding service operated by {{ operator_name }}. By using the site, submitting a pledge, or providing content, you agree to these terms and to any campaign-specific terms shown before checkout. If campaign-specific terms conflict with these terms, the more specific term controls for that campaign unless prohibited by law.
+**Effective October 28, 2026.** These terms govern use of The Pool, a crowdfunding service operated by {{ operator_name }}. By using the site, submitting a pledge, or providing content, you agree to these terms and to any campaign-specific terms shown before checkout. If campaign-specific terms conflict with these terms, the more specific term controls for that campaign unless prohibited by law.
 
 ## 1. Eligibility and acceptable use
 
@@ -28,7 +28,9 @@ You must be able to enter a binding agreement and must provide accurate contact,
 
 ## 3. Prices, payment, tax, and optional charges
 
-Prices are shown in U.S. dollars. The server verifies prices, selected variants, shipping, tax, tips, add-ons, and campaign totals when you make or change a pledge. New add-on selections, including a different variant, use current catalog prices. An existing add-on keeps its saved unit price when the product and variant are unchanged, even when you change the quantity. Campaign charges use the saved pledge amounts. Browser-displayed totals may remain estimates until enough destination information is available.
+Prices are shown in U.S. dollars. The server verifies prices, selected variants, shipping, tax, tips, add-ons, and campaign totals when you make or change a pledge. New add-on selections, including a different variant, use current catalog prices. An existing add-on keeps its saved unit price when the product and variant are unchanged, even when you change the quantity. Campaign charges use the saved pledge amounts. Browser-displayed totals update as destination information becomes available. Bundled U.S. ZIP-based tax rates remain estimates and do not cover every local jurisdiction. When local coverage is missing, ambiguous, or expired, checkout may use a state-only estimate and indicate that local taxes may be missing, including when the estimated rate is zero. A complete address does not guarantee complete local-tax coverage.
+
+Changing contact or address details during checkout refreshes payment setup and the displayed totals; it does not itself confirm a pledge or authorize a campaign charge. Known U.S. ZIP/state conflicts must be corrected before proceeding. Suggested city names are optional, and the address check does not verify street-level deliverability. Review the updated summary before confirming. Refreshing reference tax data does not reprice an already confirmed pledge.
 
 Stripe handles full card numbers and security codes; The Pool does not store them. Applicable sales tax and shipping are shown during checkout when they can be calculated. Optional platform tips and optional add-ons are identified separately before you confirm the pledge.
 

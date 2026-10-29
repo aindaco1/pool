@@ -1,136 +1,59 @@
 # Roadmap
 
-This document contains prospective work only.
-It describes neither the current product nor a promised release date or version.
-Current behavior belongs in the [README](../README.md) and practice guides;
-completed and unreleased changes
-belong in the [Changelog](../CHANGELOG.md), with release verification in
-[release evidence](./release-evidence/).
-
 ## Prospective Product Work
 
-- [ ] Google Shopping launch for the featured Their Love reward
-  - Keep `shopping.enabled: false` until the featured poster's exact expected availability date is confirmed and the visible campaign timeline can publish the same honest date
-  - Create and verify Merchant Center, then configure the feed and Shopping destination from the existing campaign/featured-tier source before expecting Shopping-tab placement; do not create a second product catalog
-  - After those prerequisites pass, enable the existing Shopping product through the dashboard or canonical campaign source and verify the rendered offer, feed acceptance, destination status, and public Shopping placement
-- [ ] Guided setup TUI wrapper
-  - Build a thin, good-looking terminal UI around the existing `scripts/setup-deploy.mjs` setup core instead of creating a separate desktop app or duplicating provider logic
-  - Take interface cues from modern terminal-first tools such as [Hermes Agent CLI](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and [Amp CLI](https://ampcode.com/manual): clear status area, responsive progress, keyboard-friendly navigation, streaming task output, interrupt/retry affordances, and a polished command palette feel
-  - Keep the script-first contract intact: every TUI action should map to an existing setup mode or a small extension of that mode, and CI/non-interactive users should still be able to use the underlying CLI directly
-  - Support the current local and production paths: local secret generation, production dry run, provider readiness checks, KV create/reuse planning, Worker secret writes, GitHub secret writes, optional deploy, and Podman readiness guidance
-  - Show a step-by-step readiness board with provider status, required credentials, planned mutations, skipped checks, generated local-only secrets, and clear next actions before any live mutation
-  - Keep secrets private in the UI: masked inputs, no terminal echo, no logs containing secret values, and explicit reminders that production secrets are not copied into `worker/.dev.vars`
-  - Provide copyable fallback commands for every failed step so operators can drop back to Wrangler, GitHub CLI, Stripe CLI, or the existing setup script without losing context
-  - Add transcript/log export that redacts secrets and captures setup decisions, provider statuses, command versions, and failure reasons for support without creating a new telemetry backend
-  - Add smoke-test shortcuts after setup, such as `podman:doctor`, `./scripts/dev.sh --podman`, `./scripts/test-checkout.sh --podman`, `npm run test:secrets`, and `npm run test:i18n`, while still leaving actual test orchestration in existing scripts
-  - Keep implementation small and cross-platform: prefer a Node TUI layer over the current setup core, avoid Electron/native packaging until the terminal wrapper proves useful, and document any platform-specific terminal limitations
-- [ ] Tax calculator expansion and compliance hardening
-  - Start from the current implemented baseline: `worker/src/tax.js` already provides `flat`, `offline_rules`, `nm_grt`, and `zip_tax` provider modes; `_config.yml` mirrors non-secret `tax.*` settings into `worker/wrangler.toml`; `/tax/quote`, checkout, Manage Pledge, stored pledge `taxDetails`, emails, analytics, and reports already use Worker-calculated tax totals; and the browser keeps tax provisional as `--` until it has enough destination detail
-  - Keep the current architecture DRY: the Worker remains the only tax authority, cart and Manage Pledge keep requesting quotes instead of duplicating tax math, `_config.yml` owns non-secret provider settings, Worker secrets own provider keys, and reports/analytics continue reading persisted `tax` / `taxDetails` instead of recalculating historical obligations from today's catalog or rate data
-  - Prioritize the U.S. experience first, then treat international VAT/GST compliance as a later phase; near-term work should focus on reliable state, county, municipal, special-district, D.C., and U.S. territory coverage before adding cross-border registration, invoicing, or reverse-charge behavior
-  - Clarify the tax model before expanding scope: document which amounts are taxable today (`subtotal` including tiers, support items, campaign add-ons, and platform add-ons), which are not currently taxed (`tipAmount` and most shipping unless a provider response marks shipping taxable), and whether each future product category should be taxable, exempt, reduced-rate, digital, admission, donation-like, or shipping-taxable
-  - Add item-level tax classification without splitting the checkout model: introduce a shared tax-line builder that turns tiers, support items, custom support, campaign add-ons, platform add-ons, and shipping into typed taxable lines with stable IDs, category codes, amounts, quantity, campaign/platform ownership, and exemption flags, then let providers aggregate those lines when they only support subtotal-level quoting
-  - Preserve current supporter UX while improving correctness: keep provisional `--` display when destination is incomplete, but make quote states explicit (`needs_input`, `quoted`, `provider_unavailable`, `fallback_used`) so cart, checkout, Manage Pledge, and admin diagnostics can distinguish missing address from provider failure or deliberate fallback
-  - Resolve the `/tax/quote` documentation/behavior mismatch: decide whether the endpoint should continue returning `400`/`503` for missing destination/provider failure, or return a structured provisional response that matches the browser copy in `worker/README.md`; update Worker route tests and docs either way
-  - Finish the New Mexico path first because it matches the current deployment: broaden the vendored GRT starter dataset beyond the five current reference locations, add metadata for generation date/source/effective period, improve city/postal/street matching diagnostics, and add a repeatable refresh workflow with reviewable diffs rather than silent live-rate drift
-  - Add a monthly GitHub Actions tax-rate watch workflow with `schedule` and `workflow_dispatch` triggers that checks for U.S. rate changes across state, county, municipal, and special-district levels, runs the New Mexico starter refresh, samples ZIP.TAX quotes for configured fixtures, compares results against checked-in snapshots, and opens a pull request or issue with reviewable diffs instead of changing production behavior silently
-  - Add provider health controls for live lookups: timeouts, bounded retries where safe, short-lived quote caching keyed by normalized destination/provider/rate version, rate-limit/circuit-breaker behavior for ZIP.TAX and EDAC, redacted error logging, and admin/runtime diagnostics that show provider readiness without exposing API keys
-  - Combine the New Mexico-specific solution with ZIP.TAX into a comprehensive U.S. strategy: use EDAC/vendored NM data where it is stronger and free, use ZIP.TAX as the general local-rate provider for all other states, D.C., and U.S. territories, and keep one provider adapter contract so checkout, Manage Pledge, reports, and tests do not care which source produced the quote
-  - Decide the fallback policy explicitly per provider and checkout stage: keep the existing configured flat-rate fallback as one available option, but define when previews may use fallback, when production checkout should block, when an operator-approved fallback rate may be used, and whether zero-tax quotes are ever allowed when ZIP.TAX or EDAC is unavailable
-  - Strengthen international behavior later: treat `offline_rules` as a conservative preview/fallback, then decide whether international VAT/GST should remain vendored, move to a provider-backed path, or stay disabled by default until registration/nexus obligations are known; add country/state/province normalization and test fixtures for intended launch countries before enabling collection
-  - Add business/customer tax features only after scope is approved: VAT ID capture and validation, reverse-charge handling, exemption certificates, tax-inclusive pricing, B2B/B2C rules, destination evidence requirements, and localized invoice/receipt copy should be behind explicit config, admin docs, and tests rather than implicit checkout behavior
-  - Improve privacy and retention of tax destinations: review whether persisted `taxDetails.destination` should keep full street address forever, whether stored tax evidence can be minimized or hashed after settlement/report windows, and how this interacts with fulfillment addresses that already require PII retention
-  - Add reconciliation and remittance support: create tax liability exports grouped by provider, source, jurisdiction, location code, effective rate, taxable subtotal, taxable shipping, tax collected, campaign/platform ownership, and refund/cancel/modify deltas; ensure reports preserve historical stored tax details even after provider settings or catalog categories change
-  - Extend testing at the right layers: unit tests for tax-line construction and provider adapters, fixture tests for NM starter/API fallback and ZIP.TAX shipping taxability, Worker tests for checkout and Manage Pledge tax deltas, browser tests for provisional/error/fallback UI states, report tests for tax liability exports, and setup tests for provider credential/readiness handling
-  - Update docs after implementation: `docs/TAX_CALCULATOR.md`, `docs/CUSTOMIZATION.md`, `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/SECURITY.md`, `worker/README.md`, `docs/PAYMENT_PROCESSOR.md`, creator checklists, and dashboard help text should explain provider selection, fallback policy, refresh cadence, tax category behavior, stored evidence, and what operators must verify with a tax professional
-- [ ] Inventory integration with Stripe POS system
-  - Treat this as shared inventory across Pool, Store, and [Payment for Stripe](https://paymentforstripe.com/), not as a claim that Stripe Products or Payment for Stripe own stock counts. Pool and Store remain authoritative for their own product content, online prices, shipping, tax, campaign accounting, and historical order/pledge values; one narrow shared stock ledger becomes authoritative only for linked finite physical inventory or event capacity, including Pool physical add-ons and Store inventory-tracked physical, ticket, and RSVP products
-  - Add a super-admin **Shared inventory and POS** setting to both Admin Dashboards, backed by canonical configuration and mirrored Worker state, with `enabled: false` as the repository, local-development, and new-fork default. Keep test and live activation separate, show configured/missing readiness for the shared coordinator, Stripe credentials, webhook, scheduler, and schema version, and require a successful read-only preflight plus explicit confirmation before live enablement
-  - When the feature has never been enabled, keep today's independent Pool/Store inventory behavior and hide or disable Stripe create/attach controls. Turning the feature off must stop new links and provider synchronization, but must not discard mappings, reservations, cursors, or event history or silently copy one shared count back into two local counts; require a reviewed unlink/baseline migration for each linked item, or place unresolved linked items into a safe paused state that blocks new/increased quantities until the integration is re-enabled or migration completes
-  - Start with a test-mode integration spike that records the actual Stripe objects and webhook sequence produced by Payment for Stripe catalog sales, refunds, cancellations, tips/tax, delayed/offline submission, and its `payment://cart` invoice flow. Only a succeeded catalog sale whose line items resolve to known Stripe Price IDs may change inventory; ignore or flag free-form amount charges that cannot be attributed to a mapped item
-  - Define a versioned shared-item contract with a stable `shared_inventory_id`, SKU, owning/equivalent Pool and Store references, and separate test/live Stripe Product and Price mappings. Each local product or variant may map to at most one shared item, each Stripe Price may belong to only one shared item, and equivalent Pool/Store records intentionally join through that shared ID instead of fuzzy name matching
-  - Model a non-variant item as one Stripe Product plus one active one-time Price. Model variants as one Stripe Product with one active Price per sellable variant, because Payment for Stripe displays multiple Stripe Prices as separate product choices; require every inventory-tracked variant to have its own SKU, shared item, and Price mapping rather than pooling sizes or options accidentally. When an in-person price changes, retain prior Price IDs as historical aliases of the same shared item so delayed webhooks, refunds, and offline reconciliation still resolve to the correct inventory identity
-  - Extend Pool physical add-on creation and Store inventory-tracked physical, ticket, and RSVP product creation with three explicit choices: **Create Stripe product**, **Attach existing Stripe product**, or **Do not link**. Do not show the inventory-link workflow for Pool digital add-ons or Store products without finite inventory/capacity. The attach flow should search and validate the active account/mode catalog, show Product and Price identity clearly, reject duplicate/conflicting inventory mappings, and allow an intentionally unlinked item to keep today's local inventory behavior
-  - Allow campaign users to create, attach, replace, or remove mappings only for add-ons in campaigns assigned to them; allow super admins to manage mappings across campaign add-ons, Pool platform add-ons, and Store products/add-ons. Keep shared-stock corrections, bulk import, forced reconciliation, test/live promotion, and cross-product conflict resolution super-admin-only, with Worker-enforced role/scope checks and audit events
-  - When **Create Stripe product** is selected, use the Pool/Store item as the initial seed: copy its current name, description, image, currency, and resolved product/variant price into the new Stripe Product and one-time Price; initialize the shared on-hand baseline from its current effective inventory/capacity in the same reviewed operation; and add stable source/shared-item metadata. Stripe has no stock-count field, so the inventory value seeds the shared ledger rather than pretending that Stripe owns inventory
-  - If the equivalent product is later linked from the other app, attach it to the existing `shared_inventory_id` and current shared balance instead of seeding or adding its local inventory a second time. Show both local baselines and the current shared count, require exact SKU/variant identity, and make an operator choose or enter the physically counted on-hand quantity whenever the preexisting Pool and Store values disagree
-  - After initial creation, synchronize inventory only. Pool/Store online prices and Stripe in-person Prices may intentionally diverge in either direction; later edits on one side must not update the other side, price differences must not be treated as inventory drift, and historical Pool pledges/Store orders keep their stored unit prices. Because a Stripe Price amount is immutable, changing the in-person price creates and maps a reviewed replacement Price while retaining the old Price mapping for delayed events and history
-  - Introduce one shared, serialized inventory coordinator used by both Workers for linked items rather than trying to mirror independent Pool and Store baselines eventually. Route linked set/restock/reset actions, Store checkout reservations, Pool pledge reservations, POS sale commits, releases, and corrections through atomic idempotent deltas; assign every accepted mutation a monotonic per-item revision and return the resulting balance so retries and concurrent events converge deterministically; keep each repository's configured inventory as seed/recovery evidence and retain the existing local coordinator/projection behavior for unlinked items
-  - Use a hybrid event-driven plus reconciliation sync: Pool and Store reserve/commit/release directly against the shared coordinator before acknowledging inventory-sensitive mutations; signed Stripe webhooks apply attributable Payment for Stripe sales as soon as Stripe reports them; short-lived public/admin projections refresh by shared revision; and scheduled overlapping reconciliation repairs missed, late, or offline POS events. Do not use periodic last-write-wins copying between three separate counters
-  - Define linked availability as shared on-hand minus active Pool pledge reservations, in-flight Store checkout reservations, confirmed Store sales, confirmed Payment for Stripe catalog sales, and an optional explicit per-item POS safety buffer, plus reviewed releases/restocks. The buffer holds a visible quantity out of online availability when operators expect active or offline in-person selling; default it to zero, never change it through opaque prediction, and show its effect in both dashboards. Both public UIs may display projections, but Pool checkout/Manage Pledge and Store cart/checkout must revalidate against the shared coordinator before accepting a new or increased quantity
-  - Reserve Pool stock when the pledge is persisted, adjust it atomically when an add-on or variant quantity changes, and release it when the pledge is cancelled or its campaign ends unfunded. Keep stock reserved after a failed settlement only for a documented, configurable Update Card grace period; after release, a payment retry must reacquire stock before charging rather than promise inventory that another channel may have sold
-  - Preserve Store's reserve-before-payment and commit/release lifecycle, but move linked SKUs onto the shared coordinator so simultaneous Pool pledges, Store checkouts, admin adjustments, webhook retries, and POS events cannot double-apply. Do not weaken current Store order truth, Pool pledge truth, historical unit-price preservation, or either system's existing payment idempotency boundaries
-  - Add a dedicated signed Stripe webhook ingestion path for POS-attributable catalog activity without rerouting Pool pledge or Store order payment handling. Verify Stripe signatures, distinguish Pool/Store-owned PaymentIntents from Payment for Stripe sales, deduplicate by Stripe event plus sale/line identity, tolerate out-of-order delivery, and store a minimized append-only inventory-event journal sufficient to explain every stock delta without retaining raw provider payloads or customer PII
-  - Resolve simultaneous-channel collisions by event type, not arrival order: atomic Pool/Store reservations cannot claim the same available unit, while a completed POS sale is recorded as a physical stock commitment even if its delayed/offline webhook arrives after online reservations. If that creates a deficit, do not silently cancel a paid Store order, an active Pool pledge, or the POS sale; set availability to zero, mark the affected shared item and reservations **at risk**, block new/increased quantities and Pool settlement that cannot reacquire stock, and require an audited restock, reservation release, or fulfillment decision
-  - Define reversal policy conservatively: failed, cancelled, or voided POS transactions do not consume stock; a refund alone does not automatically prove that physical stock was returned. Surface refunded quantities for operator review and require an explicit restock unless a future quantity-aware return workflow is deliberately enabled and audited
-  - Run bounded periodic reconciliation in both Stripe test and live modes, using a durable cursor plus overlap window to find missed, delayed, and offline-synced Payment for Stripe sales without rescanning all history. Add super-admin **Sync now** and dry-run controls that report expected deltas/conflicts before mutation, repair only idempotently attributable events, and never invent stock from an unexplained Stripe total; use bounded exponential retry for transient failures, surface permanent mapping errors immediately, and advance the durable cursor only after all events in the page are applied or explicitly quarantined
-  - Import existing mappings through a preview-first tool that can match exact SKU or preexisting shared/Stripe metadata, never product name alone. Report missing variants, duplicate SKUs, one Price linked to competing items, test/live mismatches, inactive/archived objects, and Pool/Store baseline disagreement; show online-versus-in-person price differences as expected informational context rather than a blocking conflict, and require explicit resolution only for identity, mode, or inventory ambiguity before enabling shared enforcement
-  - Expose per-item connection health in Pool and Store admin: linked/unlinked state, shared SKU, Stripe mode/Product/active Price and historical Price aliases, available/reserved/committed counts by channel, last webhook, last successful reconciliation, pending offline risk, inventory drift/error state, and recent minimized deltas. Display the independent online and in-person prices clearly without labeling a difference as drift. Make unlinking non-destructive by default, preserve historical mappings/events, and block unlink or remap while unresolved reservations would make stock ownership ambiguous
-  - Fail closed for new or increased linked quantities when the shared coordinator is unavailable, its Stripe mode/account does not match, or synchronization is older than a configured maximum age; preserve already-saved pledge/order truth and give operators retry, reconciliation, and support guidance. Do not silently fall back to an independent Pool or Store count because that would reintroduce overselling
-  - Use Payment for Stripe's `payment_hidden=true` Product/Price metadata as a best-effort sold-out visibility control and remove it after an audited restock, while documenting that the app refreshes catalog visibility only on its next product load, hidden cart URLs can still work, and offline transactions can arrive later. The first release therefore reduces and detects cross-channel overselling but cannot claim hard POS inventory enforcement
-  - Keep Stripe secret keys and shared-service credentials in Worker secrets, never browser or repository config; use server-to-server authentication between Pool, Store, and the shared coordinator; validate account and livemode on every mapping/event; rate-limit admin/provider mutations; return private/no-store admin responses; and add the new mapping, event-journal, cursor, and reservation families to data inventory, backup, restore, retention, and incident-response plans
-  - Add cross-repo contract and release sequencing so Pool and Store reject an unsupported shared-inventory schema version rather than drifting. Cover default-off configuration, test/live readiness and activation, safe disable/migration, eligibility by fulfillment/inventory type, initial inventory and Price seeding, duplicate-baseline prevention, intentional online/in-person price divergence, replacement and historical Price identity, mapping normalization, revisioned atomic cross-channel concurrency, POS safety buffers, collision deficits and at-risk reservations, pledge/order lifecycle deltas, duplicate/out-of-order webhooks, refunds, offline/delayed sales, stale-provider fail-closed behavior, test/live isolation, import conflicts, reconciliation repair, role scoping, audit output, accessibility, localization, and responsive dashboard behavior at unit, Worker, integration, and browser layers
-  - Update Pool and Store operator documentation after implementation, including their READMEs, add-on/product guides, customization/config references, dashboard, payment processor, workflows, security, testing, backup/restore, data inventories, ethical-risk records, and release evidence. Explain default-off enablement and readiness, safe disable/migration, the shared source-of-truth boundary, same-product identity across three channels, Payment for Stripe catalog-sale requirement and offline limitations, local inventory plus online-price seeding at Stripe-product creation, independent in-person pricing after creation, replacement Price history, revisioned event-driven synchronization, POS safety buffers, collision/deficit response, ongoing reconciliation, failed-payment holds, refund/restock policy, manual recovery, and a safe rollback to unlinked local inventory
+### Tax Coverage and Reporting
 
-## Accessibility And Inclusive Validation
+Use [Tax Calculator](TAX_CALCULATOR.md#shared-us-postal-and-local-rate-data) as the implemented baseline. Extend the shared Platform tax-core data and adapters rather than duplicating them in Pool.
 
-- Complete manual screen-reader verification across cart, checkout, Manage
-  Pledge, supporter-community, and admin workflows.
-- Keep keyboard, axe, ARIA, focus-order, mobile, and localized accessibility
-  coverage aligned as new interactive surfaces are added.
-- Expand catalog-specific accessibility and responsive checks when add-on
-  products gain new controls or layouts.
+- [ ] Expand reviewed public U.S. local-rate coverage and jurisdiction diagnostics, including territory and special-district gaps. Keep missing or ambiguous coverage explicitly estimated. Use the existing weekly Platform candidate-refresh workflow and reviewed consumer pins; do not add a duplicate Pool rate watcher or make a paid provider mandatory.
 
-## Localization
+- [ ] Expand and refresh the five-location New Mexico starter dataset in Platform. Keep its existing source/generation metadata, add effective-period and stale-data handling, and review changes against the address-provider path before adopting them.
 
-- Expand localized creator-authored content where campaigns need maintained
-  translations rather than automatic translation.
-- Add another supported language only with an explicit catalog owner,
-  long-form-content plan, fluent review path, and locale-specific release
-  evidence.
+- [ ] Define item-level tax categories and a shared tax-line contract for tiers, support, add-ons, and shipping before adding category-specific taxability. Preserve Worker authority, integer-cent totals, saved pledge prices, and historical tax evidence.
 
-## Developer Workflow And Platform Validation
+- [ ] Distinguish missing input, provider failure, and fallback consistently across checkout, Manage Pledge, and operator diagnostics. Build on existing estimate/coverage metadata and provider timeouts; add caching, bounded retries, or circuit breaking only with defined stale-data and failure behavior.
 
-- Review the advisory Jev supporter-message pilot before adding any default or
-  CI gate. Have a fluent reviewer label representative English/Spanish examples,
-  calibrate on a separate set, validate on fresh held-out examples, and confirm
-  repeated-run stability and incremental coverage over existing exact checks.
-  Keep checkout arithmetic, permissions and provider acceptance deterministic.
-  The current workflow belongs in [Testing](TESTING.md#advisory-jev-pilot).
+- [ ] Add tax-liability exports grouped by stored jurisdiction, source, rate, campaign/platform ownership, and modification or refund deltas. Define destination-data minimization and retention alongside fulfillment and accounting needs; do not recalculate old pledges from current rates.
 
-- Add a containerized manual checkout/browser path when it provides coverage
-  beyond the automated headless Podman suite.
-- Add Podman wrappers for remaining host-only helpers when teams need those
-  commands inside the shared launcher model.
-- Evaluate a declarative pod specification for teams that need a checked-in
-  local-environment manifest.
-- Validate the rootless Podman path on representative Linux and Windows hosts.
+International VAT/GST expansion, exemption certificates, VAT IDs, reverse charge, tax-inclusive pricing, and invoicing remain conditional on an operator-defined business scope and applicable obligations.
 
-## Accountless Access Hardening
+### Guided Terminal Setup
 
-- Evaluate shorter magic-link lifetimes together with a usable reissue and
-  recovery flow.
-- Evaluate a one-time token exchange that removes the raw magic-link token from
-  the visible URL after entry without weakening order scoping or recovery.
+- [ ] Add a small terminal interface around [the existing setup CLI](../scripts/setup-deploy.mjs). Reuse its local/production modes, readiness checks, dry runs, and provider operations; preserve direct non-interactive use.
 
-## Public Metadata And Distribution
+- [ ] Show planned changes, progress, skipped checks, retry options, and copyable fallback commands. Mask secrets and export only redacted setup evidence. Link to existing development and smoke-test commands instead of creating another test runner.
 
-- Repeat external structured-data, crawl-file, and campaign share-card
-  validation when the public metadata model changes.
-- Expand automated SEO regression coverage when new public page archetypes are
-  added.
-- Add fork-facing SEO settings only when the existing bounded surface cannot
-  represent a verified deployment need.
+### Shared Inventory and POS
 
-## Podcast Benefits
+This remains a cross-project proposal. The [detailed design](proposals/shared-inventory-pos.md) preserves the mapping, pricing, inventory, security, and recovery requirements; provider behavior must be verified before implementing it.
 
-- Define the product/tier-to-show mappings, entitlement duration, and issuance
-  lifecycle required to activate the currently disabled Podcast bridge.
-- Add pledge selection, code issuance, durable delivery, and supporter-email
-  behavior only after the cross-service contract and recovery path are verified.
+- [ ] Run a Stripe test-mode investigation of Payment for Stripe catalog sales, refunds, cancellations, and delayed/offline events. Establish which verified line-item identities can safely produce inventory changes.
 
-## Community Decisions
+- [ ] Implement an opt-in, default-off shared stock coordinator for eligible finite Pool/Store items, with exact SKU/variant and separate test/live mappings. Seed a shared baseline once; keep online and in-person pricing independent after initial creation.
 
-- Evaluate distinct copy, reporting, or outcome workflows for advisory polls and
-  binding votes while preserving the current shared supporter-only storage and
-  tallying contract.
+- [ ] Add atomic, idempotent reservations and deltas, attributable signed-webhook ingestion, and bounded reconciliation. Define failed-payment holds, refund/restock decisions, offline-sale deficits, safety buffers, and stale-service behavior before live activation; do not claim hard POS oversell prevention.
+
+- [ ] Deliver scoped admin controls, audit history, read-only preflight, safe disable/unlink migrations, backup coverage, and cross-repo compatibility tests. Preserve existing pledge/order truth and refuse new or increased linked quantities when shared stock cannot be trusted.
+
+## Validation Still Needed
+
+- [ ] Record manual VoiceOver/NVDA checks for cart, checkout, Manage Pledge, community, and admin flows when a release includes that acceptance scope. Keep this separate from existing automated keyboard, axe, responsive, and locale coverage. See [Accessibility](ACCESSIBILITY.md#manual-checks).
+
+- [ ] Validate rootless development on representative Linux and Windows physical hosts and record the results in [Podman](PODMAN.md). The existing Linux container CI and host-browser checkout helper are not evidence of every physical-host setup.
+
+- [ ] Calibrate the advisory Jev supporter-message pilot with fluent English/Spanish review, separate calibration and held-out examples, and repeated-run stability before considering a CI gate. Keep payment math, permissions, and provider acceptance deterministic. See [Testing](TESTING.md#advisory-jev-pilot).
+
+## Conditional Product Decisions
+
+These need a concrete campaign or operator use case before implementation.
+
+- [ ] Design shorter-lived supporter management links together with reissue and recovery. Evaluate a one-time exchange that removes the raw supporter token from the URL while preserving order scope. Do not duplicate the admin session or protected-preview flows.
+
+- [ ] Add maintained translations of creator-authored campaign content where a campaign needs them. Add another interface language only with an owner, fluent review, and locale-specific release evidence; the English/Spanish interface already has its own maintenance workflow.
+
+- [ ] Complete Podcast benefit mappings, entitlement duration, pledge selection, issuance/revocation, durable delivery, and supporter email around the existing signed bridge. Keep activation disabled until a controlled cross-service grant/revoke and recovery exercise passes.
+
+- [ ] Differentiate advisory polls from binding supporter votes only if campaigns need distinct copy, reports, or outcome workflows. Preserve the existing supporter-only storage and tally contract.
+
+Routine SEO checks, accessibility regressions, new-control localization, and release verification belong in the [testing](TESTING.md), [SEO](SEO.md), and [release](MERGE_SMOKE_CHECKLIST.md) guides. Campaign-specific distribution launches belong in the [creator checklist](../creator-campaign-checklist.md) and the campaign's operating plan.

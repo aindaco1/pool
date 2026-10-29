@@ -5,7 +5,7 @@ lang: es
 translation_key: about
 permalink: /es/about/
 description: Conoce cómo The Pool gestiona aportes de todo o nada, recompensas físicas, acceso de patrocinadores, privacidad y campañas creativas independientes.
-last_modified_at: 2026-09-06
+last_modified_at: 2026-10-28
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
@@ -17,6 +17,8 @@ last_modified_at: 2026-09-06
 ## Aportes de todo o nada
 
 Cuando apoyas una campaña, Stripe guarda de forma segura tu método de pago, pero **no se te cobra cuando haces el aporte**. La campaña debe alcanzar su meta antes de la fecha límite. Si no la alcanza, no se realiza ningún cobro en tu tarjeta.
+
+El proceso de pago mantiene disponibles tus campos de contacto y dirección mientras se cargan los campos de pago. Cambiar el correo o el destino actualiza la preparación del pago y el resumen de impuestos y envío. Preparar esos campos no confirma un aporte ni cobra tu tarjeta; todavía debes completar la confirmación final.
 
 Antes de que termine la campaña, puedes usar el enlace seguro de tu correo de confirmación para revisar, modificar o cancelar tu aporte, incluso si la campaña ya alcanzó su meta. Una vez pasada la fecha límite, ese enlace ya no permite modificar ni cancelar el aporte. Si un mismo proceso de pago incluye varias campañas, cada campaña sigue siendo un aporte separado y se liquida por separado.
 
@@ -38,7 +40,9 @@ Los niveles de recompensa, el apoyo directo a la campaña, los montos personaliz
 
 The Pool no descuenta una comisión de plataforma de los fondos de la campaña. Durante el proceso de pago, cada patrocinador puede elegir una propina opcional para ayudar a {{ operator_name }} a operar el servicio. Aun así, pueden aplicarse las comisiones de procesamiento de Stripe y otros gastos de la campaña.
 
-Los precios se muestran en dólares estadounidenses. Los complementos nuevos usan los precios actuales del producto y la variante. Al modificar un aporte, un complemento existente conserva su precio unitario guardado si mantienes el mismo producto y la misma variante, incluso cuando solo cambias la cantidad. Los impuestos y el envío pueden seguir siendo estimados hasta contar con suficiente información del destino.
+Los precios se muestran en dólares estadounidenses. Los complementos nuevos usan los precios actuales del producto y la variante. Al modificar un aporte, un complemento existente conserva su precio unitario guardado si mantienes el mismo producto y la misma variante, incluso cuando solo cambias la cantidad.
+
+Los impuestos y el envío se actualizan al introducir el destino. El impuesto puede seguir siendo una estimación incluso con una dirección completa: las tasas incluidas por código postal de Estados Unidos tienen cobertura parcial, y una tasa estatal de respaldo puede omitir impuestos locales. El proceso de pago identifica esas estimaciones. Debes corregir los conflictos conocidos entre el código postal y el estado antes de continuar; las sugerencias de ciudad son opcionales y no verifican que se pueda entregar en una dirección concreta. La liquidación de campaña usa el monto guardado del aporte.
 
 ## Recompensas físicas y políticas de compra
 
@@ -54,6 +58,8 @@ Los equipos de campaña pueden configurar financiación de todo o nada, niveles 
 
 Un panel privado con acceso según el rol permite gestionar contenido de campaña, recompensas, reportes, patrocinadores, preparación y entrega, análisis, enlaces de promoción y personas usuarias autorizadas. El servidor verifica los precios y totales sensibles en vez de confiar en el navegador.
 
+Los equipos pueden guardar una copia de trabajo compartida, revisarla mediante una vista previa protegida y publicarla de forma explícita. Guardar no cambia la campaña pública. El panel sigue el despliegue de la publicación y solo indica que está en línea cuando se ha desplegado la revisión guardada. Los borradores locales del navegador siguen siendo copias de recuperación separadas, y los conflictos de edición deben resolverse antes de reemplazar una copia de trabajo compartida más reciente.
+
 ## Privacidad, acceso y seguridad
 
 Stripe gestiona los datos completos de las tarjetas de pago. The Pool almacena la información necesaria para gestionar aportes, comunicarse sobre las campañas, calcular impuestos y envíos aplicables, prevenir abusos y entregar recompensas. Las personas operadoras autorizadas solo reciben la información de patrocinadores y entrega necesaria para las campañas que gestionan. No vendemos la información de patrocinadores.
@@ -68,4 +74,4 @@ El sitio público, el Worker de Cloudflare, la automatización, la localización
 
 ---
 
-_Última actualización: 6 de septiembre de 2026_
+_Última actualización: 28 de octubre de 2026_
