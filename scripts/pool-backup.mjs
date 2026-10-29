@@ -77,7 +77,11 @@ capture never export secret values. Sensitive KV values require encryption.
 }
 
 function run(command, args = [], options = {}) {
-  return runCommand(command, args, { cwd: options.cwd || ROOT, ...options });
+  return runCommand(command, args, {
+    cwd: options.cwd || ROOT,
+    timeoutMs: ['tar', 'age', 'gpg'].includes(command) ? 300_000 : 30_000,
+    ...options
+  });
 }
 
 function ensureDir(dir) {
