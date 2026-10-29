@@ -1884,6 +1884,27 @@ describe('Worker business logic hardening', () => {
     });
   });
 
+  it.each([
+    ['10467', 'NY', 'zip_local'], ['80205', 'CO', 'state_only']
+  ])('preserves estimate metadata in the public tax quote for %s', async (postalCode, state, coverage) => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-27T12:00:00Z'));
+    try {
+      const response = await worker.fetch(new Request('https://pool.test/tax/quote', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://pool.test' },
+        body: JSON.stringify({ subtotalCents: 1000, billingAddress: { country: 'US', postalCode, state } })
+      }), createEnv({ TAX_PROVIDER: 'offline_rules', TAX_ORIGIN_COUNTRY: 'US' }), { waitUntil: () => {} });
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toContain('no-store');
+      await expect(response.json()).resolves.toMatchObject({ taxDetails: {
+        estimated: true, coverage,
+        dataVersion: coverage === 'zip_local' ? expect.any(String) : null,
+        sourceUpdatedAt: coverage === 'zip_local' ? expect.any(String) : null
+      } });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it('rejects tax quote requests without a usable destination', async () => {
     const env = createEnv();
 

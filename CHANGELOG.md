@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.26 — 2026-10-28
+
+- Preserve tax estimate coverage and data provenance in public quotes and stored checkout details so the existing estimate labels remain visible.
+
 ## v1.2.25 - 2026-10-28
 
 - Share checkout validation and postal/local-tax references with Store while preserving Pool card setup and later settlement.
