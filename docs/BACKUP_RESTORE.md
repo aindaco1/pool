@@ -227,3 +227,19 @@ instead of replacing restored public content. Archiving a campaign retains its
 working copy and accounts for draft media references. Browser-local Content drafts
 and `:recovery-v1` copies remain separate and require recovery in the original
 browser/profile; see [Dashboard recovery](DASHBOARD.md#recover-a-missing-browser-draft).
+
+## Verify the current R2 archive without a restore
+
+Run **Verify Recovery Archive** manually from `main`. The `production-recovery`
+environment retains its existing reviewer and branch restrictions. This job
+uses the configured R2 credentials and recovery identity to list and download
+the newest encrypted snapshot, check its four-hour freshness, verify its size
+and SHA-256, decrypt it, and validate every internal checksum. It does not
+restore records, write to R2, change the scheduled drill setting, or send messages.
+
+The shared audit tool is pinned by immutable Platform commit separately from
+the application runtime pin. Missing, stale, corrupt, undecryptable, or incomplete
+archives fail the run. Only sanitized counts/status are retained as an artifact;
+temporary plaintext and key files are removed. This verifies the archive with
+the configured key, not independent key escrow, bucket-lock policy, historical
+retention coverage, or application restore behavior.
