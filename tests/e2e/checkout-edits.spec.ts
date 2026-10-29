@@ -495,8 +495,12 @@ for (const width of [1280, 390, 320]) test(`shipping prices stay visible beside 
       expect(row.priceY).toBeGreaterThanOrEqual(row.labelY - 1);
       expect(row.priceY).toBeLessThan(row.labelBottom);
     }
-    const choice = await select.boundingBox();
-    const price = await amountField.boundingBox();
+    // Measure together so payment auto-scroll cannot move the row between reads.
+    const { choice, price } = await amountField.evaluate(node => ({
+      choice: node.closest('.pool-first-party-cart__summary-row')!
+        .querySelector('[data-cart-custom-shipping-option]')!.getBoundingClientRect().toJSON(),
+      price: node.getBoundingClientRect().toJSON()
+    }));
     expect(choice!.width).toBeLessThanOrEqual(192);
     expect(choice!.height).toBeGreaterThanOrEqual(44);
     if (width < 724) {
