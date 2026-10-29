@@ -34,6 +34,7 @@ describe('Stripe CLI authentication detection', () => {
   it.each([
     { status: 1, stdout: 'sensitive pairing URL' },
     { status: 0, stdout: 'malformed private output' },
+    { status: 0, stdout: 'null' },
     result({ authenticated: false }),
     result({ authenticated: true })
   ])('fails closed without exposing identity or authentication output', probe => {

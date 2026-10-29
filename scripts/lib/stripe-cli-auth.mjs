@@ -16,7 +16,7 @@ export function stripeCliAuthState(options = {}) {
   // whoami reads both keychain and legacy credentials without starting a login.
   const result = execute('stripe', ['whoami', '--format', 'json'], commandOptions);
   let identity;
-  try { identity = JSON.parse(result.stdout || '{}'); } catch { identity = {}; }
+  try { identity = JSON.parse(result.stdout || '{}') || {}; } catch { identity = {}; }
   const mode = options.mode === 'live' || options.mode === 'test' ? options.mode : null;
   const usableKey = mode
     ? identity[`${mode}_mode_key`]?.available === true
