@@ -16,7 +16,7 @@ hero_image_wide: /assets/images/defaults/dust-wave-square.png
 creator_image: /assets/images/defaults/dust-wave-square.png
 creator_name: "Jace"
 category: "Other"
-short_blurb: "This is a dark comedy chamber-piece that follows Ian, who just quit his PR job, as his plan for a quiet exit is interrupted by a colorful, nosy older woman named Elise."
+short_blurb: "A freshly unemployed PR analyst's plan for a quiet exit is hijacked by a nosy stranger."
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
@@ -26,19 +26,23 @@ runner_report_emails:
 long_content:
   - type: "text"
     body: |
-      **The Project**
+      ## **THE PROJECT**
+      
+      *POSSESSIONS* is a dark comedy short film that follows Ian - a young man who just quit his PR job - as his plan for a quiet exit is interrupted by a nosy stranger named Elise.
+      
+      This film is being made by an incredibly talented Albuquerque based cast and crew, and will be going into production in January 2027.
   - type: "text"
     body: |
-      **Why We're Making This?**
+      ## **WHY AM I MAKING THIS?**
   - type: "text"
     body: |
-      **The Visual Approach**
+      ## **THE VISUAL APPROACH**
   - type: "text"
     body: |
-      **Where's Your Money Going?**
+      ## **WHERE WILL YOUR MONEY GO?**
   - type: "text"
     body: |
-      **Where We Are Now**
+      ## **WHERE ARE WE NOW?**
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -68,5 +72,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-10-29T18:05:59.509Z"
+_pool_draft_saved_at: "2026-10-30T02:31:49.048Z"
 ---
