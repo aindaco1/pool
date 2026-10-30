@@ -72,16 +72,18 @@ tiers:
     category: "digital"
     late_support: false
   - id: "bts-doc"
-    name: "BTS Doc"
+    name: "Traffic Wizard Sticker"
     price: 25
-    description: "Supporters in this tier will receive access to a short BTS documentary after the project has concluded!"
+    description: "Supporters in this tier will receive a custom Traffic Wizard sticker!"
+    limit_total: 100
     stackable: false
-    category: "digital"
+    category: "physical"
+    shipping_preset: "sticker"
     late_support: false
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-10-30T04:01:15.086Z"
+_pool_draft_saved_at: "2026-10-30T04:04:54.212Z"
 ---
