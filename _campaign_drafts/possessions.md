@@ -30,7 +30,7 @@ long_content:
       
       *POSSESSIONS* is a dark comedy short film that follows Ian - a young man who just quit his PR job - as his plan for a quiet exit is interrupted by a nosy stranger named Elise.
       
-      This film is being made by an incredibly talented Albuquerque based cast and crew, and will be going into production in January 2027.
+      This film is being made by an incredibly talented Albuquerque cast and crew, and will be going into production in January 2027.
   - type: "text"
     body: |
       ## **WHY AM I MAKING THIS?**
@@ -39,7 +39,18 @@ long_content:
       ## **THE VISUAL APPROACH**
   - type: "text"
     body: |
-      ## **WHERE WILL YOUR MONEY GO?**
+      ## WHERE WILL YOUR MONEY GO?
+      
+      This is an all-or-nothing campaign, meaning you WILL NOT be charged until we hit our $5,500 goal. Every dollar after payment processing fees will go straight to the making of the film and feeding our hard-working cast and crew.
+      
+      - **Equipment** (≈ $1,775 | 34%): Cameras, lenses, and lighting.
+      - **Location** (≈ $1,500 | 29%): We're filming for three days in a working New Mexico diner. Our insurance policy covers the shoot, so none of your support goes to coverage.
+      - **Costumes, props, & makeup** (≈ $550 | 11%): everything you'll see in the diner and on the actors.
+      - **Catering** (≈ $500 | 10%): feeding all of our cast and crew for the three day shoot.
+      - **Marketing** (≈ $350 | 7%): festival submission fees and promotional material.
+      - **Contingency fund** (≈ $500 |10%): a cushion for the unexpected things that always happen on a shoot.
+      
+      Anything left over will go toward tier reward fulfillments and additional festival submissions.
   - type: "text"
     body: |
       ## **WHERE ARE WE NOW?**
@@ -72,5 +83,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-10-30T02:31:49.048Z"
+_pool_draft_saved_at: "2026-10-30T04:01:15.086Z"
 ---
