@@ -24,7 +24,7 @@ of creating a second content catalog in KV. Save writes a working copy; Publish 
 
 ### Shared Foundations
 
-Immutable gitlinks pin Dust Wave Platform 0.47.0 (`f73b85ccfa5cd3ef00f6514ff22518bd9f02c9f3`)
+Immutable gitlinks pin Dust Wave Platform 0.48.0 (`2488c1eefd9a8fe6b5574db59a6bb84587264d48`)
 and Dust Wave Jekyll Template. Site Shell 0.6.0 supplies checkout utilities,
 Tax Core 0.4.0 supplies postal/local-rate references, and Design Core 0.3.1
 supplies mobile input sizing.
