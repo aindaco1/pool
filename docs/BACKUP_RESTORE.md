@@ -92,18 +92,19 @@ The copy is append-only by default, rejects unsafe paths, rechecks checksums, an
 Preview retention decisions before pruning:
 
 ```bash
-npm run backup:retention -- --root=/secure/path/pool-snapshots --dry-run
+npm run backup:retention -- --root=/secure/path/pool-snapshots --output=pool-retention.json
 ```
 
-Apply only after reviewing the keep/delete set:
+Review the keep and prune lists in `pool-retention.json` and verify the off-device copy. Apply the reviewed preview with the following command.
 
 ```bash
-npm run backup:retention -- \
-  --root=/secure/path/pool-snapshots \
-  --acknowledge=POOL_BACKUP_RETENTION_PRUNE
+npm run backup:retention -- --root=/secure/path/pool-snapshots \
+  --execute --plan=pool-retention.json --acknowledge=POOL_BACKUP_RETENTION_PRUNE
 ```
 
-Retention pruning operates only on checksum-valid snapshot directories under the supplied root and follows the approved 7/5/12/release policy.
+The planner keeps the newest snapshot, release snapshots, and the configured daily, weekly, and monthly representatives. It skips invalid receipts and symlinked entries. The preview binds the directory and each verified archive's SHA-256. Before the first deletion, the command rechecks every reviewed archive and each prune target's eligibility under the active policy. A different root, changed archive, or newly protected target rejects the entire batch. Newly discovered snapshots stay in place. Generate a fresh preview after a rejection or when upgrading from version 1.
+
+Use a real, non-symlinked root outside the repository. Run pruning while other processes that change these backups are idle. The command rechecks each target before removal, but a later filesystem error can interrupt a batch after a deletion.
 
 ### Configured off-account R2 archive
 
