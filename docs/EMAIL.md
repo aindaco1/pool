@@ -332,7 +332,8 @@ effect, and the minute scheduler drains bounded batches. Each job:
 - renders once, freezes the exact provider payload, and records a content hash
 - uses a processing lease so crashed work can resume
 - respects `Retry-After`, quota responses, and bounded exponential delay
-- refuses blind retry after an ambiguous response outlives Resend's 24-hour idempotency window
+- retries with the original key and frozen payload only before 23 hours from the first possible provider send
+- at or after that cutoff, makes no further send and preserves known provider evidence or records an ambiguous outcome for reconciliation. Re-enqueuing the same job does not restart the window.
 - expires transient payload data after 30 days and retains only minimal `email-delivery:v1:*` evidence for 400 days
 
 The pending-job prefix and `pool:email-outbox-queue:v1` marker are Pool-specific,
