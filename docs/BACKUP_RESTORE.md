@@ -80,14 +80,13 @@ Do not commit snapshot directories, decrypted archives, manifests containing cap
 Copy a verified encrypted snapshot to a separately mounted destination:
 
 ```bash
-POOL_BACKUP_AGE_IDENTITY=/secure/age-identity.txt \
-node scripts/pool-backup-offsite-copy.mjs \
-  --source=/secure/path/pool-backup \
+node scripts/pool-backup-offsite-copy.mjs --execute \
+  --snapshot=/secure/path/pool-backup \
   --destination=/Volumes/Recovery/Pool \
   --acknowledge=POOL_BACKUP_OFF_DEVICE_COPY
 ```
 
-The copy is append-only by default, rejects unsafe paths, rechecks checksums, and verifies decryption. A different filesystem is required unless an operator explicitly chooses a documented exception.
+The copy is append-only by default, rejects unsafe paths, and verifies checksum readback. The command writes a success receipt only when the copied archive matches the SHA-256 recorded at the start of execution. On a mismatch, it removes the new snapshot directory and its partial contents. It leaves any pre-existing snapshot untouched. A different filesystem is required unless an operator explicitly chooses a documented exception. Run `--verify-only --verify-decrypt` on the recovery device to verify decryption.
 
 Preview retention decisions before pruning:
 
