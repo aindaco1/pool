@@ -22,6 +22,9 @@ Dir.mktmpdir do |destination|
   site.read
   campaign = site.collections['campaigns'].docs.find { |doc| doc.data['slug'] == 'their-love' }
   abort 'Their Love fixture missing' unless campaign
+  shopping = campaign.data.fetch('shopping')
+  abort 'Their Love Shopping must stay disabled until a date is confirmed' unless
+    shopping.fetch('enabled', false) == false && shopping.fetch('availability_date') == ''
 
   campaign.data['shopping'] = {
     'enabled' => true,
