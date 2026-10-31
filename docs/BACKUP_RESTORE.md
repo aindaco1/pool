@@ -151,6 +151,10 @@ node scripts/pool-restore.mjs \
   --acknowledge-preview-cleanup=POOL_PREVIEW_RESTORE_CLEANUP
 ```
 
+Cleanup checks both `PLEDGES` and `VOTES` before the first delete. It compares each present snapshot key's current value and metadata, skips confirmed absent keys, and preserves unlisted keys. A mismatch, incomplete read, or provider error in either binding fails the cleanup with zero deletes. A second successful cleanup issues zero deletes.
+
+Keep preview writers idle from preflight through deletion. The checked-in Store `STORE_STATE` and Pool `PLEDGES` bindings use the same preview namespace ID. Coordinate drills across both projects because the reads and deletes are separate provider operations.
+
 The restore planner validates pledge keys/order IDs/statuses/campaign ownership, admin roles/emails, and vote records. Derived families become rebuild actions. Quarantined families are skipped. Admin audit and privacy-minimized login history are also skipped unless an incident-specific plan adds `--include-incident-evidence`. Durable Objects are never imported. Provider writes stop on the first failure, and verification reads back restored values in bounded batches.
 
 ## Stripe reconciliation
