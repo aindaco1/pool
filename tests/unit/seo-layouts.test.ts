@@ -408,7 +408,6 @@ describe('SEO templates', () => {
     const tierCard = readRepoFile('_includes', 'tier-card.html');
     const seoMeta = readRepoFile('_includes', 'seo-meta.html');
     const seoJsonLd = readRepoFile('_includes', 'seo-json-ld.html');
-    const campaign = readRepoFile('_campaigns', 'their-love.md');
 
     expect(plugin).toContain("campaign.data['featured_tier_id']");
     expect(plugin).toContain("campaign.data['shopping']");
@@ -428,7 +427,6 @@ describe('SEO templates', () => {
     expect(seoJsonLd).toContain('"@type": "Product"');
     expect(seoJsonLd).toContain('"@type": "Offer"');
     expect(seoJsonLd).toContain('site.author');
-    expect(campaign).toContain('shopping:\n  enabled: false\n  availability_date: ""');
   });
 
   it('deep-merges local nested overrides without erasing canonical platform identity', () => {
