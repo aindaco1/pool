@@ -4,6 +4,8 @@ import {
 import { sha256Hex } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 import {
   classifyOutboxJob,
+  outboxProviderAttemptStart,
+  OutboxRetryWindowClosed,
   createOutboxJobId,
   createOutboxJobRecord,
   createOutboxQueueState,
@@ -28,7 +30,6 @@ export const RESEND_WEBHOOK_MARKER_PREFIX = 'resend-webhook:v1:';
 const EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS = 30 * 24 * 60 * 60;
 const EMAIL_DELIVERY_TTL_SECONDS = 400 * 24 * 60 * 60;
 const EMAIL_PROCESSING_LEASE_MS = 10 * 60 * 1000;
-const RESEND_IDEMPOTENCY_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 const MAX_FROZEN_PROVIDER_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
 const MARKETING_KINDS = new Set(['announcement', 'diary', 'milestone', 'launch_reminder', 'abandoned_cart']);
@@ -95,6 +96,9 @@ export async function enqueueEmailOutbox(env, {
   if (['accepted', 'delivered'].includes(delivered?.status) || existing?.status === 'sent') {
     return { sent: true, queued: false, deduped: true, jobId, providerId: delivered?.providerId || '' };
   }
+  if (delivered?.status === 'ambiguous' || delivered?.retryWindowClosedAt) {
+    return { sent: false, queued: false, deduped: true, jobId, reason: 'Delivery requires reconciliation' };
+  }
   if (existing && ['pending', 'processing', 'retry'].includes(existing.status)) {
     return { sent: true, queued: true, deduped: true, jobId };
   }
@@ -104,7 +108,7 @@ export async function enqueueEmailOutbox(env, {
     kind,
     payload,
     metadata: { campaignSlug: String(campaignSlug || payload?.campaignSlug || '') },
-    existing,
+    existing: existing || delivered,
     expiresAt,
     maxRecordBytes: MAX_FROZEN_PROVIDER_PAYLOAD_BYTES
   });
@@ -144,7 +148,9 @@ async function isMarketingRecipientSuppressed(env, job) {
   return values.some(Boolean);
 }
 
-export async function processEmailOutbox(env, { now = new Date(), limit = 10 } = {}) {
+export async function processEmailOutbox(env, { now: fixedNow, limit = 10 } = {}) {
+  const clock = () => fixedNow ?? new Date();
+  const now = clock();
   if (!env?.PLEDGES) return { attempted: false, checked: 0, sent: 0, retried: 0, failed: 0, suppressed: 0 };
   const queueState = await env.PLEDGES.get(EMAIL_OUTBOX_QUEUE_STATE_KEY, { type: 'json' });
   if (queueState && queueState.hasPending === false) {
@@ -170,36 +176,45 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       if (!nextDueAt || Date.parse(disposition.nextDueAt) < Date.parse(nextDueAt)) nextDueAt = disposition.nextDueAt;
       continue;
     }
-    if (disposition.state === 'expired') {
-      await env.PLEDGES.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'expired', kind: job.kind, campaignSlug: job.campaignSlug, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
-      await env.PLEDGES.delete(key.name);
-      results.failed++;
-      continue;
-    }
     if (disposition.state === 'leased') {
       hasPending = true;
       continue;
     }
-    if (await isMarketingRecipientSuppressed(env, job)) {
-      await env.PLEDGES.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'suppressed', kind: job.kind, campaignSlug: job.campaignSlug, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
-      await env.PLEDGES.delete(key.name);
-      results.suppressed++;
-      continue;
-    }
-
+    const previous = { ...job };
+    let deliveryStage = 'preflight';
     try {
+      outboxProviderAttemptStart(previous, clock());
+      const priorStart = previous.firstProviderAttemptAt ?? (previous.providerPayload ? previous.firstAttemptAt : '');
+      if (disposition.state === 'expired') {
+        await env.PLEDGES.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'expired', kind: job.kind, firstProviderAttemptAt: priorStart, campaignSlug: job.campaignSlug, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
+        await env.PLEDGES.delete(key.name);
+        results.failed++;
+        continue;
+      }
+      if (await isMarketingRecipientSuppressed(env, job)) {
+        await env.PLEDGES.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'suppressed', kind: job.kind, firstProviderAttemptAt: priorStart, campaignSlug: job.campaignSlug, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
+        await env.PLEDGES.delete(key.name);
+        results.suppressed++;
+        continue;
+      }
+      deliveryStage = 'render';
       if (!job.providerPayload) {
         job.providerPayload = await renderProviderPayload(env, job);
         job.contentHash = await sha256Hex(stableStringify(job.providerPayload));
       }
+      job.firstProviderAttemptAt = outboxProviderAttemptStart(previous, clock());
       job.status = 'processing';
       job.attempts = Number(job.attempts || 0) + 1;
       job.firstAttemptAt = job.firstAttemptAt || now.toISOString();
       job.lastAttemptAt = now.toISOString();
       job.updatedAt = now.toISOString();
+      deliveryStage = 'persist';
       await env.PLEDGES.put(key.name, JSON.stringify(job), { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
 
       const { sendPreparedResendEmail } = await import('./email.js');
+      // Rendering and the durable checkpoint may have crossed the cutoff.
+      outboxProviderAttemptStart(job, clock());
+      deliveryStage = 'provider';
       const response = await sendPreparedResendEmail(env, job.providerPayload, {
         idempotencyKey: `pool/${job.jobId}`,
         errorLabel: `Resend outbox error (${job.kind})`,
@@ -223,13 +238,34 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       await env.PLEDGES.delete(key.name);
       results.sent++;
     } catch (error) {
-      const firstAttemptMs = Date.parse(job.firstAttemptAt || '');
-      const ambiguityExpired = error?.ambiguous && Number.isFinite(firstAttemptMs) && now.getTime() - firstAttemptMs > RESEND_IDEMPOTENCY_RETRY_WINDOW_MS;
-      if (!error?.retryable || ambiguityExpired) {
+      if (error instanceof OutboxRetryWindowClosed) {
+        const evidenceKey = deliveryKey(job.jobId);
+        const evidence = await env.PLEDGES.get(evidenceKey, { type: 'json' });
+        const closedAt = clock().toISOString();
+        if (['accepted', 'delivered'].includes(evidence?.status)) {
+          results.sent++;
+        } else {
+          await env.PLEDGES.put(evidenceKey, JSON.stringify({
+            version: 1, kind: job.kind, campaignSlug: job.campaignSlug, contentHash: job.contentHash,
+            attempts: previous.attempts, lastError: previous.lastError, ...evidence,
+            status: evidence?.providerId && evidence.status ? evidence.status : 'ambiguous',
+            firstProviderAttemptAt: previous.firstProviderAttemptAt || previous.firstAttemptAt,
+            retryWindowClosedAt: closedAt, updatedAt: closedAt
+          }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
+          results.failed++;
+        }
+        await env.PLEDGES.delete(key.name);
+        continue;
+      }
+      if (deliveryStage === 'preflight') throw error;
+      if (deliveryStage === 'persist') job.firstProviderAttemptAt = previous.firstProviderAttemptAt;
+      const providerOutcomeUnknown = deliveryStage === 'provider' && !(Number(error?.statusCode || 0) > 0);
+      if (!error?.retryable && !providerOutcomeUnknown) {
         await env.PLEDGES.put(deliveryKey(job.jobId), JSON.stringify({
           version: 1,
-          status: ambiguityExpired ? 'ambiguous' : 'failed',
+          status: 'failed',
           kind: job.kind,
+          firstProviderAttemptAt: job.firstProviderAttemptAt,
           campaignSlug: job.campaignSlug,
           contentHash: job.contentHash,
           attempts: job.attempts,
@@ -245,7 +281,7 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       }));
       job.status = 'retry';
       job.nextAttemptAt = next.toISOString();
-      job.lastError = outboxDeliveryErrorEvidence(error);
+      job.lastError = outboxDeliveryErrorEvidence(error, { stage: deliveryStage });
       job.updatedAt = now.toISOString();
       await env.PLEDGES.put(key.name, JSON.stringify(job), { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
       hasPending = true;

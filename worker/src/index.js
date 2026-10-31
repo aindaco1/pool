@@ -6261,7 +6261,7 @@ export default {
 
     if ((!cronExpression || cronExpression === PLATFORM_SCHEDULER_CRON) && String(env.EMAIL_OUTBOX_ENABLED || '').trim().toLowerCase() !== 'false') {
       try {
-        const outboxResults = await processEmailOutbox(env, { now, limit: 10 });
+        const outboxResults = await processEmailOutbox(env);
         if (env.PLEDGES && outboxResults.attempted) {
           await env.PLEDGES.put('cron:lastEmailOutboxRun', now.toISOString(), { expirationTtl: 172800 });
         }
