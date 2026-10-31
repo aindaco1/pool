@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { matchingPreviewKvKeys } from './lib/preview-kv-cleanup.mjs';
 import { runCommand } from './lib/command-runner.mjs';
 import { transformKvBackupValuesToPutRecords } from './lib/kv-backup-records.mjs';
 import { verifyChecksumManifest } from './lib/file-integrity.mjs';
@@ -319,20 +320,36 @@ export function cleanupPoolPreviewRestore(plan, options = {}) {
   if (plan.invalidActions.length || plan.missingValueFamilies.length) throw new Error('Preview cleanup requires a complete valid plan.');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pool-restore-cleanup-'));
   const evidence = { ok: true, deletes: 0, records: 0, failures: [] };
+  const run = args => runForOptions(options, 'npx', args);
   try {
-    for (const action of plan.actions.filter((item) => item.type === 'kv-restore')) {
-      const records = transformPoolKvValues(readJson(action.valuesFile));
-      if (!records.length) continue;
-      const keysFile = path.join(temp, `${action.binding}-${action.familyId}.json`);
-      fs.writeFileSync(keysFile, `${JSON.stringify(records.map((entry) => entry.key), null, 2)}\n`, { mode: 0o600 });
-      const result = runForOptions(options, 'npx', [
-        'wrangler', 'kv', 'bulk', 'delete', keysFile, '--binding', action.binding, '--remote', '--preview'
-      ]);
-      evidence.deletes += 1;
-      evidence.records += records.length;
-      if (result.status !== 0) {
+    const byBinding = new Map();
+    for (const action of plan.actions.filter(item => item.type === 'kv-restore')) {
+      if (!['PLEDGES', 'VOTES'].includes(action.binding)) throw new Error('Unexpected preview KV binding.');
+      if (!byBinding.has(action.binding)) byBinding.set(action.binding, []);
+      const records = byBinding.get(action.binding);
+      for (const record of transformPoolKvValues(readJson(action.valuesFile))) records.push(record);
+    }
+    const matches = new Map();
+    for (const [binding, records] of byBinding) {
+      try {
+        matches.set(binding, matchingPreviewKvKeys(records, binding, path.join(temp, 'read.json'), run));
+      } catch {
         evidence.ok = false;
-        evidence.failures.push({ familyId: action.familyId, reason: 'provider delete failed' });
+        evidence.failures.push({ binding, reason: 'preview content changed or read failed' });
+        return evidence;
+      }
+    }
+    for (const [binding, keys] of matches) {
+      for (const batch of chunks(keys, 1000)) {
+        const keysFile = path.join(temp, 'delete.json');
+        fs.writeFileSync(keysFile, JSON.stringify(batch), { mode: 0o600 });
+        const result = run(['wrangler', 'kv', 'bulk', 'delete', keysFile, '--binding', binding, '--remote', '--preview']);
+        evidence.deletes += 1;
+        evidence.records += batch.length;
+        if (result.status !== 0) {
+          evidence.ok = false;
+          evidence.failures.push({ binding, reason: 'provider delete failed' });
+        }
       }
     }
   } finally {
@@ -359,7 +376,10 @@ async function main() {
   if (!result.plan.complete) console.log(`Execution remains blocked: ${result.plan.missingValueFamilies.length} value families missing and ${result.plan.invalidActions.length} invalid actions.`);
   if (result.execution) console.log(`Restore execution ${result.execution.ok ? 'completed' : 'failed'}.`);
   if (result.verification) console.log(`Restore verification ${result.verification.ok ? 'completed' : 'failed'}.`);
-  if (result.cleanup) console.log(`Preview cleanup ${result.cleanup.ok ? 'completed' : 'failed'}.`);
+  if (result.cleanup) {
+    console.log(`Preview cleanup ${result.cleanup.ok ? 'completed' : 'failed'}.`);
+    if (!result.cleanup.ok) process.exitCode = 1;
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

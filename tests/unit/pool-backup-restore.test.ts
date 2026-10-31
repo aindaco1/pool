@@ -6,6 +6,7 @@ import { buildChecksumManifest } from '../../scripts/lib/file-integrity.mjs';
 import { buildPoolKvBackupPlan, validatePoolBackupSafety } from '../../scripts/pool-backup.mjs';
 import {
   buildPoolRestorePlan,
+  cleanupPoolPreviewRestore,
   productionPoolRestoreGate,
   readAndVerifyPoolSnapshot,
   transformPoolKvValues,
@@ -96,6 +97,79 @@ describe('Pool backup and restore contracts', () => {
 
     const incidentPlan = buildPoolRestorePlan(snapshot, { includeIncidentEvidence: true });
     expect(incidentPlan.actions.some((item) => item.familyId === 'admin-audit' && item.type === 'kv-restore')).toBe(true);
+  });
+
+  it.each([
+    ['PLEDGES', 'unchanged'], ['PLEDGES', 'changed'], ['PLEDGES', 'unreadable'],
+    ['VOTES', 'changed'], ['VOTES', 'unreadable'], ['VOTES', 'incomplete'],
+  ])('preflights both bindings with %s last and %s', (lastBinding, change) => {
+    const root = createSnapshotFixture();
+    const plan = buildPoolRestorePlan(readAndVerifyPoolSnapshot(root), { target: 'preview' });
+    const byBinding = new Map<string, Map<string, string>>();
+    const targets: string[] = [];
+    for (const binding of ['PLEDGES', 'VOTES']) {
+      const records = new Map([['unlisted', 'keep']]);
+      for (const action of plan.actions.filter(item => item.binding === binding && item.type === 'kv-restore')) {
+        for (const row of transformPoolKvValues(JSON.parse(fs.readFileSync(action.valuesFile, 'utf8')))) {
+          records.set(row.key, row.value);
+          targets.push(binding + '/' + row.key);
+        }
+      }
+      byBinding.set(binding, records);
+    }
+    plan.actions.sort((a, b) => Number(a.binding === lastBinding) - Number(b.binding === lastBinding));
+    const lastKey = [...byBinding.get(lastBinding)!.keys()].at(-1)!;
+    if (change === 'unchanged') {
+      expect(byBinding.get('PLEDGES')!.delete('admin-users:v1')).toBe(true);
+      targets.splice(targets.indexOf('PLEDGES/admin-users:v1'), 1);
+    }
+    if (change === 'changed') byBinding.get(lastBinding)!.set(lastKey, 'replacement');
+    const state = () => [...byBinding].map(([binding, values]) => [binding, [...values]]);
+    const before = state();
+    const deletes: string[] = [];
+    let deleteCalls = 0;
+    const run = (_cmd: string, args: string[]) => {
+      const binding = args[args.indexOf('--binding') + 1];
+      expect(args).toContain('--remote');
+      expect(args).toContain('--preview');
+      const records = byBinding.get(binding)!;
+      const op = args.slice(1, 4).join(' ');
+      const ok = (stdout = '') => ({ status: 0, stdout, stderr: '' });
+      if (op === 'kv key list') return ok(JSON.stringify([...records.keys()].map(name => ({ name }))));
+      const keys: string[] = JSON.parse(fs.readFileSync(args[4], 'utf8'));
+      if (op === 'kv bulk get') {
+        if (change === 'unreadable' && binding === lastBinding && keys.includes(lastKey)) return { status: 1 };
+        return ok(JSON.stringify(Object.fromEntries(keys.filter(key =>
+          !(change === 'incomplete' && binding === lastBinding && key === lastKey)).map(key => [key, records.get(key)]))));
+      }
+      if (op === 'kv bulk delete') {
+        deleteCalls += 1;
+        for (const key of keys) { deletes.push(binding + '/' + key); records.delete(key); }
+        return ok();
+      }
+      throw new Error('Unexpected command: ' + op);
+    };
+    const cleanup = () => cleanupPoolPreviewRestore(plan, {
+      target: 'preview', acknowledgePreviewCleanup: 'POOL_PREVIEW_RESTORE_CLEANUP', runCommandFn: run
+    });
+    try {
+      const result = cleanup();
+      if (change === 'unchanged') {
+        expect(result.ok).toBe(true);
+        expect(deletes.sort()).toEqual(targets.sort());
+        for (const values of byBinding.values()) expect([...values]).toEqual([['unlisted', 'keep']]);
+        expect(deleteCalls).toBe(2);
+        deleteCalls = 0;
+        deletes.length = 0;
+        expect(cleanup()).toMatchObject({ ok: true, records: 0, deletes: 0 });
+      } else {
+        expect(result).toMatchObject({ ok: false, records: 0, deletes: 0 });
+        expect(state()).toEqual(before);
+      }
+      expect(deleteCalls).toBe(0);
+      expect(deletes).toEqual([]);
+      expect(JSON.stringify(result)).not.toContain(lastKey);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
   it('fails production restore closed until every interlock is present', () => {
