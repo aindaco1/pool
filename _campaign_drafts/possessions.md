@@ -14,7 +14,7 @@ charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
 creator_image: /assets/images/defaults/dust-wave-square.png
-creator_name: "Jace"
+creator_name: "Jace Strickland"
 category: "Other"
 short_blurb: "A freshly unemployed PR analyst's plan for a quiet exit is hijacked by a nosy stranger."
 show_ongoing: false
@@ -28,9 +28,9 @@ long_content:
     body: |
       ## **THE PROJECT**
       
-      Ian just quit his PR job, and has a plan for how tonight ends. But when he runs into Elise, a nosy stranger on the street who won't take "no" for an answer - everything gets derailed.
+      Ian just quit his PR job, and has a plan for how tonight will end. But when he runs into Elise, a nosy stranger on the street who won't take "no" for an answer - everything gets derailed.
       
-      *POSSESSIONS* is a dark comedy short film set over a single night in a New Mexico diner. Made by an Albuquerque-based cast and crew, the film will be shooting over the course of three days in January 2027 with a slated premiere in May.
+      *POSSESSIONS* is a dark comedy short film set over a single night in a New Mexico diner. Made by an Albuquerque-based cast and crew, the film will be shot over the course of three days in January 2027 with a slated premiere in May.
       
       *Content Note: this film deals with themes of suicide. If you or someone you know is struggling, you can call or text 988 (US).*
   - type: "text"
@@ -42,7 +42,7 @@ long_content:
     author: "Fyodor Dostoevsky, *Demons*"
   - type: "text"
     body: |
-      You probably know someone who can't switch off their work brain. Someone who fixes everyone's problems except their own. Someone who always makes an uncomfortable joke the second a conversation gets too real. We see these patterns clear as day in the people around us. But what pattern drives you? Can you name it? Most of us can't, because from the inside, a habit doesn't feel like a habit, it just feels like us being who we are.
+      You probably know someone who can't switch off their work brain. Someone who fixes everyone's problems except their own. Someone who always makes an uncomfortable joke the second a conversation gets too real. We see these patterns clear as day in the people around us. But what pattern drives you? Can you name it? Most of us can't, because from the inside, a habit doesn't feel like a habit; it just feels like us being who we are.
       
       That's what *POSSESSIONS* is about:  two people whose lives are dominated by subconscious habits like these, and the one night when each of them gets a glimpse of the other's blind spot. Ian hides behind professional language and nihilism until there's little else left underneath; Elise can't stop prying into other people's lives, whatever it has cost her. It's a film about the things we own - our job title, our comfort objects, the notebook we carry everywhere. -  but it's also a film about the things that own us.
       
@@ -135,5 +135,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-02T20:53:14.162Z"
+_pool_draft_saved_at: "2026-11-02T22:44:47.140Z"
 ---
