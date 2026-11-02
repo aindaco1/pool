@@ -15,7 +15,7 @@ hero_image: /assets/images/defaults/dust-wave-square.png
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
 creator_image: /assets/images/defaults/dust-wave-square.png
 creator_name: "Jace Strickland"
-category: "Other"
+category: "Short Film"
 short_blurb: "A freshly unemployed PR analyst's plan for a quiet exit is hijacked by a nosy stranger."
 show_ongoing: false
 single_tier_only: false
@@ -135,5 +135,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-02T22:44:47.140Z"
+_pool_draft_saved_at: "2026-11-02T23:47:42.735Z"
 ---
