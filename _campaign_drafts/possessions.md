@@ -31,8 +31,6 @@ long_content:
       Ian just quit his PR job, and has a plan for how tonight will end. But when he runs into Elise, a nosy stranger on the street who won't take "no" for an answer - everything gets derailed.
       
       *POSSESSIONS* is a dark comedy short film set over a single night in a New Mexico diner. Made by an Albuquerque-based cast and crew, the film will be shot over the course of three days in January 2027 with a slated premiere in May.
-      
-      *Content Note: this film deals with themes of suicide. If you or someone you know is struggling, you can call or text 988 (US).*
   - type: "text"
     body: |
       ## WHY ARE WE MAKING THIS?
@@ -135,5 +133,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-02T23:47:42.735Z"
+_pool_draft_saved_at: "2026-11-02T23:49:09.257Z"
 ---
