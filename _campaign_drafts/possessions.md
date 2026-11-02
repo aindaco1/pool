@@ -102,10 +102,38 @@ tiers:
     stackable: false
     category: "digital"
     late_support: false
+  - id: "possessions-t-shirt"
+    name: "POSSESSIONS T-Shirt"
+    price: 100
+    description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt."
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "possessions-poster"
+    name: "POSSESSIONS Poster"
+    price: 250
+    description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster."
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "associate-producer"
+    name: "Associate Producer"
+    price: 500
+    description: "Supporters in this tier will receive an Associate Producer credit on the film!"
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "executive-producer"
+    name: "Executive Producer"
+    price: 1000
+    description: "Supporters in this tier will receive an Executive Producer credit on the film!"
+    stackable: false
+    category: "digital"
+    late_support: false
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-02T20:47:19.842Z"
+_pool_draft_saved_at: "2026-11-02T20:53:14.162Z"
 ---
