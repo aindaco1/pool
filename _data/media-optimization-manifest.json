@@ -2302,6 +2302,64 @@
       ]
     },
     {
+      "path": "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab.png",
+      "publicPath": "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab.png",
+      "name": "creator-20261103-232527-d350d1ab.png",
+      "label": "creator 20261103 232527 d350d1ab",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "how-to-run-a-perfect-casino",
+      "bytes": 96886,
+      "sha256": "d4f6782845eeed95f55a2c340376999d96c3e87d27f99b47f33ccf15dd7ee0b1",
+      "width": 1214,
+      "height": 807,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-320.webp",
+        "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-480.webp",
+        "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-640.webp",
+        "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-320.webp",
+          "publicPath": "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-320.webp",
+          "bytes": 24222,
+          "sha256": "1a6800f1ed97dce51052c8a289c62ddc3e64271771c07df68999a8e8aeedad67",
+          "sourceSha256": "d4f6782845eeed95f55a2c340376999d96c3e87d27f99b47f33ccf15dd7ee0b1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-480.webp",
+          "publicPath": "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-480.webp",
+          "bytes": 40490,
+          "sha256": "3c2b30ea66b4c784d326d364add9f4d8e5dc209e642ddd983f356af96deffd92",
+          "sourceSha256": "d4f6782845eeed95f55a2c340376999d96c3e87d27f99b47f33ccf15dd7ee0b1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-640.webp",
+          "publicPath": "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-640.webp",
+          "bytes": 58294,
+          "sha256": "98f28a0aa311ce15d6cdb255c9a91d1e2d73da301fb0d3fd8dc89c44e4581751",
+          "sourceSha256": "d4f6782845eeed95f55a2c340376999d96c3e87d27f99b47f33ccf15dd7ee0b1",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-960.webp",
+          "publicPath": "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261103-232527-d350d1ab-960.webp",
+          "bytes": 94732,
+          "sha256": "17076c4573b9d6a32c53e884cc709670eba6c3abc20548b078e69a6acb1dffd0",
+          "sourceSha256": "d4f6782845eeed95f55a2c340376999d96c3e87d27f99b47f33ccf15dd7ee0b1",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/human-error/background-20261011-230031-10358d80.png",
       "publicPath": "/assets/images/campaigns/human-error/background-20261011-230031-10358d80.png",
       "name": "background-20261011-230031-10358d80.png",
