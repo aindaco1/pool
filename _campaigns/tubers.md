@@ -8,7 +8,7 @@ preview_enabled: true
 preview_reviewer_emails: []
 state: upcoming
 start_date: "2026-10-03"
-goal_deadline: "2026-11-15"
+goal_deadline: "2026-11-30"
 goal_amount: 3000
 charged: false
 hero_image: "/assets/images/campaigns/tubers/hero-square-20261006-085032-cb2b19f2.png"
