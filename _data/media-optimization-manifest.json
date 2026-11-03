@@ -2424,7 +2424,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/content-landscapetitlecard-resized-20261001-214300-858cd5ba.png",
@@ -2540,7 +2545,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/content-pitch-7-20261012-193213-3ba96a48.png",
@@ -2598,7 +2608,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/content-pool-1-20261011-222007-a462a203.png",
@@ -2656,7 +2671,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/content-pool-2-20261012-050540-0cb2d431.png",
@@ -2830,7 +2850,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/content-pool-3-20261012-174224-882a02c7.png",
@@ -3065,6 +3090,69 @@
       "references": []
     },
     {
+      "path": "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6.png",
+      "publicPath": "/assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6.png",
+      "name": "content-pool-3-20261023-213130-9a5f36e6.png",
+      "label": "content pool 3 20261023 213130 9a5f36e6",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "human-error",
+      "bytes": 1872139,
+      "sha256": "812cd9a13049b76489285434e8caaffe30f264d107d539648e6bc2d4c06c8a87",
+      "width": 1280,
+      "height": 720,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-320.webp",
+        "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-480.webp",
+        "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-640.webp",
+        "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-320.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-320.webp",
+          "bytes": 13088,
+          "sha256": "fa099ad5d3405d4482bf0dcd28d986940e8f76887134e3a090df4114585cdf47",
+          "sourceSha256": "812cd9a13049b76489285434e8caaffe30f264d107d539648e6bc2d4c06c8a87",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-480.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-480.webp",
+          "bytes": 30300,
+          "sha256": "dbbd9b057dc953f09101600636f396335e3e4d80ecc89ff594197596691a5777",
+          "sourceSha256": "812cd9a13049b76489285434e8caaffe30f264d107d539648e6bc2d4c06c8a87",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-640.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-640.webp",
+          "bytes": 60968,
+          "sha256": "bb0a5c07118cef90ec6026bb4cfd3ca3d8c39afed504428d10e9ccbdd1a67a46",
+          "sourceSha256": "812cd9a13049b76489285434e8caaffe30f264d107d539648e6bc2d4c06c8a87",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-960.webp",
+          "publicPath": "/assets/images/campaigns/human-error/content-pool-3-20261023-213130-9a5f36e6-960.webp",
+          "bytes": 125848,
+          "sha256": "8416c2105a7fafd481d428dd1f3aba180a3b9225e57001de8ab7479a5d6c33ab",
+          "sourceSha256": "812cd9a13049b76489285434e8caaffe30f264d107d539648e6bc2d4c06c8a87",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/campaigns/human-error/content-pool-4-20261012-190526-26337ccc.png",
       "publicPath": "/assets/images/campaigns/human-error/content-pool-4-20261012-190526-26337ccc.png",
       "name": "content-pool-4-20261012-190526-26337ccc.png",
@@ -3236,7 +3324,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/content-whatishumanerror-20261002-045724-07100ddd.png",
@@ -3678,7 +3771,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/hero-square-20261001-213911-925398ba.png",
@@ -3785,7 +3883,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/hero-wide-20261001-213405-37fb7d8c.png",
@@ -4008,7 +4111,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/progress-20261011-230027-16a9527f.png",
@@ -4200,7 +4308,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/tier-digital-access-to-behind-the-scenes-content-20261011-223732-56943703.png",
@@ -4401,7 +4514,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/tier-get-a-digital-copy-of-the-film-20261002-045816-274fbc29.png",
@@ -4663,7 +4781,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/tier-physical-human-error-poster-20261011-223952-8c1975c5.png",
@@ -4931,7 +5054,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/tier-special-thanks-20261002-045650-388ba387.png",
@@ -5050,7 +5178,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/human-error/tier-your-face-in-the-film-no-really-20261011-225211-bae56ea4.png",
@@ -5318,7 +5451,12 @@
         }
       ],
       "warnings": [],
-      "references": []
+      "references": [
+        {
+          "path": "_campaigns/human-error.md",
+          "count": 1
+        }
+      ]
     },
     {
       "path": "assets/images/campaigns/night-work/night-work-square.png",
@@ -5430,6 +5568,124 @@
           "bytes": 44246,
           "sha256": "39b63609c00c888f0f41c17d380f2617fd3db82410dd066493fc898394a99844",
           "sourceSha256": "e9c70d2a4ab060bc2ce2748b174c92ef89d0747e18071daceb4d37925754d109",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0.jpg",
+      "publicPath": "/assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0.jpg",
+      "name": "creator-20261029-214404-ce378ab0.jpg",
+      "label": "creator 20261029 214404 ce378ab0",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "possessions",
+      "bytes": 587947,
+      "sha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+      "width": 1200,
+      "height": 1200,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-320.webp",
+        "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-480.webp",
+        "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-640.webp",
+        "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-320.webp",
+          "publicPath": "/assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-320.webp",
+          "bytes": 19796,
+          "sha256": "4434b3d8b29e7c650d5bf25711c41ff8f912af12fade1fec22fb5f1e271f8267",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-480.webp",
+          "publicPath": "/assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-480.webp",
+          "bytes": 37274,
+          "sha256": "24fa301d9946d58e4b3103d23a27cf4bdefaf554302f4375a071ab3008e5a87b",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-640.webp",
+          "publicPath": "/assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-640.webp",
+          "bytes": 56688,
+          "sha256": "b1d077abfbe4bf4ec62c7cbc14eaa90d3856a4e30b2f5b41ea9c5a55653a7afe",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-960.webp",
+          "publicPath": "/assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0-960.webp",
+          "bytes": 97554,
+          "sha256": "69dcf57c6d0081f80b4abd69a584b35a554fd028985c6f01624f6f4877ede5c5",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc.jpg",
+      "publicPath": "/assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc.jpg",
+      "name": "hero-square-20261029-214544-9bddd3dc.jpg",
+      "label": "hero square 20261029 214544 9bddd3dc",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "possessions",
+      "bytes": 587947,
+      "sha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+      "width": 1200,
+      "height": 1200,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-320.webp",
+        "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-480.webp",
+        "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-640.webp",
+        "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-320.webp",
+          "publicPath": "/assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-320.webp",
+          "bytes": 19796,
+          "sha256": "4434b3d8b29e7c650d5bf25711c41ff8f912af12fade1fec22fb5f1e271f8267",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-480.webp",
+          "publicPath": "/assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-480.webp",
+          "bytes": 37274,
+          "sha256": "24fa301d9946d58e4b3103d23a27cf4bdefaf554302f4375a071ab3008e5a87b",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-640.webp",
+          "publicPath": "/assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-640.webp",
+          "bytes": 56688,
+          "sha256": "b1d077abfbe4bf4ec62c7cbc14eaa90d3856a4e30b2f5b41ea9c5a55653a7afe",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-960.webp",
+          "publicPath": "/assets/images/campaigns/possessions/hero-square-20261029-214544-9bddd3dc-960.webp",
+          "bytes": 97554,
+          "sha256": "69dcf57c6d0081f80b4abd69a584b35a554fd028985c6f01624f6f4877ede5c5",
+          "sourceSha256": "9921381dd1b2bd5c52b228fa09e93b2e8fa60d98b40c5513c22c86569f163d03",
           "width": 960
         }
       ],
@@ -8732,6 +8988,69 @@
           "sha256": "c72a0411348817d45eb8a197bb128ffd9c88e7bdcb73bb4cce76ecd45d8c5a51",
           "sourceSha256": "aac8ecac64475c6afc8e7bafd78957615413da43b23298f965d4c62e77e7fafb",
           "width": 320
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_campaigns/their-love.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46.png",
+      "publicPath": "/assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46.png",
+      "name": "content-title-still-20261029-183802-160b7a46.png",
+      "label": "content title still 20261029 183802 160b7a46",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "their-love",
+      "bytes": 1132624,
+      "sha256": "2559ac41ef15713c3c44a77d96caffd74804ee4594ca3a1a470f626402ead325",
+      "width": 1338,
+      "height": 733,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-320.webp",
+        "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-480.webp",
+        "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-640.webp",
+        "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-320.webp",
+          "publicPath": "/assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-320.webp",
+          "bytes": 9254,
+          "sha256": "c806fd367f3a70838e89de1ae6750d7045c894f90172ab8fa68b323bd0a0b448",
+          "sourceSha256": "2559ac41ef15713c3c44a77d96caffd74804ee4594ca3a1a470f626402ead325",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-480.webp",
+          "publicPath": "/assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-480.webp",
+          "bytes": 15242,
+          "sha256": "4c27834c6a21972992714834641aabe38d4c53d7589f617a2c1ca6722d80a186",
+          "sourceSha256": "2559ac41ef15713c3c44a77d96caffd74804ee4594ca3a1a470f626402ead325",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-640.webp",
+          "publicPath": "/assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-640.webp",
+          "bytes": 21886,
+          "sha256": "a28c152372bb91a32754eaf8ee1b76cc47170cf4e0cc61ebc73c641b3111be84",
+          "sourceSha256": "2559ac41ef15713c3c44a77d96caffd74804ee4594ca3a1a470f626402ead325",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-960.webp",
+          "publicPath": "/assets/images/campaigns/their-love/content-title-still-20261029-183802-160b7a46-960.webp",
+          "bytes": 35412,
+          "sha256": "a83920dce2bad10c051c040c78ae6f6083006fe3875884bad0ae5acd1dd9c72d",
+          "sourceSha256": "2559ac41ef15713c3c44a77d96caffd74804ee4594ca3a1a470f626402ead325",
+          "width": 960
         }
       ],
       "warnings": [],
@@ -15278,7 +15597,7 @@
           "count": 3
         },
         {
-          "path": "_campaigns/human-error.md",
+          "path": "_campaigns/possessions.md",
           "count": 3
         },
         {
