@@ -8,7 +8,7 @@ preview_enabled: false
 preview_reviewer_emails: []
 state: upcoming
 start_date: "2026-10-03"
-goal_deadline: "2026-11-15"
+goal_deadline: "2026-11-30"
 goal_amount: 3000
 charged: false
 hero_image: "/assets/images/campaigns/tubers/hero-square-20261006-085032-cb2b19f2.png"
@@ -130,8 +130,8 @@ ongoing_items: []
 diary: []
 decisions: []
 instagram: "https://www.instagram.com/ratamacuefilm/"
-_pool_draft_base_hash: "689052df8ec9345dd91b41fd35e952b17e2f03c1b9ff1ab686a53c1354c8a3bc"
-_pool_draft_saved_at: "2026-10-06T09:01:30.122Z"
+_pool_draft_base_hash: "9de2edabd39f82b63dd9e85dea1acc97c40709278f54372adafc9eb56ef70090"
+_pool_draft_saved_at: "2026-11-03T05:39:43.258Z"
 campaign_background: ""
 hero_video: "https://youtu.be/p6jQjvYDcBQ?si=cv-3_owpjM-KZtq6"
 ---
