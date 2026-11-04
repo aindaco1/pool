@@ -158,10 +158,16 @@ tiers:
     stackable: false
     category: "digital"
     late_support: false
-stretch_goals: []
+stretch_goals:
+  - threshold: 1815
+    title: "1/3"
+    status: "locked"
+  - threshold: 3630
+    title: "2/3"
+    status: "locked"
 ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-04T23:54:46.381Z"
+_pool_draft_saved_at: "2026-11-04T23:58:31.792Z"
 ---
