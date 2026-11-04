@@ -5633,6 +5633,74 @@
       "references": []
     },
     {
+      "path": "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg",
+      "publicPath": "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg",
+      "name": "content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg",
+      "label": "content 1 nighthawks by edward hopper 1942 20261104 175840 15af4736",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "possessions",
+      "bytes": 6491461,
+      "sha256": "7e6dd0b86eb0382280d4c9d391d5bf014b40b71fd7e566daac6f124781b895ab",
+      "width": 6000,
+      "height": 3274,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-320.webp",
+        "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-480.webp",
+        "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-640.webp",
+        "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-960.webp",
+        "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-320.webp",
+          "publicPath": "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-320.webp",
+          "bytes": 7490,
+          "sha256": "fbece4b5f1cff1564a9c764aa1a81b8df78ee23677037ff43a5e8cd7dfd84da4",
+          "sourceSha256": "7e6dd0b86eb0382280d4c9d391d5bf014b40b71fd7e566daac6f124781b895ab",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-480.webp",
+          "publicPath": "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-480.webp",
+          "bytes": 13594,
+          "sha256": "e4ecab14f50b2e071a7be5e25dc09737ae2a41591ce0bf7420cc9beb6e4a3418",
+          "sourceSha256": "7e6dd0b86eb0382280d4c9d391d5bf014b40b71fd7e566daac6f124781b895ab",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-640.webp",
+          "publicPath": "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-640.webp",
+          "bytes": 20276,
+          "sha256": "240b145ad0927a7ac45bd9352245bf56e1a24dc7d184e51e8960d6ec1474c772",
+          "sourceSha256": "7e6dd0b86eb0382280d4c9d391d5bf014b40b71fd7e566daac6f124781b895ab",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-960.webp",
+          "publicPath": "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-960.webp",
+          "bytes": 36954,
+          "sha256": "bd862ea1f13265ec593946dcd0b1df29ed0a91df143474e51076069de1a80076",
+          "sourceSha256": "7e6dd0b86eb0382280d4c9d391d5bf014b40b71fd7e566daac6f124781b895ab",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-1600.webp",
+          "publicPath": "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736-1600.webp",
+          "bytes": 89640,
+          "sha256": "5a24778c8d9bb5b6a8d3db67a24b12b8b6525d0dd2fbd58fb130bfb47627b9f5",
+          "sourceSha256": "7e6dd0b86eb0382280d4c9d391d5bf014b40b71fd7e566daac6f124781b895ab",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0.jpg",
       "publicPath": "/assets/images/campaigns/possessions/creator-20261029-214404-ce378ab0.jpg",
       "name": "creator-20261029-214404-ce378ab0.jpg",
