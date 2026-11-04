@@ -65,16 +65,16 @@ long_content:
     body: |
       ## **WHERE ARE WE NOW?**
       
-      The script is finished, and has been refined across multiple drafts and table reads. The film is cast and fully crewed - primarily with Albuquerque filmmakers - who've all signed on to this project because they truly believe in it.
+      The script is finished, and has been refined across multiple drafts and table reads.
       
-      Being a first-time director, I'm incredibly honored to have such a talented and experienced bunch of people helping me bring this to life. This team includes:
+      I'm making my directorial debut with POSSESSIONS, after coming up through the G&E path, so it was very important to me that I secure a crew with the experience to make this the best film it can possible be. I'm pleased to say I've done just that
       
       - **Director of Photography**: Ella Daniel
       - **Producers**: Ria Suarez, Ty Hernandez, and Massimiliano Mraz
       
       We are in final talks with Grandma's K&I Diner to officially secure the location in writing for our three day shoot in January 2027. After production is completed, we're poised to move swiftly into post-production to be ready for our premiere in May!
       
-      With all of that done, the only thing missing is the funding to put all of this on screen. So:
+      With all of that done, the only thing missing is the funding to put all of this on screen.
   - type: "image"
     src: "/assets/images/campaigns/possessions/content-bernie-sanders-i-am-once-again-20261104-182052-5967db91.gif"
     alt: ""
@@ -160,5 +160,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-04T18:20:58.993Z"
+_pool_draft_saved_at: "2026-11-04T18:26:43.900Z"
 ---
