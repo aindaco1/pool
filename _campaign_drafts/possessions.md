@@ -47,7 +47,7 @@ long_content:
       Within minutes, you'll be drawing conclusions about both of them. You'll catch his evasions, her meddling, and the ways each of them dodges the moments that matter most. You'll feel how easy - and maybe even satisfying - it is to read someone else's habits. But by the time you've worked them out, the question will have turned around: if you can see all this in Ian and Elise, what would a stranger notice about you?
   - type: "text"
     body: |
-      ## **THE VISUAL APPROACH**
+      ## **WHAT WILL IT LOOK LIKE?**
       
       Given we're telling such a contained story, the aesthetics have to do a lot of the heavy lifting here. Everything revolves around the diner - a warm, lit-up building standing against the dark, full of people just being alone together.
   - type: "image"
@@ -70,10 +70,10 @@ long_content:
       
       I'm making my directorial debut with POSSESSIONS, after coming up through the G&E path. So it was very important to me that I secure a crew with the experience to make this the best film it can possible be, and I'm pleased to say I've done just that.
       
-      - **Director of Photography**: Ella Daniel (*Gary's Day*)
+      - **Director of Photography**: Ella Daniel (elladanieldp.com)
       - **Gaffer**: Luis Gutierrez
-      - **Producer/Costume Designer:** Ria Suarez (*Bewildered*)
-      - **Producer/Assistant Director:** Massimilliano Mraz
+      - **Producer & Costume Designer:** Ria Suarez (*Worst Movie Ever, Bewildered!*)
+      - **Producer & Assistant Director:** Massimilliano Mraz
       
       We are in final talks with the diner to officially secure the location for our three-day-shoot in January 2027. After production is completed, we're poised to move swiftly into post-production to be ready for our premiere in May!
       
@@ -163,5 +163,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-04T19:14:10.311Z"
+_pool_draft_saved_at: "2026-11-04T23:54:46.381Z"
 ---
