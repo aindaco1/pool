@@ -48,9 +48,24 @@ long_content:
   - type: "text"
     body: |
       ## **THE VISUAL APPROACH**
+      
+      Given we're telling such a contained story, the aesthetics have to do a lot of the heavy lifting here. Everything revolves around the diner - a warm, lit-up building standing against the dark, full of people just being alone together.
+  - type: "image"
+    src: "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg"
+    alt: ""
+    caption: "Edward Hopper - Nighthawks"
+  - type: "text"
+    body: |
+      As Ian and Elise's conversation progresses through the night - we'll watch the natural light of the outside world slowly fade away until we're left with only the pale light of the moon. Ian wraps himself in cool, muted tones - while Elise is the most colorful thing in the room.
+      
+      Because this film is in part about the things we own, physical objects do a lot of the talking: what's on the table, what's in the pockets, what someone can't put down. All of these things are very intentional, and have plenty to say to those who are willing to watch closely.
+      
+      We're going to keep you stuck in long, unbroken stretches of conversation - forcing you into the same pressurized space as Ian. You'll be at the table right with him, with nowhere else to look. Think the special diner episode of *Euphoria* meets *My Dinner with André:* it's just two people, one night, and no easy way out of an uncomfortable conversation.
   - type: "text"
     body: |
       ## **WHERE ARE WE NOW?**
+      
+      The script is finished, and has been refined across multiple drafts and table reads.
   - type: "text"
     body: |
       ## WHERE WILL YOUR MONEY GO?
@@ -133,5 +148,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-02T23:49:09.257Z"
+_pool_draft_saved_at: "2026-11-04T17:58:46.583Z"
 ---
