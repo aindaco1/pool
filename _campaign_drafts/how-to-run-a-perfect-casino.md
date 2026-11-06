@@ -141,7 +141,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T06:12:54.479Z"
+_pool_draft_saved_at: "2026-11-06T06:13:22.743Z"
 hero_video: "https://youtu.be/igSerwszSe0"
-campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-054125-a485fced.jpg"
+campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 ---
