@@ -11,9 +11,9 @@ start_date: "2026-11-06"
 goal_deadline: "2026-12-06"
 goal_amount: 6000
 charged: false
-hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image: "/assets/images/campaigns/how-to-run-a-perfect-casino/hero-square-20261106-054115-03bbd724.jpg"
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
-creator_image: /assets/images/defaults/dust-wave-square.png
+creator_image: "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261106-050839-2fec9e97.jpg"
 creator_name: "Jack McLaughlin"
 category: "Short Film"
 short_blurb: "A southwestern film-noir set in the 1950's, a story of love, betrayal, money, and fate. How to run a Perfect Casino."
@@ -120,5 +120,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T05:08:32.273Z"
+_pool_draft_saved_at: "2026-11-06T05:42:57.723Z"
+hero_video: "https://youtu.be/igSerwszSe0"
+campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-054125-a485fced.jpg"
 ---
