@@ -11,7 +11,7 @@ start_date: 2026-10-28
 goal_deadline: 2026-10-28
 goal_amount: 5500
 charged: false
-hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image: "/assets/images/campaigns/possessions/hero-square-20261106-003507-947cf646.jpg"
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
 creator_image: /assets/images/defaults/dust-wave-square.png
 creator_name: "Jace Strickland"
@@ -169,5 +169,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-04T23:58:31.792Z"
+_pool_draft_saved_at: "2026-11-06T00:36:03.708Z"
 ---
