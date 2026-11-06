@@ -164,7 +164,13 @@ tiers:
     image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-executive-20261106-164720-b59608c2.png"
     description: "Previous tiers, plus: a high-quality custom designed deck of cards themed around the Perfect Casino, and a special thank you in our Executives section of the credits. Feel like the big shot you are in the \"Executive\" tier!"
     stackable: false
-    category: "digital"
+    category: "physical"
+    shipping:
+      weight_oz: 32
+      packaging_weight_oz: 6
+      length_in: 10
+      width_in: 5
+      height_in: 5
     late_support: false
   - id: "shareholder"
     name: "Shareholder"
@@ -172,7 +178,12 @@ tiers:
     image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-shareholder-20261106-164716-f047d403.png"
     description: "Previous rewards, plus: A deluxe Custom Poker Set from the Perfect Casino, a personalized \"Thank You\" video from the cast and crew, and your name & likeness in our exclusive wheel of \"Shareholders\" displayed at the end of our film. Claim your stake in our film with the \"Shareholder\" tier!"
     stackable: false
-    category: "digital"
+    category: "physical"
+    shipping:
+      weight_oz: 80
+      length_in: 11.8
+      width_in: 8.5
+      height_in: 2.5
     late_support: false
   - id: "the-perfect-donor"
     name: "Chairman of the Board"
