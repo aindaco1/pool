@@ -16,7 +16,7 @@ hero_image_wide: /assets/images/defaults/dust-wave-square.png
 creator_image: "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261106-050839-2fec9e97.jpg"
 creator_name: "Jack McLaughlin"
 category: "Short Film"
-short_blurb: "A southwestern film-noir set in the 1950's, a story of love, betrayal, money, and fate. How to run a Perfect Casino."
+short_blurb: ""
 show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
@@ -28,6 +28,11 @@ long_content:
     text: |
       **Man is a gaming animal. He must be always trying to get the better in something or other.**
     author: "Charles Lamb"
+  - type: "text"
+    body: |
+      A southwestern film-noir set in the 1950's, a story of love, betrayal, money, and fate.
+      
+      This is How to Run a Perfect Casino.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -120,7 +125,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T05:42:57.723Z"
+_pool_draft_saved_at: "2026-11-06T05:50:22.655Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-054125-a485fced.jpg"
 ---
