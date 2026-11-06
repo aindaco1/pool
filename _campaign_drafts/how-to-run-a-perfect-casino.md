@@ -28,19 +28,44 @@ long_content:
     provider: "youtube"
     video_id: "DZqfYAQMLSw"
     caption: "Campaign Video: Nata Aguilar, Logo: Lex Padilla-Perez"
+  - type: "divider"
   - type: "quote"
     text: |
       **Man is a gaming animal. He must be always trying to get the better in something or other.**
     author: "Charles Lamb"
   - type: "text"
+    align: "center"
     body: |
-      A southwestern film-noir set in the 1950's. A  story of love, betrayal, money, and fate.
+      ## This is:
       
-      This is How to Run a Perfect Casino.
+      ## How to Run a Perfect Casino
+  - type: "text"
+    align: "center"
+    body: |
+      A Hay's code-accurate Southwestern Film Noir, set in the early 1950s.
+      
+      **How to Run a Perfect Casino is a film about love, greed, gambling, and *Fate...***
+      
+      *Fate is a complicated term. It’s impossible to know your future, but that doesn’t mean we don’t dream of what it will be.  They could want power. Maybe it’s money. For some it’s love. For some it’s freedom. Regardless of what you want, one thing unites us all.*
+      
+      *We all wish to control our fate.*
   - type: "divider"
   - type: "text"
     body: |
-      ### Meet The Team
+      ## The Plan:
+      
+      *How to Run a Perfect Casino **will be shot on glorious 35mm film!***
+      
+      We were blessed with a generous donation of 4-perf, 35mm filmstock which we will be shooting with, in conjunction with a partnership with Panavision, NM. This offers an experience and look that cannot be replicated digitally. *We have it, now we're shooting it!*
+      
+      In all design aspects, we are faithfully replicating a classic film noir. From the dialogue to the design, we are using the classics to create something fresh, new, and wholly original. After  you watch HTRAPC, you'll leave feeling like you found a hidden gem from the early 50's.
+  - type: "image"
+    src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-htrpc-comps-20261106-085728-4ad7bd7f.jpg"
+    alt: ""
+  - type: "divider"
+  - type: "text"
+    body: |
+      ## Meet The Team!
   - type: "gallery"
     layout: "grid"
     images:
@@ -68,6 +93,16 @@ long_content:
       How to Run a Perfect Casino is a micro-budget independent production. That means we rely on the generosity of our community (that's you!) to help us achieve this dream of ours.
       
       Your "buy-in" to our project goes directly to the **developing our 35mm film, feeding our crew, renting equipment, booking locations, and decorating a period-accurate 50's set.** It's a LOT, and none of it would be possible without you. Thank you.
+  - type: "text"
+    body: |
+      ## Why This Film?
+      
+      How to Run a Perfect Casino is universal in its messaging. It is an empowering, sentimental, love letter to the Noir genre. Noir was invented to critique the underbelly of American life, from the petty criminal to the corrupt politician. Without a doubt, those critiques hold just as much weight in 2026 as they did in 1946. We innovate the genre with a new message, one of empowerment, to light the fire of hope in the Noir-esque apathy of our modern lives.
+  - type: "divider"
+  - type: "text"
+    align: "center"
+    body: |
+      ## THANK YOU!
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -160,7 +195,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T08:16:35.155Z"
+_pool_draft_saved_at: "2026-11-06T08:57:32.291Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
