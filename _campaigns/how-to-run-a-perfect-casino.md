@@ -193,23 +193,7 @@ tiers:
     stackable: false
     category: "digital"
     late_support: false
-stretch_goals:
-  - threshold: 7770
-    title: "Lucky Sevens"
-    description: "We will use this funding to pay for the full festival run. Wish us luck!"
-    status: "locked"
-  - threshold: 8000
-    title: "Crazy 8s"
-    description: "A crazy amount of support from this wonderful community!\nAll remaining funding goes to providing amenities for the Cast and Crew, everything from additional crafty, to stipends for gas. Thank you for your support!!"
-    status: "locked"
-  - threshold: 9000
-    title: "Ultra Luxe 9000"
-    description: "At this goal, we'll be able to do this film the \"Hollywood way,\" ultra luxe 9 gives the budget provide more amenities for the cast and crew, host more live events, and fill out all the extra bells and whistles we otherwise wouldn't have  the budget for. Thank you, so, so much!"
-    status: "locked"
-  - threshold: 10000
-    title: "Jackpot"
-    description: "All extra funds go straight to the Crew! \nThey will receive a huge bonus stipend for their very hard work on our wonderful film!\nThank you all so, so much for your generosity!"
-    status: "locked"
+stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
