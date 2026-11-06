@@ -177,7 +177,7 @@ tiers:
   - id: "the-perfect-donor"
     name: "Chairman of the Board"
     price: 2500
-    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-chairman-of-the-board-20261106-064738-d4257135.jpg"
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-chairman-of-the-board-20261106-184613-202e9888.png"
     description: "All Other Tiers, plus: For a donor like no other, your likeness will be enshrined in our film in the form of a portrait hung in the background of a key scene. Become a \"Chairman of the Board,\" and live on as a head honcho in the Perfect Casino."
     stackable: false
     category: "digital"
