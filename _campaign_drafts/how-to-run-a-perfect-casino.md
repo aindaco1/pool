@@ -112,7 +112,7 @@ tiers:
     name: "Croupier"
     price: 25
     image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-croupier-20261106-050751-a7a470ba.jpg"
-    description: "The previous reward, plus:Exclusive announcements and updates on the film's progress. \nAn early-access digital copy of our film! Join the exclusive private screening as a \"Croupier!\""
+    description: "The previous reward, plus: Exclusive announcements and updates on the film's progress. \nAn early-access digital copy of our film! Join the exclusive private screening as a \"Croupier!\""
     stackable: false
     category: "digital"
     late_support: false
@@ -188,8 +188,8 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
-_pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T09:19:19.405Z"
+_pool_draft_base_hash: "7eeb5e374419d2e2e770ea4c660840c45c015918964c598a7a3eb0182deeaa7e"
+_pool_draft_saved_at: "2026-11-06T09:27:07.213Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
