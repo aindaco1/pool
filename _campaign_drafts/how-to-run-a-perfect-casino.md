@@ -16,14 +16,18 @@ hero_image_wide: /assets/images/defaults/dust-wave-square.png
 creator_image: /assets/images/defaults/dust-wave-square.png
 creator_name: "Jack McLaughlin"
 category: "Short Film"
-short_blurb: "A southwestern film-noir set in the 1950's, a story of love, betrayal, money, and fate.How to run a Perfect Casino."
+short_blurb: "A southwestern film-noir set in the 1950's, a story of love, betrayal, money, and fate. How to run a Perfect Casino."
 show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
 custom_late_support: false
 runner_report_emails:
   - "marquschavez239@gmail.com"
-long_content: []
+long_content:
+  - type: "quote"
+    text: |
+      **Man is a gaming animal. He must be always trying to get the better in something or other.**
+    author: "Charles Lamb"
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -110,5 +114,5 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T03:23:07.332Z"
+_pool_draft_saved_at: "2026-11-06T05:01:48.267Z"
 ---
