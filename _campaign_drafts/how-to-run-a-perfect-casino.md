@@ -24,11 +24,6 @@ custom_late_support: false
 runner_report_emails:
   - "marquschavez239@gmail.com"
 long_content:
-  - type: "video"
-    provider: "youtube"
-    video_id: "DZqfYAQMLSw"
-    caption: "Campaign Video: Nata Aguilar, Logo: Lex Padilla-Perez"
-  - type: "divider"
   - type: "quote"
     text: |
       **Man is a gaming animal. He must be always trying to get the better in something or other.**
@@ -195,7 +190,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T08:57:32.291Z"
+_pool_draft_saved_at: "2026-11-06T09:01:08.056Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
