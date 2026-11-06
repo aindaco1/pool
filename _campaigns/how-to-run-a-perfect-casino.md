@@ -112,7 +112,7 @@ tiers:
     name: "Croupier"
     price: 25
     image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-croupier-20261106-050751-a7a470ba.jpg"
-    description: "The previous reward, plus:Exclusive announcements and updates on the film's progress. \nAn early-access digital copy of our film! Join the exclusive private screening as a \"Croupier!\""
+    description: "The previous reward, plus: Exclusive announcements and updates on the film's progress. \nAn early-access digital copy of our film! Join the exclusive private screening as a \"Croupier!\""
     stackable: false
     category: "digital"
     late_support: false
