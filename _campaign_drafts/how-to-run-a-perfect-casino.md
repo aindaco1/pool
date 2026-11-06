@@ -31,7 +31,7 @@ long_content:
   - type: "image"
     align: "center"
     src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-htrapc-transparent-20261106-091153-9815ef14.png"
-    alt: ""
+    alt: "How To Run A Perfect Casino"
     caption: "Logo by Lex Padilla-Perez"
   - type: "text"
     align: "center"
@@ -40,7 +40,7 @@ long_content:
       
       **How to Run a Perfect Casino is a film about love, greed, gambling, and *Fate...***
       
-      *Fate is a complicated term. It’s impossible to know your future, but that doesn’t mean we don’t dream of what it will be.  They could want power. Maybe it’s money. For some it’s love. For some it’s freedom. Regardless of what you want, one thing unites us all.*
+      *Fate is a complicated term. It’s impossible to know your future, but that doesn’t mean we don’t dream of what it will be.  You could want power. Maybe it’s money. For some it’s love. Or is it freedom? Regardless of what you want, one thing unites us all...*
       
       *We all wish to control our fate.*
   - type: "divider"
@@ -189,7 +189,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T09:11:57.476Z"
+_pool_draft_saved_at: "2026-11-06T09:16:34.954Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
