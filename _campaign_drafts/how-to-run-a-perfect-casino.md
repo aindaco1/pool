@@ -37,6 +37,7 @@ long_content:
       A southwestern film-noir set in the 1950's. A  story of love, betrayal, money, and fate.
       
       This is How to Run a Perfect Casino.
+  - type: "divider"
   - type: "text"
     body: |
       ### Meet The Team
@@ -45,14 +46,21 @@ long_content:
     images:
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-creator-20261106-055645-3392fc44.jpg"
         alt: ""
+        caption: "Jack McLaughlin - Director"
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-ella-20261106-055652-d63a8a13.jpg"
         alt: ""
+        caption: "Ella Daniel - Director of Photography"
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-mayli-ben-20261106-055656-e59c2327.jpg"
         alt: ""
+        caption: "Mayli Bachand - 1st AD\nBen Arndt - 2nd AD"
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-producers-20261106-055659-1a05b958.jpg"
         alt: ""
+        caption: "Producers: Beau Ryan McKean, Marqus Chavez, Charles Like"
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-stella-20261106-055703-912999d6.jpg"
         alt: ""
+        caption: "Stella Cole - Art Director"
+    caption: "What a Fine Crew!"
+  - type: "divider"
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -145,7 +153,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T06:59:00.288Z"
+_pool_draft_saved_at: "2026-11-06T08:01:19.371Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
