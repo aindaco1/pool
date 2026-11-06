@@ -161,7 +161,7 @@ tiers:
   - id: "executive"
     name: "Executive"
     price: 500
-    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-executive-20261106-161753-1816a8ab.png"
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-executive-20261106-164613-bcd973fe.png"
     description: "Previous tiers, plus: a high-quality custom designed deck of cards themed around the Perfect Casino, and a special thank you in our Executives section of the credits. Feel like the big shot you are in the \"Executive\" tier!"
     stackable: false
     category: "digital"
@@ -204,8 +204,8 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
-_pool_draft_base_hash: "29ad3492e52b55eea8615cf170dbb2ec4922c98fd976f79453e9247b763dda60"
-_pool_draft_saved_at: "2026-11-06T16:32:57.002Z"
+_pool_draft_base_hash: "d27f07b2ad628ed2bb0e90f83092861a85987214c1997acb2417089399eb3966"
+_pool_draft_saved_at: "2026-11-06T16:46:18.947Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
