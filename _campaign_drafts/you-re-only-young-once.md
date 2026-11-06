@@ -29,11 +29,53 @@ long_content:
     author: "Joey Greenberg"
 support_items: []
 campaign_add_ons: []
-tiers: []
+tiers:
+  - id: "special-thanks"
+    name: "Special Thanks"
+    price: 10
+    description: "Be featured in the credits as a 'thank you' for supporting our film!"
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "link-to-the-film"
+    name: "Link to the Film"
+    price: 25
+    description: "Receive a private link to the film"
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "private-screening-invite"
+    name: "Private Screening Invite"
+    price: 50
+    description: "Join the cast and crew to a private screening of the film, complete with refreshments and a word from the director."
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "get-a-signed-poster"
+    name: "Get a Signed Poster!"
+    price: 100
+    description: "Get a signed poster from the cast and crew!"
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "have-your-name-in-the-film"
+    name: "Have Your Name In the Film!"
+    price: 500
+    description: "Your name will be featured as a teacher or student's name in the film. You could be on the board or the main character can be talking about you!"
+    stackable: false
+    category: "digital"
+    late_support: false
+  - id: "be-an-extra"
+    name: "Be an Extra!"
+    price: 1000
+    description: "You'll get the chance to be featured as an extra in the final cut of the film!"
+    stackable: false
+    category: "digital"
+    late_support: false
 stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-04T03:01:57.749Z"
+_pool_draft_saved_at: "2026-11-06T23:16:57.210Z"
 ---
