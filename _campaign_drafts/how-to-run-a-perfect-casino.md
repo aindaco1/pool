@@ -12,11 +12,11 @@ goal_deadline: "2026-12-06"
 goal_amount: 6000
 charged: false
 hero_image: "/assets/images/campaigns/how-to-run-a-perfect-casino/hero-square-20261106-054115-03bbd724.jpg"
-hero_image_wide: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: "/assets/images/campaigns/how-to-run-a-perfect-casino/hero-wide-20261106-060707-060952dd.png"
 creator_image: "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261106-050839-2fec9e97.jpg"
 creator_name: "Jack McLaughlin"
 category: "Short Film"
-short_blurb: ""
+short_blurb: "A southwestern film-noir set in the 1950's, a story of love, betrayal, money, and fate. How to run a Perfect Casino."
 show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
@@ -30,9 +30,25 @@ long_content:
     author: "Charles Lamb"
   - type: "text"
     body: |
-      A southwestern film-noir set in the 1950's, a story of love, betrayal, money, and fate.
+      A southwestern film-noir set in the 1950's. A  story of love, betrayal, money, and fate.
       
       This is How to Run a Perfect Casino.
+  - type: "text"
+    body: |
+      ### Meet The Team
+  - type: "gallery"
+    layout: "grid"
+    images:
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-creator-20261106-055645-3392fc44.jpg"
+        alt: ""
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-ella-20261106-055652-d63a8a13.jpg"
+        alt: ""
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-mayli-ben-20261106-055656-e59c2327.jpg"
+        alt: ""
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-producers-20261106-055659-1a05b958.jpg"
+        alt: ""
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-stella-20261106-055703-912999d6.jpg"
+        alt: ""
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -125,7 +141,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T05:50:22.655Z"
+_pool_draft_saved_at: "2026-11-06T06:12:54.479Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-054125-a485fced.jpg"
 ---
