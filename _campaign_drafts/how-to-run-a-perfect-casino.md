@@ -75,7 +75,7 @@ long_content:
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-producers-20261106-055659-1a05b958.jpg"
         alt: ""
         caption: "Producers: Beau Ryan McKean, Marqus Chavez, Charles Like"
-      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-stella-20261106-055703-912999d6.jpg"
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-1000036648-20261106-201123-7cbffdb4.jpg"
         alt: ""
         caption: "Stella Cole - Art Director"
     caption: "What a Fine Crew!"
@@ -199,8 +199,8 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
-_pool_draft_base_hash: "459f80bdb4f09b506a0a98a8fc1460b9057d025ddc4404514bd44a1160046608"
-_pool_draft_saved_at: "2026-11-06T19:55:07.473Z"
+_pool_draft_base_hash: "5259646fd076ea7091c2b42538427d2943a00b4fa4509f1e5258ef991d1a01fb"
+_pool_draft_saved_at: "2026-11-06T20:11:27.290Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
