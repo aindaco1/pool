@@ -100,14 +100,6 @@ long_content:
 support_items: []
 campaign_add_ons: []
 tiers:
-  - id: "shareholder"
-    name: "Shareholder"
-    price: 1000
-    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-shareholder-20261106-163134-dcf168f3.png"
-    description: "Previous rewards, plus: A deluxe Custom Poker Set from the Perfect Casino, a personalized \"Thank You\" video from the cast and crew, and your name & likeness in our exclusive wheel of \"Shareholders\" displayed at the end of our film. Claim your stake in our film with the \"Shareholder\" tier!"
-    stackable: false
-    category: "digital"
-    late_support: false
   - id: "player"
     name: "Player"
     price: 10
@@ -174,6 +166,14 @@ tiers:
     stackable: false
     category: "digital"
     late_support: false
+  - id: "shareholder"
+    name: "Shareholder"
+    price: 1000
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-shareholder-20261106-163134-dcf168f3.png"
+    description: "Previous rewards, plus: A deluxe Custom Poker Set from the Perfect Casino, a personalized \"Thank You\" video from the cast and crew, and your name & likeness in our exclusive wheel of \"Shareholders\" displayed at the end of our film. Claim your stake in our film with the \"Shareholder\" tier!"
+    stackable: false
+    category: "digital"
+    late_support: false
   - id: "the-perfect-donor"
     name: "Chairman of the Board"
     price: 2500
@@ -205,7 +205,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "29ad3492e52b55eea8615cf170dbb2ec4922c98fd976f79453e9247b763dda60"
-_pool_draft_saved_at: "2026-11-06T16:32:45.372Z"
+_pool_draft_saved_at: "2026-11-06T16:32:57.002Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
