@@ -61,6 +61,13 @@ long_content:
         caption: "Stella Cole - Art Director"
     caption: "What a Fine Crew!"
   - type: "divider"
+  - type: "text"
+    body: |
+      ## Where Does The Money Go?
+      
+      How to Run a Perfect Casino is a micro-budget independent production. That means we rely on the generosity of our community (that's you!) to help us achieve this dream of ours.
+      
+      Your "buy-in" to our project goes directly to the **developing our 35mm film, feeding our crew, renting equipment, booking locations, and decorating a period-accurate 50's set.** It's a LOT, and none of it would be possible without you. Thank you.
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -153,7 +160,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T08:01:19.371Z"
+_pool_draft_saved_at: "2026-11-06T08:16:35.155Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
