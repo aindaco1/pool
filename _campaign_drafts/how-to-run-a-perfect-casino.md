@@ -16,7 +16,7 @@ hero_image_wide: "/assets/images/campaigns/how-to-run-a-perfect-casino/hero-wide
 creator_image: "/assets/images/campaigns/how-to-run-a-perfect-casino/creator-20261106-050839-2fec9e97.jpg"
 creator_name: "Jack McLaughlin"
 category: "Short Film"
-short_blurb: "A Mysterious Stranger Throws a Fork in a Young Woman's Murderous Scheme to Make it Rich in the Perfect Casino."
+short_blurb: "A handsome stranger throws a fork in a young woman's murderous plot to get rich in the Perfect Casino."
 show_ongoing: true
 single_tier_only: false
 stretch_hidden: true
@@ -145,7 +145,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T06:57:30.310Z"
+_pool_draft_saved_at: "2026-11-06T06:59:00.288Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
