@@ -75,7 +75,7 @@ long_content:
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-producers-20261106-055659-1a05b958.jpg"
         alt: ""
         caption: "Producers: Beau Ryan McKean, Marqus Chavez, Charles Like"
-      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-stella-20261106-055703-912999d6.jpg"
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-1000036648-20261106-201123-7cbffdb4.jpg"
         alt: ""
         caption: "Stella Cole - Art Director"
     caption: "What a Fine Crew!"
