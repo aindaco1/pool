@@ -98,7 +98,7 @@ stretch_goals:
     status: "locked"
   - threshold: 9000
     title: "Ultra Luxe 9000"
-    description: "At this goal, we'll be able to do this film the \"Hollywood way,\" ultra luxe 9 gives the budget provide more amenities for the cast and crew, pro to host more live events"
+    description: "At this goal, we'll be able to do this film the \"Hollywood way,\" ultra luxe 9 gives the budget provide more amenities for the cast and crew, host more live events, and fill out all the extra bells and whistles we otherwise wouldn't have  the budget for. Thank you, so, so much!"
     status: "locked"
   - threshold: 10000
     title: "Jackpot"
@@ -110,5 +110,5 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T03:20:26.143Z"
+_pool_draft_saved_at: "2026-11-06T03:23:07.332Z"
 ---
