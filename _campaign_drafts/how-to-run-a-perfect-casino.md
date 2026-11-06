@@ -34,6 +34,7 @@ tiers:
   - id: "player"
     name: "Player"
     price: 10
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-player-20261106-050746-cabdc1e7.jpg"
     description: "You receive a special thanks in the credits of our film!"
     stackable: false
     category: "digital"
@@ -41,6 +42,7 @@ tiers:
   - id: "croupier"
     name: "Croupier"
     price: 25
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-croupier-20261106-050751-a7a470ba.jpg"
     description: "Digital copy of the Film + previous rewards"
     stackable: false
     category: "digital"
@@ -48,6 +50,7 @@ tiers:
   - id: "pit-boss"
     name: "Pit Boss"
     price: 75
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-pit-boss-20261106-050756-f8f3a35c.jpg"
     description: "Strip of the film (5 frames) + previous rewards"
     stackable: false
     category: "physical"
@@ -61,6 +64,7 @@ tiers:
   - id: "high-roller"
     name: "High-Roller"
     price: 100
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-high-roller-20261106-050815-dadd5e57.jpg"
     description: "Commemorative Poker Chip + Previous Rewards"
     stackable: false
     category: "physical"
@@ -74,6 +78,7 @@ tiers:
   - id: "manager"
     name: "Manager"
     price: 250
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-manager-20261106-050810-827b0a09.jpg"
     description: "Strip of film (24 frames) + Previous Rewards"
     stackable: false
     category: "physical"
@@ -87,6 +92,7 @@ tiers:
   - id: "the-perfect-donor"
     name: "The Perfect Donor"
     price: 1000
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-the-perfect-donor-20261106-050823-d9d07fa2.jpg"
     description: "Your Photograph In The Background + All Other Tiers"
     stackable: false
     category: "digital"
@@ -114,5 +120,5 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T05:01:48.267Z"
+_pool_draft_saved_at: "2026-11-06T05:08:32.273Z"
 ---
