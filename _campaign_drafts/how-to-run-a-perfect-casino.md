@@ -197,26 +197,22 @@ stretch_goals:
   - threshold: 7770
     title: "Lucky Sevens"
     description: "We will use this funding to pay for the full festival run. Wish us luck!"
-    status: "locked"
   - threshold: 8000
     title: "Crazy 8s"
     description: "A crazy amount of support from this wonderful community!\nAll remaining funding goes to providing amenities for the Cast and Crew, everything from additional crafty, to stipends for gas. Thank you for your support!!"
-    status: "locked"
   - threshold: 9000
     title: "Ultra Luxe 9000"
     description: "At this goal, we'll be able to do this film the \"Hollywood way,\" ultra luxe 9 gives the budget provide more amenities for the cast and crew, host more live events, and fill out all the extra bells and whistles we otherwise wouldn't have  the budget for. Thank you, so, so much!"
-    status: "locked"
   - threshold: 10000
     title: "Jackpot"
     description: "All extra funds go straight to the Crew! \nThey will receive a huge bonus stipend for their very hard work on our wonderful film!\nThank you all so, so much for your generosity!"
-    status: "locked"
 ongoing_items: []
 diary: []
 decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
-_pool_draft_base_hash: "a0b6445bce8292c27d7581969e30594073276ed3b153970089fd15c2932a0d3b"
-_pool_draft_saved_at: "2026-11-06T18:52:04.166Z"
+_pool_draft_base_hash: "459f80bdb4f09b506a0a98a8fc1460b9057d025ddc4404514bd44a1160046608"
+_pool_draft_saved_at: "2026-11-06T19:53:03.560Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
