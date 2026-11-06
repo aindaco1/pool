@@ -177,7 +177,7 @@ tiers:
   - id: "the-perfect-donor"
     name: "Chairman of the Board"
     price: 2500
-    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-chairman-of-the-board-20261106-064738-d4257135.jpg"
+    image: "/assets/images/campaigns/how-to-run-a-perfect-casino/tier-chairman-of-the-board-20261106-184613-202e9888.png"
     description: "All Other Tiers, plus: For a donor like no other, your likeness will be enshrined in our film in the form of a portrait hung in the background of a key scene. Become a \"Chairman of the Board,\" and live on as a head honcho in the Perfect Casino."
     stackable: false
     category: "digital"
@@ -204,8 +204,8 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
-_pool_draft_base_hash: "d27f07b2ad628ed2bb0e90f83092861a85987214c1997acb2417089399eb3966"
-_pool_draft_saved_at: "2026-11-06T16:47:37.778Z"
+_pool_draft_base_hash: "ec67bf7f531739fc240a37b2f23cf09c1935091fd174875d8d5a29702c40aaf9"
+_pool_draft_saved_at: "2026-11-06T18:46:23.430Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
