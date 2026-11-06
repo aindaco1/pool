@@ -30,7 +30,7 @@ long_content:
     author: "Charles Lamb"
   - type: "image"
     align: "center"
-    src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-htrapc-transparent-20261106-090736-8293497a.png"
+    src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-screenshot-2026-11-06-020957-20261106-091050-9e641533.png"
     alt: ""
     caption: "Logo by Lex Padilla-Perez"
   - type: "text"
@@ -189,7 +189,7 @@ decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
 _pool_draft_base_hash: "64dcf221b287d25c234fa6714e67046b3715be7e24b2c263f7b449528c82cebb"
-_pool_draft_saved_at: "2026-11-06T09:08:59.874Z"
+_pool_draft_saved_at: "2026-11-06T09:10:54.804Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
