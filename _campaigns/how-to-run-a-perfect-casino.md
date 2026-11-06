@@ -4,7 +4,7 @@ title: "How to Run a Perfect Casino"
 slug: how-to-run-a-perfect-casino
 published: false
 preview_only: true
-preview_enabled: false
+preview_enabled: true
 preview_reviewer_emails: []
 state: upcoming
 start_date: 2026-09-10
@@ -30,4 +30,5 @@ stretch_goals: []
 ongoing_items: []
 diary: []
 decisions: []
+preview_updated_at: "2026-11-06T09:00:07.867Z"
 ---
