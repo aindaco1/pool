@@ -78,6 +78,8 @@ long_content:
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-1000036648-20261106-201123-7cbffdb4.jpg"
         alt: ""
         caption: "Stella Cole - Art Director"
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-1000036676-20261107-205507-f32cd8d7.png"
+        alt: ""
     caption: "What a Fine Crew!"
   - type: "divider"
   - type: "text"
