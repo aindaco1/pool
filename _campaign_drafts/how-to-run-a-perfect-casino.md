@@ -78,6 +78,8 @@ long_content:
       - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-1000036648-20261106-201123-7cbffdb4.jpg"
         alt: ""
         caption: "Stella Cole - Art Director"
+      - src: "/assets/images/campaigns/how-to-run-a-perfect-casino/content-1000036676-20261107-205507-f32cd8d7.png"
+        alt: ""
     caption: "What a Fine Crew!"
   - type: "divider"
   - type: "text"
@@ -199,8 +201,8 @@ diary: []
 decisions: []
 instagram: "https://www.instagram.com/concho_pearl_films/"
 shopping: {"availability_date":"2027-04-05"}
-_pool_draft_base_hash: "5259646fd076ea7091c2b42538427d2943a00b4fa4509f1e5258ef991d1a01fb"
-_pool_draft_saved_at: "2026-11-06T20:11:27.290Z"
+_pool_draft_base_hash: "b5c49036e72852a626918aa1ab30951f98de6b131fbe74eb1761fbd1ee3e5a65"
+_pool_draft_saved_at: "2026-11-07T20:55:11.369Z"
 hero_video: "https://youtu.be/igSerwszSe0"
 campaign_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/background-20261106-061313-2ca0861e.jpg"
 progress_background: "/assets/images/campaigns/how-to-run-a-perfect-casino/progress-20261106-065549-44ca9ccb.jpg"
