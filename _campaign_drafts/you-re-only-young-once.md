@@ -13,10 +13,10 @@ goal_amount: 2000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
-creator_image: /assets/images/defaults/dust-wave-square.png
+creator_image: "/assets/images/campaigns/you-re-only-young-once/creator-20261108-040130-addf200c.jpg"
 creator_name: "Joey Greenberg"
 category: "Other"
-short_blurb: "s"
+short_blurb: "A 30 year-old school teacher on the verge of fatherhood has doubts about his commitments to leading a responsible and adult life. In his attempts to live vicariously through his students, he begins to drift more and more away from his adult life until he destroys all he has for the sake of his own selfish freedom."
 show_ongoing: false
 single_tier_only: false
 stretch_hidden: true
@@ -86,5 +86,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-08T03:26:45.961Z"
+_pool_draft_saved_at: "2026-11-08T04:17:49.419Z"
+campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261108-040940-893d69ae.jpg"
 ---
