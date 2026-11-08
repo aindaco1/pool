@@ -7,9 +7,9 @@ preview_only: true
 preview_enabled: false
 preview_reviewer_emails: []
 state: upcoming
-start_date: "2026-10-04"
-goal_deadline: "2027-03-01"
-goal_amount: 0
+start_date: "2026-11-09"
+goal_deadline: "2026-12-13"
+goal_amount: 2000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
@@ -33,6 +33,7 @@ tiers:
   - id: "special-thanks"
     name: "Special Thanks"
     price: 10
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-special-thanks-20261108-030104-4dac8d8f.png"
     description: "Be featured in the credits as a 'thank you' for supporting our film!"
     stackable: false
     category: "digital"
@@ -40,6 +41,7 @@ tiers:
   - id: "link-to-the-film"
     name: "Link to the Film"
     price: 25
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-link-to-the-film-20261108-030117-ffd2a0f0.png"
     description: "Receive a private link to the film"
     stackable: false
     category: "digital"
@@ -47,6 +49,7 @@ tiers:
   - id: "private-screening-invite"
     name: "Private Screening Invite"
     price: 50
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-private-screening-invite-20261108-030133-11b531c2.png"
     description: "Join the cast and crew to a private screening of the film, complete with refreshments and a word from the director."
     stackable: false
     category: "digital"
@@ -54,6 +57,7 @@ tiers:
   - id: "get-a-signed-poster"
     name: "Get a Signed Poster!"
     price: 100
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-get-a-signed-poster-20261108-030150-a556ad35.png"
     description: "Get a signed poster from the cast and crew!"
     stackable: false
     category: "digital"
@@ -61,6 +65,7 @@ tiers:
   - id: "have-your-name-in-the-film"
     name: "Have Your Name In the Film!"
     price: 500
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-have-your-name-in-the-film-20261108-030204-8b32d220.png"
     description: "Your name will be featured as a teacher or student's name in the film. You could be on the board or the main character can be talking about you!"
     stackable: false
     category: "digital"
@@ -68,6 +73,7 @@ tiers:
   - id: "be-an-extra"
     name: "Be an Extra!"
     price: 1000
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-be-an-extra-20261108-030255-34677076.png"
     description: "You'll get the chance to be featured as an extra in the final cut of the film!"
     stackable: false
     category: "digital"
@@ -77,5 +83,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-06T23:16:57.210Z"
+_pool_draft_saved_at: "2026-11-08T03:12:57.814Z"
 ---
