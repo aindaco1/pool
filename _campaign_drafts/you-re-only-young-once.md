@@ -30,6 +30,23 @@ long_content:
     text: |
       "This film is based on one simple idea that I believe to be universal: No one really knows how to be an adult and everyone is just pretending. Beyond that, there is always some part of us that misses the time when you didn't have to pretend, a mythical childhood state of irresponsibility. This is the part of us that thinks "what if I packed up and left today, with no note, and started over." For most it is only a fleeting thought, but Billy, the protagonist, represents a reflection of that aspect of ourselves taken to the extreme. What would happen if we did feed our irresponsible, childish impulses? How close would we be to him? This is the uncomfortable question that we want to present to the viewers of this film. Through a mix of drama and cringe-comedy, this film will explore this question. Myself and the rest of the team are so excited to create this project and are thrilled to have your support!"
     author: "Director,Joey Greenberg"
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-yoyo-headers-team-20261108-045742-4453d940.png"
+    alt: ""
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image4-20261108-045748-c99a8a00.jpg"
+    alt: ""
+    caption: "Joey Greenberg"
+  - type: "text"
+    body: |
+      #### Joey Greenberg- Writer/Director
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-yoyo-headers-budget-20261108-045755-0ac88d9e.png"
+    alt: ""
+    caption: "Wait, so what am I paying for....?"
+  - type: "text"
+    body: |
+      **Your support is going to go towards all of the moving parts that help bring a motion picture to life!** We will use your proceeds to pay for things like location fees, feeding cast and crew, insurance costs, and **much much more**. We are a lean-mean-indie-machine that will utilize every cent we receive!
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -45,7 +62,7 @@ tiers:
     name: "Link to the Film"
     price: 25
     image: "/assets/images/campaigns/you-re-only-young-once/tier-link-to-the-film-20261108-030117-ffd2a0f0.png"
-    description: "Receive a private link to the film"
+    description: "You will receive a private link to the film before it's public release!"
     stackable: false
     category: "digital"
     late_support: false
@@ -53,7 +70,7 @@ tiers:
     name: "Private Screening Invite"
     price: 50
     image: "/assets/images/campaigns/you-re-only-young-once/tier-private-screening-invite-20261108-030133-11b531c2.png"
-    description: "Join the cast and crew to a private screening of the film, complete with refreshments and a word from the director."
+    description: "Join the cast and crew to a private screening of the film, complete with refreshments and a word from the director. (He promises to keep it short)"
     stackable: false
     category: "digital"
     late_support: false
@@ -77,7 +94,7 @@ tiers:
     name: "Be an Extra!"
     price: 1000
     image: "/assets/images/campaigns/you-re-only-young-once/tier-be-an-extra-20261108-030255-34677076.png"
-    description: "You'll get the chance to be featured as an extra in the final cut of the film!"
+    description: "You'll get the chance to be featured as an extra in the final cut of the film! Live out your Hollywood dreams!"
     stackable: false
     category: "digital"
     late_support: false
@@ -86,6 +103,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-08T04:17:49.419Z"
+_pool_draft_saved_at: "2026-11-08T04:58:00.238Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261108-040940-893d69ae.jpg"
 ---
