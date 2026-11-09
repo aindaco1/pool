@@ -305,6 +305,7 @@ start_pod_containers() {
     --restart=unless-stopped \
     -v "$ROOT_DIR:/workspace" \
     -v "$SITE_VOLUME:/usr/local/bundle" \
+    -e CI="${CI:-}" \
     "$SITE_IMAGE" >/dev/null || return 1
 
   podman run -d \
