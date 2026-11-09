@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { replaceImageIfSmaller } from '../../scripts/optimize-media.mjs';
 import { validateImageChanges } from '../../scripts/validate-media-optimization.mjs';
 
 const temporary: string[] = [];
@@ -160,5 +161,39 @@ describe('automatic image publication', () => {
     f.run();
     expect(git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split('\t')[0]).toBe(newer);
     expect(fs.readFileSync(f.log, 'utf8')).toContain('media-optimization.yml');
+  });
+});
+
+
+describe('source optimization before replacement', () => {
+  it('retains the original when decoded image evidence changes', async () => {
+    const { root } = fixture();
+    const source = path.join(root, 'assets/images/photo.jpg');
+    const candidate = `${source}.candidate`;
+    fs.writeFileSync(candidate, 'smaller');
+    const result = await replaceImageIfSmaller(source, candidate, true,
+      async (file: string) => ({ frames: file === source ? 'original' : 'changed' }));
+    expect(result).toMatchObject({ changed: false, bytesSaved: 0, skipped: 'candidate changes source image evidence' });
+    expect(fs.readFileSync(source, 'utf8')).toBe('original image content');
+    expect(fs.existsSync(candidate)).toBe(false);
+  });
+  it.each([false, true])('accepts identical evidence with write=%s', async (write) => {
+    const { root } = fixture();
+    const source = path.join(root, 'assets/images/photo.jpg');
+    const candidate = `${source}.candidate`;
+    fs.writeFileSync(candidate, 'smaller');
+    expect(await replaceImageIfSmaller(source, candidate, write, inspect)).toMatchObject({ changed: true });
+    expect(fs.readFileSync(source, 'utf8')).toBe(write ? 'smaller' : 'original image content');
+    expect(fs.existsSync(candidate)).toBe(false);
+  });
+  it('fails closed and removes the candidate when decoding fails', async () => {
+    const { root } = fixture();
+    const source = path.join(root, 'assets/images/photo.jpg');
+    const candidate = `${source}.candidate`;
+    fs.writeFileSync(candidate, 'smaller');
+    await expect(replaceImageIfSmaller(source, candidate, true, () => { throw new Error('decode failed'); }))
+      .rejects.toThrow('decode failed');
+    expect(fs.readFileSync(source, 'utf8')).toBe('original image content');
+    expect(fs.existsSync(candidate)).toBe(false);
   });
 });
