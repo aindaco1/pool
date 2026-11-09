@@ -17,6 +17,8 @@ import {
   normalizeMediaRepoPath
 } from '../worker/src/media-catalog.js';
 
+import { inspectImage } from './inspect-image.mjs';
+
 const execFileAsync = promisify(execFile);
 
 const IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png', '.webp']);
@@ -237,16 +239,21 @@ export async function resolveMediaFiles(args) {
   return pending;
 }
 
-async function replaceIfSmaller(sourcePath, candidatePath, write) {
+export async function replaceImageIfSmaller(sourcePath, candidatePath, write, inspect = inspectImage) {
   const sourceSize = await fileSize(sourcePath);
   const candidateSize = await fileSize(candidatePath);
   if (!candidateSize || candidateSize >= sourceSize) {
     await fs.rm(candidatePath, { force: true });
     return { changed: false, bytesSaved: 0 };
   }
-  if (write) {
-    await fs.rename(candidatePath, sourcePath);
-  } else {
+  try {
+    if (JSON.stringify(await inspect(sourcePath)) !== JSON.stringify(await inspect(candidatePath))) {
+      return { changed: false, bytesSaved: 0, skipped: 'candidate changes source image evidence' };
+    }
+    if (write) {
+      await fs.rename(candidatePath, sourcePath);
+    }
+  } finally {
     await fs.rm(candidatePath, { force: true });
   }
   return { changed: true, bytesSaved: sourceSize - candidateSize };
@@ -279,24 +286,28 @@ async function optimizeImage(repoPath, args, tools) {
   const before = await fileSize(filePath);
   if (!before) return { repoPath, changed: false, skipped: 'missing' };
 
+  if (!tools.ffmpeg || !tools.ffprobe) {
+    return { repoPath, changed: false, skipped: 'missing ffmpeg/ffprobe for source validation' };
+  }
+
   if (extension === '.png' && tools.oxipng) {
     const candidatePath = `${filePath}.optimized.png`;
     await fs.copyFile(filePath, candidatePath);
     await execFileAsync('oxipng', ['-o', 'max', '--strip', 'safe', candidatePath]);
-    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
+    return { repoPath, ...await replaceImageIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.png' && tools.optipng) {
     const candidatePath = `${filePath}.optimized.png`;
     await fs.copyFile(filePath, candidatePath);
     await execFileAsync('optipng', ['-o7', '-quiet', candidatePath]);
-    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
+    return { repoPath, ...await replaceImageIfSmaller(filePath, candidatePath, args.write) };
   } else if ((extension === '.jpg' || extension === '.jpeg') && tools.jpegtran) {
     const candidatePath = `${filePath}.optimized`;
     await execFileAsync('jpegtran', ['-copy', 'all', '-optimize', '-progressive', '-outfile', candidatePath, filePath]);
-    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
+    return { repoPath, ...await replaceImageIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.gif' && tools.gifsicle) {
     const candidatePath = `${filePath}.optimized.gif`;
     await execFileAsync('gifsicle', ['-O3', filePath, '-o', candidatePath]);
-    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
+    return { repoPath, ...await replaceImageIfSmaller(filePath, candidatePath, args.write) };
   } else if (extension === '.webp') {
     if (isResponsiveWebpDerivative(repoPath)) {
       return { repoPath, changed: false, skipped: 'generated responsive webp derivative' };
@@ -309,7 +320,7 @@ async function optimizeImage(repoPath, args, tools) {
     }
     const candidatePath = `${filePath}.optimized`;
     await execFileAsync('cwebp', ['-quiet', '-lossless', '-z', '9', filePath, '-o', candidatePath]);
-    return { repoPath, ...await replaceIfSmaller(filePath, candidatePath, args.write) };
+    return { repoPath, ...await replaceImageIfSmaller(filePath, candidatePath, args.write) };
   } else {
     return { repoPath, changed: false, skipped: `missing optimizer for ${extension}` };
   }

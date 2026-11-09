@@ -4,7 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PLAYWRIGHT_IMAGE="localhost/pool-dev-playwright:node-24.22.1"
+PLAYWRIGHT_VERSION="$(node -e '
+  const version = require("./package-lock.json").packages?.["node_modules/@playwright/test"]?.version;
+  if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) process.exit(1);
+  process.stdout.write(version);
+')"
+PLAYWRIGHT_IMAGE="localhost/pool-dev-playwright:${PLAYWRIGHT_VERSION}-node-24.22.1"
 PLAYWRIGHT_NODE_MODULES_VOLUME="pool-dev-playwright-node-modules"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_STACK_STARTED=false
@@ -95,6 +100,14 @@ if ! shared_stack_ready; then
   fi
 fi
 
+# Browser fixtures import Worker modules. Reuse the running Worker's installed
+# dependencies instead of depending on the host checkout's node_modules.
+WORKER_NODE_MODULES_VOLUME="$(podman inspect --format '{{range .Mounts}}{{if and (eq .Type "volume") (eq .Destination "/workspace/worker/node_modules")}}{{.Name}}{{end}}{{end}}' pool-dev-worker)"
+if [ -z "$WORKER_NODE_MODULES_VOLUME" ]; then
+  echo "Cannot locate the running Worker's dependency volume for Playwright." >&2
+  exit 1
+fi
+
 if [ "$PODMAN_REBUILD" = "1" ] || ! podman image exists "$PLAYWRIGHT_IMAGE"; then
   echo "🔨 Building $PLAYWRIGHT_IMAGE..." >&2
   podman build -t "$PLAYWRIGHT_IMAGE" -f "$ROOT_DIR/Containerfile.playwright.dev" "$ROOT_DIR" >&2
@@ -106,6 +119,7 @@ podman run --rm \
   --pod pool-dev-pod \
   -v "$ROOT_DIR:/workspace" \
   -v "$PLAYWRIGHT_NODE_MODULES_VOLUME:/workspace/node_modules" \
+  -v "$WORKER_NODE_MODULES_VOLUME:/workspace/worker/node_modules:ro" \
   -w /workspace \
   -e CI="${CI:-1}" \
   -e PLAYWRIGHT_EXTERNAL_SERVER=1 \

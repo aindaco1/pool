@@ -206,7 +206,11 @@ That focused suite is the preferred local browser check for admin UI changes suc
 
 For host-side commands that need a Podman-backed site/Worker without assuming detached stack persistence, use [`scripts/podman-stack-run.sh`](../scripts/podman-stack-run.sh). `npm run test:security:podman` uses that wrapper to boot the stack, run the security suite, and tear the stack down in one invocation.
 
-The Worker container defaults to `node:24-bookworm-slim`. If a local Podman image pull stalls but the Playwright image pinned in `Containerfile.playwright.dev` is already cached, the launcher can reuse that exact Node 24 base so development still matches the GitHub Actions Node 24 runtime. Use `nvm use` from the repository root to select the supported Node 24.15 baseline before running host-side npm commands.
+Playwright mounts the running Worker's dependency volume read-only because browser fixtures import Worker modules. It fails before testing if that volume cannot be found, rather than relying on host `worker/node_modules`. The browser image tag includes the locked Playwright version so a tooling upgrade cannot silently reuse an older cached image; the entrypoint installs the exact lockfile with `npm ci`.
+
+When a new stack starts with `CI=1` or `CI=true`, Jekyll serves one build with `--no-watch`, matching the host Playwright server. Normal local development retains polling for source edits. An already-running development stack keeps its original mode. Performance budgets and browser assertions apply unchanged in either mode.
+
+The Worker container defaults to `node:24-bookworm-slim`. If a local Podman image pull stalls but the Playwright image pinned in `Containerfile.playwright.dev` is already cached, the launcher can reuse that exact Node 24 base so development still matches the GitHub Actions Node 24 runtime. Use `nvm use` from the repository root to select the supported Node 24.22.1 baseline before running host-side npm commands.
 
 For the host-side headless browser path, Playwright builds a clean static `_site` and serves it with a lightweight HTTP server instead of relying on `jekyll serve`. That keeps browser regressions closer to the real published asset shape and avoids some WEBrick instability during parallel runs.
 
