@@ -84,6 +84,8 @@ describe('package release scripts', () => {
   it('keeps the Playwright package, container, fallback, and docs aligned', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
     const packageVersion = String(packageJson.devDependencies['@playwright/test']).replace(/^[~^]/, '');
+    const lockedVersion = JSON.parse(readFileSync(join(repoRoot, 'package-lock.json'), 'utf8')).packages['node_modules/@playwright/test'].version;
+    expect(lockedVersion).toBe(packageVersion);
     const image = `mcr.microsoft.com/playwright:v${packageVersion}-noble`;
     const containerfile = readFileSync(join(repoRoot, 'Containerfile.playwright.dev'), 'utf8');
     const podmanLauncher = readFileSync(join(repoRoot, 'scripts', 'dev-podman.sh'), 'utf8');

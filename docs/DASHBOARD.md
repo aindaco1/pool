@@ -713,6 +713,7 @@ The Worker upload endpoint is source-preserving. It validates type, size, campai
 Campaign archive moves are repository-side for the same reason. In local dev, the Worker calls the local repo helper when `ADMIN_LOCAL_REPO_WRITES_ENABLED=true`; in production, the dashboard dispatches the **Archive campaign** workflow after super-admin authorization, and the workflow validates the slug before moving campaign source and campaign-owned media into `archive/campaigns/<slug>/`.
 
 Retry the workflow with `scope=changed` to process pending uploads, or `scope=all` to reprocess all source images. Changed scope uses source hashes and missing sizes instead of relying on the latest commit. Both scopes preserve intentionally skipped derivatives that would be larger than their source. `npm run media:manifest` rebuilds the index without processing binaries. Local commands and the reviewed video workflow are documented in [Performance](PERFORMANCE.md#media-optimization).
+
 ### Source image preservation during optimization
 
 The optimizer and release validator use the same decoded-image inspection. A smaller candidate replaces an original only when pixels, dimensions, orientation, aspect-ratio evidence, and animation timing match. Candidates that change that evidence are discarded with a skip reason; the original remains authoritative and responsive derivatives can still be generated. FFmpeg and ffprobe are required for source replacement. The release validator remains an independent final check of the complete patch.

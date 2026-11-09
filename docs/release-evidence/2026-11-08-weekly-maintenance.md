@@ -21,12 +21,19 @@ Platform's rational normalization is unchanged: unspecified and square aspect
 ratios are not universally equivalent. Filesystem decoding, optimizer choice,
 and source-publication policy remain Pool-owned.
 
+The scheduled Podman failure came from Playwright importing `sales-tax` through
+Worker source without the Worker's dependency volume. Adopt Store's existing
+read-only mount pattern, discover the mounted volume from the running Worker,
+and fail if absent. Include the locked Playwright version in the image tag and
+use `npm ci` to keep container dependencies reproducible.
+
 ## Validation
 
 - `npm ci` at root and Worker, plus `npm run test:dependencies`: pass, zero vulnerabilities in production and full audits.
 - `npm run test:premerge`: pass. Full unit suite: 1,230 passed, one existing skip. Browser suite: 178 passed, three existing content-dependent skips. Security, build artifacts, host Worker, and Podman mutable-pledge smoke pass.
 - The exact reported JPEG candidate is rejected before replacement while retaining the original bytes. Focused regressions cover accepted write/check modes, evidence mismatch, failed decoding, and candidate cleanup.
 - An isolated checkout ran the optimizer and final validator on the reported JPEG: original bytes retained, four responsive derivatives validated, manifest consistency passed. Its generated artifacts are rehearsal evidence, not published assets.
+- Container follow-up: regression fixtures failed before the mount change and pass afterward (20 focused wrapper/tooling tests). All 22 checkout-edit cases pass through the real Podman wrapper with the Worker dependency volume mounted read-only. The full premerge result above precedes this shell-only follow-up; hosted CI validates the final revision.
 - No campaign assets, settings, provider state, Platform pin, or production deployment changed.
 
 ## Rollback
