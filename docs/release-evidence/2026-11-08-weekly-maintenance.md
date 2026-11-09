@@ -37,6 +37,14 @@ the host Playwright configuration; normal editing retains polling. This removes
 unneeded filesystem polling during CI without loosening any timing gate. Final
 hosted verification is recorded on the pull request.
 
+The fixed-build hosted run passed in 7m24s (177 browser passes, three existing
+skips, and one keyboard-checkout case that passed on retry). Its remaining race
+was a one-shot accessibility snapshot taken immediately after dialog visibility.
+The two duplicate snapshot helpers now share one bounded assertion in
+`tests/e2e/helpers/aria.ts`. It retries the same assertions for up to five seconds,
+matching Playwright's ordinary assertion window; it does not skip the keyboard
+flow or change expected accessible content.
+
 ## Validation
 
 - `npm ci` at root and Worker, plus `npm run test:dependencies`: pass, zero vulnerabilities in production and full audits.
@@ -45,6 +53,7 @@ hosted verification is recorded on the pull request.
 - An isolated checkout ran the optimizer and final validator on the reported JPEG: original bytes retained, four responsive derivatives validated, manifest consistency passed. Its generated artifacts are rehearsal evidence, not published assets.
 - Container follow-up: regression fixtures failed before the mount change and pass afterward (20 focused wrapper/tooling tests). All 22 checkout-edit cases pass through the real Podman wrapper with the Worker dependency volume mounted read-only. The full premerge result above precedes this shell-only follow-up; hosted CI validates the final revision.
 - Fixed-build CI serving: three new shell cases fail before the change; all 16 site/wrapper/connection tests pass afterward. Fifteen repeated real Podman dashboard and keyboard-flow checks pass with browser retries disabled. The three-second dashboard budget is unchanged.
+- Accessibility snapshot follow-up: ten repeated keyboard checkout flows and all 23 public accessibility cases pass through real Podman with browser retries disabled.
 - No campaign assets, settings, provider state, Platform pin, or production deployment changed.
 
 ## Rollback

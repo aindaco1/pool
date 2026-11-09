@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
+import { expectAriaSnapshotToContain } from './helpers/aria';
 
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
 
@@ -30,13 +31,6 @@ async function expectNoAxeViolations(page: any) {
       .map((violation: any) => `${violation.id}: ${violation.help}`)
       .join('\n')
   ).toEqual([]);
-}
-
-async function expectAriaSnapshotToContain(locator: any, fragments: string[]) {
-  const snapshot = await locator.ariaSnapshot();
-  for (const fragment of fragments) {
-    expect(snapshot).toContain(fragment);
-  }
 }
 
 const JSON_HEADERS = {

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
+import { expectAriaSnapshotToContain } from './helpers/aria';
 
 const CART_BUTTON_SELECTOR = 'button.poolcart-add-item';
 const TIER_CARD_BUTTON_SELECTOR = '.tier-card button.poolcart-add-item';
@@ -118,13 +119,6 @@ async function getActiveRuntime(page: any) {
   return page.evaluate(() => {
     return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
   });
-}
-
-async function expectAriaSnapshotToContain(locator: any, fragments: string[]) {
-  const snapshot = await locator.ariaSnapshot();
-  for (const fragment of fragments) {
-    expect(snapshot).toContain(fragment);
-  }
 }
 
 test.describe('Campaign Page Structure', () => {
