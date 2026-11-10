@@ -12,7 +12,7 @@ goal_deadline: 2026-10-28
 goal_amount: 5500
 charged: false
 hero_image: "/assets/images/campaigns/possessions/hero-square-20261106-005212-79347bee.jpg"
-hero_image_wide: /assets/images/defaults/dust-wave-square.png
+hero_image_wide: "/assets/images/campaigns/possessions/hero-wide-20261109-174333-6f9c35b9.jpg"
 creator_image: /assets/images/defaults/dust-wave-square.png
 creator_name: "Jace Strickland"
 category: "Short Film"
@@ -169,5 +169,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-06T00:54:35.597Z"
+_pool_draft_saved_at: "2026-11-09T17:44:12.434Z"
 ---
