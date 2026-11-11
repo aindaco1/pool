@@ -7,15 +7,15 @@ preview_only: true
 preview_enabled: false
 preview_reviewer_emails: []
 state: upcoming
-start_date: "2026-11-09"
+start_date: "2026-11-12"
 goal_deadline: "2026-12-13"
-goal_amount: 2000
+goal_amount: 3000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
 creator_image: "/assets/images/campaigns/you-re-only-young-once/creator-20261108-040130-addf200c.jpg"
 creator_name: "Joey Greenberg"
-category: "Other"
+category: "Short Film"
 short_blurb: "A 30 year-old school teacher on the verge of fatherhood has doubts about his commitments to leading a responsible and adult life. In his attempts to live vicariously through his students, he begins to drift more and more away from his adult life until he destroys all he has for the sake of his own selfish freedom."
 show_ongoing: false
 single_tier_only: false
@@ -133,6 +133,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-11T22:42:47.423Z"
+_pool_draft_saved_at: "2026-11-11T22:45:27.179Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261108-040940-893d69ae.jpg"
 ---
