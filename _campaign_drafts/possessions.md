@@ -34,10 +34,9 @@ long_content:
   - type: "text"
     body: |
       ## WHY ARE WE MAKING THIS?
-  - type: "quote"
-    text: |
-      It was not you who ate the idea, but the idea that ate you.
-    author: "Fyodor Dostoevsky, *Demons*"
+  - type: "image"
+    src: "/assets/images/campaigns/possessions/content-dostoevsky-20261111-185036-087649bf.png"
+    alt: ""
   - type: "text"
     body: |
       You probably know someone who can't switch off their work brain. Someone who fixes everyone's problems except their own. Someone who always makes an uncomfortable joke the second a conversation gets too real. We see these patterns clear as day in the people around us. But what pattern drives you? Can you name it? Most of us can't, because from the inside, a habit doesn't feel like a habit; it just feels like us being who we are.
@@ -49,7 +48,7 @@ long_content:
     body: |
       ## **WHAT WILL IT LOOK LIKE?**
       
-      Given we're telling such a contained story, the aesthetics have to do a lot of the heavy lifting here. Everything revolves around the diner - a warm, lit-up building standing against the dark, full of people just being alone together.
+      Given we're telling such a contained story, the aesthetics have to do a lot of the heavy lifting here. Everything revolves around the diner - a warm, lit-up building standing against the dark. Full of people just being alone together.
   - type: "image"
     align: "center"
     src: "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg"
@@ -66,7 +65,7 @@ long_content:
     body: |
       ## **WHERE ARE WE NOW?**
       
-      The script is finished, and has been refined across multiple drafts and table reads.
+      The script is finished, and has been refined across multiple drafts and table reads. And we've also filled all of our most important crew positions!
       
       I'm making my directorial debut with POSSESSIONS, after coming up through the G&E path. So it was very important to me that I secure a crew with the experience to make this the best film it can possible be, and I'm pleased to say I've done just that.
       
@@ -96,13 +95,14 @@ long_content:
       
       If anything is left over, it will go directly toward additional festival submissions!
       
-      This campaign is built around tiered pledges. Each tier introduces a new reward - and as the tiers progress, note that all previous rewards from lower tiers will also be included alongside the exclusive reward for a given tier.
+      This campaign is built around tiered pledges. Each tier introduces a new reward - and as the tiers progress, note that all previous rewards from lower tiers will also be included alongside the exclusive reward for a given tier. Rewards will be shipped after filming has wrapped & prior to our release in May!
 support_items: []
 campaign_add_ons: []
 tiers:
   - id: "thanks"
-    name: "Thanks!"
+    name: "Thank You!"
     price: 5
+    image: "/assets/images/campaigns/possessions/tier-thank-you-20261111-181656-8721b996.jpg"
     description: "Thank you from the bottom of our hearts! No on-screen credit will be given."
     stackable: false
     category: "digital"
@@ -110,49 +110,52 @@ tiers:
   - id: "special-thanks"
     name: "Special Thanks!"
     price: 10
+    image: "/assets/images/campaigns/possessions/tier-special-thanks-20261111-181826-e952ff3f.jpg"
     description: "Thank you from the bottom of our hearts! Supporters in this tier will receive an on-screen credit for your contribution!"
     stackable: false
     category: "digital"
     late_support: false
   - id: "bts-doc"
-    name: "Traffic Wizard Sticker"
+    name: "Blessing of the Traffic Wizard"
     price: 25
-    description: "Supporters in this tier will receive a custom Traffic Wizard sticker!"
+    image: "/assets/images/campaigns/possessions/tier-blessing-of-the-traffic-wizard-20261111-182113-f48e41db.jpg"
+    description: "Supporters in this tier will receive a custom Traffic Wizard sticker! The design is not yet final, so check back in for updates."
     limit_total: 100
     stackable: false
     category: "physical"
     shipping_preset: "sticker"
     late_support: false
   - id: "bts-documentary"
-    name: "BTS Documentary"
+    name: "A Peek Behind the Counter"
     price: 50
-    description: "Supporters in this tier will receive access to a behind the scenes documentary on the making of POSSESSIONS."
+    image: "/assets/images/campaigns/possessions/tier-a-peek-behind-the-counter-20261111-182244-7bec8af2.jpg"
+    description: "Supporters in this tier will receive access to a behind the scenes documentary on the making of POSSESSIONS! Will be sent out after the release of the film itself!"
     stackable: false
     category: "digital"
     late_support: false
   - id: "possessions-t-shirt"
-    name: "POSSESSIONS T-Shirt"
+    name: "New Hire"
     price: 100
-    description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt."
+    description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt. The design is not yet finalized - so check back in for updates!"
     stackable: false
     category: "digital"
     late_support: false
   - id: "possessions-poster"
-    name: "POSSESSIONS Poster"
+    name: "Line Cook"
     price: 250
     description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster."
     stackable: false
     category: "digital"
     late_support: false
   - id: "associate-producer"
-    name: "Associate Producer"
+    name: "General Manager"
     price: 500
     description: "Supporters in this tier will receive an Associate Producer credit on the film!"
     stackable: false
     category: "digital"
     late_support: false
   - id: "executive-producer"
-    name: "Executive Producer"
+    name: "Franchise Owner"
     price: 1000
     description: "Supporters in this tier will receive an Executive Producer credit on the film!"
     stackable: false
@@ -169,5 +172,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-09T17:44:12.434Z"
+_pool_draft_saved_at: "2026-11-11T18:50:42.200Z"
 ---
