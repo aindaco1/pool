@@ -19,7 +19,7 @@ category: "Short Film"
 short_blurb: "A freshly unemployed PR analyst's plan for a quiet exit is hijacked by a nosy stranger."
 show_ongoing: false
 single_tier_only: false
-stretch_hidden: true
+stretch_hidden: false
 custom_late_support: false
 runner_report_emails:
   - "tyhernandez11@gmail.com"
@@ -67,16 +67,24 @@ long_content:
     body: |
       ## **WHERE ARE WE NOW?**
       
-      The script is finished, and has been refined across multiple drafts and table reads. And we've also filled all of our most important crew positions!
+      The script is finished, and has been refined across multiple drafts and table reads. We've also filled all of our most important crew positions!
       
-      I'm making my directorial debut with POSSESSIONS, after coming up through the G&E path. So it was very important to me that I secure a crew with the experience to make this the best film it can possible be, and I'm pleased to say I've done just that.
+      I'm making my directorial debut with POSSESSIONS, after spending the past five years working primarily in lighting and camera. Needless to say, it was very important to me that I secure a crew with the experience to make this the best film it can possibly be, and I'm pleased to say I've done just that!
+      
+      **<u>KEY CREW</u>**
       
       - **Director of Photography**: Ella Daniel (elladanieldp.com)
       - **Gaffer**: Luis Gutierrez
       - **Producer & Costume Designer:** Ria Suarez (*Worst Movie Ever, Bewildered!*)
-      - **Producer & Assistant Director:** Massimilliano Mraz
+      - **Producer & Assistant Director:** Massimilliano Mraz ()
+      - **Art Director**: Stella Cole ()
       
-      We are in final talks with the diner to officially secure the location for our three-day-shoot in January 2027. After production is completed, we're poised to move swiftly into post-production to be ready for our premiere in May!
+      **<u>PRIMARY CAST</u>**
+      
+      - **Ian**: TBD
+      - **Elise**: Lucinda Marker
+      
+      We are in final talks with the diner to officially secure the location for our three-day shoot in January 2027. After production is completed, we're poised to move swiftly into post-production to be ready for our premiere in May!
       
       The only thing missing is the funding to put all of this on screen!
   - type: "image"
@@ -97,7 +105,7 @@ long_content:
       
       If anything is left over, it will go directly toward additional festival submissions!
       
-      This campaign is built around tiered pledges. Each tier introduces a new reward - and as the tiers progress, note that all previous rewards from lower tiers will also be included alongside the exclusive reward for a given tier. Rewards will be shipped after filming has wrapped & prior to our release in May!
+      This campaign is built around tiered pledges. Each tier introduces a new reward - and as the tiers progress, note that all previous rewards from lower tiers will also be included alongside the exclusive reward for a given tier. Rewards ship after filming wraps, but ahead of our May release!
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -188,6 +196,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T22:07:32.434Z"
+_pool_draft_saved_at: "2026-11-11T22:26:15.491Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
