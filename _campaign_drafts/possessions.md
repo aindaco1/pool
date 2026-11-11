@@ -65,8 +65,12 @@ long_content:
     alt: ""
   - type: "text"
     body: |
-      ## **WHERE ARE WE NOW?**
-      
+      ## WHERE ARE WE NOW?
+  - type: "image"
+    src: "/assets/images/campaigns/possessions/content-timeline-20261111-234710-d628516c.png"
+    alt: ""
+  - type: "text"
+    body: |
       The script is finished, and has been refined across multiple drafts and table reads. We've also filled all of our most important crew positions!
       
       I'm making my directorial debut with POSSESSIONS, after spending the past five years working primarily in lighting and camera. Needless to say, it was very important to me that I secure a crew with the experience to make this the best film it can possibly be, and I'm pleased to say I've done just that!
@@ -196,6 +200,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T23:21:52.653Z"
+_pool_draft_saved_at: "2026-11-11T23:47:15.009Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
