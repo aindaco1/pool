@@ -79,8 +79,8 @@ long_content:
       
       - **Director of Photography**: Ella Daniel (elladanieldp.com)
       - **Gaffer**: Luis Gutierrez
-      - **Producer & Costume Designer:** Ria Suarez (*Worst Movie Ever, Bewildered!*)
-      - **Producer & Assistant Director:** Massimilliano Mraz ()
+      - **Producer & Costume Designer:** Ria Suarez (Costume Designer for *Worst Movie Ever & Bewildered!*)
+      - **Producer & Assistant Director:** Massimilliano Mraz (Lead Producer on *The Arsonists* and Associate Producer on *Every Type of Orange*)
       - **Art Director**: Stella Cole ()
       
       **<u>PRIMARY CAST</u>**
@@ -200,6 +200,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T23:47:15.009Z"
+_pool_draft_saved_at: "2026-11-11T23:54:58.066Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
