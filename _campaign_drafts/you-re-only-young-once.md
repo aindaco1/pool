@@ -71,6 +71,24 @@ long_content:
     body: |
       #### **Marissa Carmenaty- Producer**
   - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image0-1-20261111-225807-0e163a99.jpg"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **Stella Cole- Art Director**
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image1-1-20261111-225810-c28e7ee8.jpg"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **Ria Suarez- Costume Designer**
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image2-20261111-225814-37d6e0b2.png"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **Steven Bullard- Gaffer**
+  - type: "image"
     src: "/assets/images/campaigns/you-re-only-young-once/content-yoyo-headers-budget-20261108-045755-0ac88d9e.png"
     alt: ""
     caption: "Wait, so what am I paying for....?"
@@ -130,9 +148,17 @@ tiers:
     late_support: false
 stretch_goals: []
 ongoing_items: []
-diary: []
+diary:
+  - title: "Read Me!"
+    id: "read-me"
+    date: "2026-11-12T00:00-06:00"
+    phase: "launch"
+    content:
+      - type: "text"
+        body: |
+          Hey there! Thanks so much for checking out the fundraising site for 'You're Only Young Once'! The cast and crew can't thank you enough for your support. Feel free to check out the site and get to know more about the project. If you're so inclined- send this to your friends, family group chat or whoever might want to know more about the film.
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-11T22:45:27.179Z"
+_pool_draft_saved_at: "2026-11-11T22:58:18.295Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261108-040940-893d69ae.jpg"
 ---
