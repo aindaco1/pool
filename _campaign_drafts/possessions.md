@@ -143,7 +143,7 @@ tiers:
   - id: "possessions-poster"
     name: "Line Cook"
     price: 250
-    description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster."
+    description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster. The design will be composed of visuals from the film, and thus will not be designed until after filming has wrapped. Stay posted for updates!"
     stackable: false
     category: "digital"
     late_support: false
@@ -172,5 +172,5 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T18:50:42.200Z"
+_pool_draft_saved_at: "2026-11-11T19:07:41.093Z"
 ---
