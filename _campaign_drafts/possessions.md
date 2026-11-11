@@ -7,8 +7,8 @@ preview_only: true
 preview_enabled: false
 preview_reviewer_emails: []
 state: upcoming
-start_date: 2026-10-28
-goal_deadline: 2026-10-28
+start_date: "2026-11-24"
+goal_deadline: "2026-12-25"
 goal_amount: 5500
 charged: false
 hero_image: "/assets/images/campaigns/possessions/hero-square-20261106-005212-79347bee.jpg"
@@ -172,5 +172,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T19:07:41.093Z"
+_pool_draft_saved_at: "2026-11-11T19:14:01.214Z"
+instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
