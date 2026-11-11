@@ -41,6 +41,36 @@ long_content:
     body: |
       #### Joey Greenberg- Writer/Director
   - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image3-20261111-224227-bc458f25.jpg"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **MayLi Bachand- Assistant Director**
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image5-20261111-224231-3973907b.jpg"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **Sam Tomatz- Director of Photography**
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image2-20261111-224235-eb4a0874.jpg"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **Marqus Chavez- Producer**
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image1-20261111-224239-9a38af18.jpg"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **Beau Ryan McKean- Producer**
+  - type: "image"
+    src: "/assets/images/campaigns/you-re-only-young-once/content-image0-20261111-224243-91c64309.jpg"
+    alt: ""
+  - type: "text"
+    body: |
+      #### **Marissa Carmenaty- Producer**
+  - type: "image"
     src: "/assets/images/campaigns/you-re-only-young-once/content-yoyo-headers-budget-20261108-045755-0ac88d9e.png"
     alt: ""
     caption: "Wait, so what am I paying for....?"
@@ -103,6 +133,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-08T04:58:00.238Z"
+_pool_draft_saved_at: "2026-11-11T22:42:47.423Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261108-040940-893d69ae.jpg"
 ---
