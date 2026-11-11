@@ -136,6 +136,7 @@ tiers:
   - id: "possessions-t-shirt"
     name: "New Hire"
     price: 100
+    image: "/assets/images/campaigns/possessions/tier-new-hire-20261111-211404-0ed8d100.jpg"
     description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt. The design is not yet finalized - so check back in for updates!"
     stackable: false
     category: "digital"
@@ -143,6 +144,7 @@ tiers:
   - id: "possessions-poster"
     name: "Line Cook"
     price: 250
+    image: "/assets/images/campaigns/possessions/tier-line-cook-20261111-210954-733335cc.jpg"
     description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster. The design will be composed of visuals from the film, and thus will not be designed until after filming has wrapped. Stay posted for updates!"
     stackable: false
     category: "digital"
@@ -150,6 +152,7 @@ tiers:
   - id: "associate-producer"
     name: "General Manager"
     price: 500
+    image: "/assets/images/campaigns/possessions/tier-general-manager-20261111-211017-3151f0e4.jpg"
     description: "Supporters in this tier will receive an Associate Producer credit on the film!"
     stackable: false
     category: "digital"
@@ -157,6 +160,7 @@ tiers:
   - id: "executive-producer"
     name: "Franchise Owner"
     price: 1000
+    image: "/assets/images/campaigns/possessions/tier-franchise-owner-20261111-211245-3e4d1ccc.jpg"
     description: "Supporters in this tier will receive an Executive Producer credit on the film!"
     stackable: false
     category: "digital"
@@ -172,6 +176,6 @@ ongoing_items: []
 diary: []
 decisions: []
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T19:14:01.214Z"
+_pool_draft_saved_at: "2026-11-11T21:14:52.943Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
