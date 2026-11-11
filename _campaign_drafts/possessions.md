@@ -51,9 +51,8 @@ long_content:
       Given we're telling such a contained story, the aesthetics have to do a lot of the heavy lifting here. Everything revolves around the diner - a warm, lit-up building standing against the dark. Full of people just being alone together.
   - type: "image"
     align: "center"
-    src: "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg"
+    src: "/assets/images/campaigns/possessions/content-nighthawks-20261111-220720-6f8aa476.png"
     alt: ""
-    caption: "Nighthawks (1942), Edward Hopper"
   - type: "text"
     body: |
       As Ian and Elise's conversation progresses through the night - we'll watch the natural light of the outside world slowly fade away until we're left with only the pale light of the moon. Ian wraps himself in cool, muted tones - while Elise is the most colorful thing in the room.
@@ -61,6 +60,9 @@ long_content:
       Because this film is in part about the things we own, physical objects do a lot of the talking: what's on the table, what's in the pockets, what someone can't put down. All of these things are very intentional, and have plenty to say to those who are willing to watch closely.
       
       We're going to keep you stuck in long, unbroken stretches of conversation - forcing you into the same pressurized space as Ian. You'll be at the table right with him, with nowhere else to look. Think the special diner episode of *Euphoria* meets *My Dinner with André:* it's just two people, one night, and no easy way out of an uncomfortable conversation.
+  - type: "image"
+    src: "/assets/images/campaigns/possessions/content-comps-20261111-220727-8faf8457.png"
+    alt: ""
   - type: "text"
     body: |
       ## **WHERE ARE WE NOW?**
@@ -174,8 +176,18 @@ stretch_goals:
     status: "locked"
 ongoing_items: []
 diary: []
-decisions: []
+decisions:
+  - id: "what-s-in-ian-s-drawer-of-shame"
+    type: "poll"
+    title: "What's in Ian's drawer of shame?"
+    deadline: "2027-01-01"
+    options:
+      - "A magic 8 ball"
+      - "A box of dry breakfast cereal"
+      - "A broken plastic trophey"
+    eligible: "backers"
+    status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T21:14:52.943Z"
+_pool_draft_saved_at: "2026-11-11T22:07:32.434Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
