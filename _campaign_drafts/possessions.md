@@ -105,7 +105,7 @@ long_content:
       
       If anything is left over, it will go directly toward additional festival submissions!
       
-      This campaign is built around tiered pledges. Each tier introduces a new reward - and as the tiers progress, note that all previous rewards from lower tiers will also be included alongside the exclusive reward for a given tier. Rewards ship after filming wraps, but ahead of our May release!
+      This campaign is built around tiered pledges. Work your way up the job ladder - from a regular guest to a franchise owner! Each tier introduces a new reward - and as they progress, all previous rewards will also be included alongside the exclusive reward for a given tier. Rewards ship after filming wraps, but ahead of our May release!
 support_items: []
 campaign_add_ons: []
 tiers:
@@ -196,6 +196,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T22:26:15.491Z"
+_pool_draft_saved_at: "2026-11-11T23:21:52.653Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
