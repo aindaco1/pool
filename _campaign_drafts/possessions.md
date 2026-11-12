@@ -114,17 +114,17 @@ support_items: []
 campaign_add_ons: []
 tiers:
   - id: "thanks"
-    name: "Thank You!"
+    name: "First Time Customer"
     price: 5
-    image: "/assets/images/campaigns/possessions/tier-thank-you-20261111-181656-8721b996.jpg"
+    image: "/assets/images/campaigns/possessions/tier-thank-you-20261112-210332-e989aacf.jpg"
     description: "Thank you from the bottom of our hearts! No on-screen credit will be given."
     stackable: false
     category: "digital"
     late_support: true
   - id: "special-thanks"
-    name: "Special Thanks!"
+    name: "Late Night Regular"
     price: 10
-    image: "/assets/images/campaigns/possessions/tier-special-thanks-20261111-181826-e952ff3f.jpg"
+    image: "/assets/images/campaigns/possessions/tier-late-night-regular-20261112-212741-b29a306c.jpg"
     description: "Thank you from the bottom of our hearts! Supporters in this tier will receive an on-screen credit for your contribution!"
     stackable: false
     category: "digital"
@@ -200,6 +200,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-12T19:28:44.012Z"
+_pool_draft_saved_at: "2026-11-12T21:28:15.337Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
