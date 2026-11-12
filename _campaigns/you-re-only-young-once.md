@@ -12,7 +12,7 @@ goal_deadline: "2026-12-13"
 goal_amount: 3000
 charged: false
 hero_image: "/assets/images/defaults/dust-wave-square.png"
-hero_image_wide: "/assets/images/defaults/dust-wave-square.png"
+hero_image_wide: "/assets/images/campaigns/you-re-only-young-once/hero-wide-20261112-070836-94c832ca.png"
 creator_image: "/assets/images/campaigns/you-re-only-young-once/creator-20261112-062709-a6c89328.jpg"
 creator_name: "Joey Greenberg"
 category: "Short Film"
