@@ -165,17 +165,17 @@ diary:
       - type: "text"
         body: |
           So far so good! Our pre-production process has been going well, with the help of our producers. We locked in some filming locations and filled up our crew. The team is currently working on casting, marketing the film, and securing gear. The department heads and producers have been busy making this project come to life.
-  - title: "Read Me!"
+  - title: "Hey! Welcome!"
     id: "read-me"
     date: "2026-11-12T00:00-06:00"
-    phase: "launch"
+    phase: "fundraising"
     content:
       - type: "text"
         body: |
           Hey there! Thanks so much for checking out the fundraising site for 'You're Only Young Once'! The cast and crew can't thank you enough for your support. Feel free to check out the site and get to know more about the project. If you're so inclined- send this to your friends, family group chat or whoever might want to know more about the film.
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-12T04:46:11.693Z"
+_pool_draft_saved_at: "2026-11-12T04:51:46.237Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261112-042225-27aa4ef8.jpg"
 hero_video: "https://youtu.be/olvUpF8FTwU?si=q9O7sT8JcRycCBhM"
 ---
