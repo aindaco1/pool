@@ -100,12 +100,12 @@ long_content:
       
       This is an all-or-nothing campaign, meaning you **will not be charged until we hit our $5,500** **goal**. Every dollar after payment processing fees will go straight to the making of the film and feeding our hard-working cast and crew.
       
-      - **Equipment** - $1,775 (34%): Cameras, lenses, and lighting.
-      - **Location** - $1,500 (29%): We're filming for three days in a working New Mexico diner. Our insurance policy covers the shoot, so none of your support goes to coverage.
-      - **Costumes, props, & makeup** - ≈ $550 (11%): everything you'll see in the diner and on the actors.
-      - **Catering** - ≈ $500 (10%): feeding all of our cast and crew for the three-day-shoot.
-      - **Contingency fund** - ≈ $500 (10%): a cushion for the unexpected things that always happen on a shoot.
-      - **Marketing** - ≈ $350 (7%): festival submission fees and promotional material.
+      - **Equipment** - $1,625 (30%): Cameras, lenses, and lighting.
+      - **Location** - $1,500 (27%): We're filming for three days in a working New Mexico diner. Our insurance policy covers the shoot, so none of your support goes to coverage.
+      - **Marketing** **& Distribution** - ≈ $825 (15%): festival submission fees, shipping fulfillments, and processing fees.
+      - **Costumes, props, & makeup** - ≈ $550 (10%): everything you'll see in the diner and on the actors.
+      - **Catering** - ≈ $500 (9%): feeding all of our cast and crew for the three-day-shoot.
+      - **Contingency fund** - ≈ $500 (9%): a cushion for the unexpected things that always happen on a shoot.
       
       If anything is left over, it will go directly toward additional festival submissions!
       
@@ -200,6 +200,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-12T21:37:03.125Z"
+_pool_draft_saved_at: "2026-11-12T23:06:13.456Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
