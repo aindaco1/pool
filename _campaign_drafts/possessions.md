@@ -174,7 +174,7 @@ tiers:
   - id: "executive-producer"
     name: "Franchise Owner"
     price: 1000
-    image: "/assets/images/campaigns/possessions/tier-franchise-owner-20261111-211245-3e4d1ccc.jpg"
+    image: "/assets/images/campaigns/possessions/tier-franchise-owner-20261112-192823-33ae9a49.jpg"
     description: "Supporters in this tier will receive an Executive Producer credit on the film!"
     stackable: false
     category: "digital"
@@ -200,6 +200,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-12T18:56:04.847Z"
+_pool_draft_saved_at: "2026-11-12T19:28:44.012Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
