@@ -143,7 +143,7 @@ tiers:
     name: "A Peek Behind the Counter"
     price: 50
     image: "/assets/images/campaigns/possessions/tier-a-peek-behind-the-counter-20261112-173138-00fa0be2.jpg"
-    description: "Supporters in this tier will receive access to a behind the scenes documentary on the making of POSSESSIONS! Will be sent out after the release of the film itself!"
+    description: "Supporters in this tier will receive access to a behind the scenes documentary on the making of POSSESSIONS in addition to the reward from the previous tier! The doc will be sent out after the release of the main film itself!"
     stackable: false
     category: "digital"
     late_support: false
@@ -151,7 +151,7 @@ tiers:
     name: "First Day on the Job"
     price: 100
     image: "/assets/images/campaigns/possessions/tier-new-hire-20261112-181454-c049863e.jpg"
-    description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt. The design is not yet finalized - so check back in for updates!"
+    description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt along with the rewards from previous tiers. The T-shirt design is not yet finalized - so check back in for updates!"
     stackable: false
     category: "digital"
     late_support: false
@@ -159,7 +159,7 @@ tiers:
     name: "Late Night Line Cook"
     price: 250
     image: "/assets/images/campaigns/possessions/tier-line-cook-20261112-181147-b3acd475.jpg"
-    description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster. The design will be composed of visuals from the film, and thus will not be designed until after filming has wrapped. Stay posted for updates!"
+    description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster along with the rewards from previous tiers. The design will be composed of visuals from the film, and thus will not be designed until after filming has wrapped. Stay posted for updates!"
     stackable: false
     category: "digital"
     late_support: false
@@ -167,7 +167,7 @@ tiers:
     name: "General Manager"
     price: 500
     image: "/assets/images/campaigns/possessions/tier-general-manager-20261112-185046-e22a2e44.jpg"
-    description: "Supporters in this tier will receive an Associate Producer credit on the film!"
+    description: "Supporters in this tier will receive an Associate Producer credit on the film along with all proceeding rewards!"
     stackable: false
     category: "digital"
     late_support: false
@@ -175,7 +175,7 @@ tiers:
     name: "Franchise Owner"
     price: 1000
     image: "/assets/images/campaigns/possessions/tier-franchise-owner-20261112-192823-33ae9a49.jpg"
-    description: "Supporters in this tier will receive an Executive Producer credit on the film!"
+    description: "Supporters in this tier will receive an Executive Producer credit on the film along with all proceeding rewards!"
     stackable: false
     category: "digital"
     late_support: false
@@ -200,6 +200,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-12T21:28:15.337Z"
+_pool_draft_saved_at: "2026-11-12T21:37:03.125Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
