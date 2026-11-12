@@ -13,7 +13,7 @@ goal_amount: 3000
 charged: false
 hero_image: /assets/images/defaults/dust-wave-square.png
 hero_image_wide: /assets/images/defaults/dust-wave-square.png
-creator_image: "/assets/images/campaigns/you-re-only-young-once/creator-20261108-040130-addf200c.jpg"
+creator_image: "/assets/images/campaigns/you-re-only-young-once/creator-20261112-042208-d5fabbf3.png"
 creator_name: "Joey Greenberg"
 category: "Short Film"
 short_blurb: "You're Only Young Once Logline: A 30 year-old school teacher on the verge of fatherhood has doubts about his commitments to leading a responsible and adult life. In his attempts to live vicariously through his students, he begins to drift more and more away from his adult life until he destroys all he has for the sake of his own selfish freedom."
@@ -167,6 +167,6 @@ diary:
           Hey there! Thanks so much for checking out the fundraising site for 'You're Only Young Once'! The cast and crew can't thank you enough for your support. Feel free to check out the site and get to know more about the project. If you're so inclined- send this to your friends, family group chat or whoever might want to know more about the film.
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-12T04:18:49.530Z"
-campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261111-231009-2ba7fc6b.png"
+_pool_draft_saved_at: "2026-11-12T04:23:31.535Z"
+campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261112-042225-27aa4ef8.jpg"
 ---
