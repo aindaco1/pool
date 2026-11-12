@@ -132,7 +132,7 @@ tiers:
   - id: "bts-doc"
     name: "Blessing of the Traffic Wizard"
     price: 25
-    image: "/assets/images/campaigns/possessions/tier-blessing-of-the-traffic-wizard-20261111-182113-f48e41db.jpg"
+    image: "/assets/images/campaigns/possessions/tier-blessing-of-the-traffic-wizard-20261112-173127-799f44a2.jpg"
     description: "Supporters in this tier will receive a custom Traffic Wizard sticker! The design is not yet final, so check back in for updates."
     limit_total: 100
     stackable: false
@@ -142,23 +142,23 @@ tiers:
   - id: "bts-documentary"
     name: "A Peek Behind the Counter"
     price: 50
-    image: "/assets/images/campaigns/possessions/tier-a-peek-behind-the-counter-20261111-182244-7bec8af2.jpg"
+    image: "/assets/images/campaigns/possessions/tier-a-peek-behind-the-counter-20261112-173138-00fa0be2.jpg"
     description: "Supporters in this tier will receive access to a behind the scenes documentary on the making of POSSESSIONS! Will be sent out after the release of the film itself!"
     stackable: false
     category: "digital"
     late_support: false
   - id: "possessions-t-shirt"
-    name: "New Hire"
+    name: "First Day on the Job"
     price: 100
-    image: "/assets/images/campaigns/possessions/tier-new-hire-20261111-211404-0ed8d100.jpg"
+    image: "/assets/images/campaigns/possessions/tier-new-hire-20261112-181454-c049863e.jpg"
     description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt. The design is not yet finalized - so check back in for updates!"
     stackable: false
     category: "digital"
     late_support: false
   - id: "possessions-poster"
-    name: "Line Cook"
+    name: "Late Night Line Cook"
     price: 250
-    image: "/assets/images/campaigns/possessions/tier-line-cook-20261111-210954-733335cc.jpg"
+    image: "/assets/images/campaigns/possessions/tier-line-cook-20261112-181147-b3acd475.jpg"
     description: "Supporters in this tier will receive a 27x40 physical copy of the POSSESSIONS film poster. The design will be composed of visuals from the film, and thus will not be designed until after filming has wrapped. Stay posted for updates!"
     stackable: false
     category: "digital"
@@ -166,7 +166,7 @@ tiers:
   - id: "associate-producer"
     name: "General Manager"
     price: 500
-    image: "/assets/images/campaigns/possessions/tier-general-manager-20261111-211017-3151f0e4.jpg"
+    image: "/assets/images/campaigns/possessions/tier-general-manager-20261112-185046-e22a2e44.jpg"
     description: "Supporters in this tier will receive an Associate Producer credit on the film!"
     stackable: false
     category: "digital"
@@ -200,6 +200,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-11T23:54:58.066Z"
+_pool_draft_saved_at: "2026-11-12T18:56:04.847Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
