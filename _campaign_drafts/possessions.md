@@ -145,7 +145,8 @@ tiers:
     image: "/assets/images/campaigns/possessions/tier-a-peek-behind-the-counter-20261112-173138-00fa0be2.jpg"
     description: "Supporters in this tier will receive access to a behind the scenes documentary on the making of POSSESSIONS in addition to the reward from the previous tier! The doc will be sent out after the release of the main film itself!"
     stackable: false
-    category: "digital"
+    category: "physical"
+    shipping_preset: "sticker"
     late_support: false
   - id: "possessions-t-shirt"
     name: "First Day on the Job"
@@ -153,7 +154,8 @@ tiers:
     image: "/assets/images/campaigns/possessions/tier-new-hire-20261112-181454-c049863e.jpg"
     description: "Supporters in this tier will receive a high-quality POSSESSIONS T-shirt along with the rewards from previous tiers. The T-shirt design is not yet finalized - so check back in for updates!"
     stackable: false
-    category: "digital"
+    category: "physical"
+    shipping_preset: "tshirt"
     late_support: false
   - id: "possessions-poster"
     name: "Late Night Line Cook"
@@ -200,6 +202,6 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-12T23:06:13.456Z"
+_pool_draft_saved_at: "2026-11-12T23:07:59.407Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 ---
