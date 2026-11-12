@@ -11,7 +11,7 @@ start_date: "2026-11-12"
 goal_deadline: "2026-12-13"
 goal_amount: 3000
 charged: false
-hero_image: /assets/images/defaults/dust-wave-square.png
+hero_image: "/assets/images/campaigns/you-re-only-young-once/hero-square-20261112-071602-f507042b.png"
 hero_image_wide: "/assets/images/campaigns/you-re-only-young-once/hero-wide-20261112-070836-94c832ca.png"
 creator_image: "/assets/images/campaigns/you-re-only-young-once/creator-20261112-062709-a6c89328.jpg"
 creator_name: "Joey Greenberg"
@@ -174,8 +174,8 @@ diary:
         body: |
           Hey there! Thanks so much for checking out the fundraising site for 'You're Only Young Once'! The cast and crew can't thank you enough for your support. Feel free to check out the site and get to know more about the project. If you're so inclined- send this to your friends, family group chat or whoever might want to know more about the film!
 decisions: []
-_pool_draft_base_hash: "370a2328997807cc2574326bf2ade4e7460f1d114b05d50536f62452cd611bda"
-_pool_draft_saved_at: "2026-11-12T07:08:47.328Z"
+_pool_draft_base_hash: "5d2d792b8a84d2fc79bd542fcbb8403192fb5bfb59319f408dba2341c937ad9f"
+_pool_draft_saved_at: "2026-11-12T07:16:09.006Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261112-042225-27aa4ef8.jpg"
 hero_video: "https://youtu.be/wiipOPN2q-I?si=UOew47EUEJAc5erI"
 ---
