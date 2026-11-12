@@ -101,7 +101,7 @@ tiers:
   - id: "special-thanks"
     name: "Special Thanks"
     price: 10
-    image: "/assets/images/campaigns/you-re-only-young-once/tier-special-thanks-20261108-030104-4dac8d8f.png"
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-special-thanks-20261112-043404-d7a3f469.png"
     description: "Be featured in the credits as a 'thank you' for supporting our film!"
     stackable: false
     category: "digital"
@@ -109,7 +109,7 @@ tiers:
   - id: "link-to-the-film"
     name: "Link to the Film"
     price: 25
-    image: "/assets/images/campaigns/you-re-only-young-once/tier-link-to-the-film-20261108-030117-ffd2a0f0.png"
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-link-to-the-film-20261112-043509-3ba9cf67.png"
     description: "You will receive a private link to the film before it's public release!"
     stackable: false
     category: "digital"
@@ -117,7 +117,7 @@ tiers:
   - id: "private-screening-invite"
     name: "Private Screening Invite"
     price: 50
-    image: "/assets/images/campaigns/you-re-only-young-once/tier-private-screening-invite-20261108-030133-11b531c2.png"
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-private-screening-invite-20261112-043527-4990464d.png"
     description: "Join the cast and crew to a private screening of the film, complete with refreshments and a word from the director. (He promises to keep it short)"
     stackable: false
     category: "digital"
@@ -125,7 +125,7 @@ tiers:
   - id: "get-a-signed-poster"
     name: "Get a Signed Poster!"
     price: 100
-    image: "/assets/images/campaigns/you-re-only-young-once/tier-get-a-signed-poster-20261108-030150-a556ad35.png"
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-get-a-signed-poster-20261112-043647-cb80a626.png"
     description: "Get a signed poster from the cast and crew!"
     stackable: false
     category: "digital"
@@ -133,7 +133,7 @@ tiers:
   - id: "have-your-name-in-the-film"
     name: "Have Your Name In the Film!"
     price: 500
-    image: "/assets/images/campaigns/you-re-only-young-once/tier-have-your-name-in-the-film-20261108-030204-8b32d220.png"
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-have-your-name-in-the-film-20261112-043701-0ea0185f.png"
     description: "Your name will be featured as a teacher or student's name in the film. You could be on the board or the main character can be talking about you!"
     stackable: false
     category: "digital"
@@ -141,7 +141,7 @@ tiers:
   - id: "be-an-extra"
     name: "Be an Extra!"
     price: 1000
-    image: "/assets/images/campaigns/you-re-only-young-once/tier-be-an-extra-20261108-030255-34677076.png"
+    image: "/assets/images/campaigns/you-re-only-young-once/tier-be-an-extra-20261112-043727-a1aa9c40.png"
     description: "You'll get the chance to be featured as an extra in the final cut of the film! Live out your Hollywood dreams!"
     stackable: false
     category: "digital"
@@ -157,6 +157,14 @@ stretch_goals:
     status: "locked"
 ongoing_items: []
 diary:
+  - title: "What's Going On?"
+    id: "what-s-going-on"
+    date: "2026-11-12T00:00-06:00"
+    phase: "production"
+    content:
+      - type: "text"
+        body: |
+          So far so good! Our pre-production process has been going well, with the help of our producers. We locked in some filming locations and filled up our crew. The team is currently working on casting, marketing the film, and securing gear. The department heads and producers have been busy making this project come to life.
   - title: "Read Me!"
     id: "read-me"
     date: "2026-11-12T00:00-06:00"
@@ -167,6 +175,6 @@ diary:
           Hey there! Thanks so much for checking out the fundraising site for 'You're Only Young Once'! The cast and crew can't thank you enough for your support. Feel free to check out the site and get to know more about the project. If you're so inclined- send this to your friends, family group chat or whoever might want to know more about the film.
 decisions: []
 _pool_draft_base_hash: "7ad29f0221d932d2d7d0ccaf6c5c644ddfce800da16e1fcf9163f218b71f2907"
-_pool_draft_saved_at: "2026-11-12T04:23:31.535Z"
+_pool_draft_saved_at: "2026-11-12T04:43:21.111Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261112-042225-27aa4ef8.jpg"
 ---
