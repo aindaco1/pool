@@ -157,6 +157,16 @@ stretch_goals:
     status: "locked"
 ongoing_items: []
 diary:
+  - title: "Halfway There!"
+    id: "halfway-there"
+    date: "2026-11-13T10:00-06:00"
+    phase: "fundraising"
+    content:
+      - type: "text"
+        body: |
+          We just crossed the halfway point! A huge thank you to all of our supporters so far! We are so grateful to have so many people near and far who believe in supporting the arts and young artists!
+          
+          But we're not done yet! Keep sharing our fundraiser with other like-minded and enthusiastic supporters! Let get this movie fully funded!
   - title: "What's Going On?"
     id: "what-s-going-on"
     date: "2026-11-12T00:00-06:00"
