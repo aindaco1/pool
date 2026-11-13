@@ -157,6 +157,16 @@ stretch_goals:
     status: "locked"
 ongoing_items: []
 diary:
+  - title: "Halfway There!"
+    id: "halfway-there"
+    date: "2026-11-13T10:00-06:00"
+    phase: "fundraising"
+    content:
+      - type: "text"
+        body: |
+          We just crossed the halfway point! A huge thank you to all of our supporters so far! We are so grateful to have so many people near and far who believe in supporting the arts and young artists!
+          
+          But we're not done yet! Keep sharing our fundraiser with other like-minded and enthusiastic supporters! Let get this movie fully funded!
   - title: "What's Going On?"
     id: "what-s-going-on"
     date: "2026-11-12T00:00-06:00"
@@ -174,8 +184,8 @@ diary:
         body: |
           Hey there! Thanks so much for checking out the fundraising site for 'You're Only Young Once'! The cast and crew can't thank you enough for your support. Feel free to check out the site and get to know more about the project. If you're so inclined- send this to your friends, family group chat or whoever might want to know more about the film!
 decisions: []
-_pool_draft_base_hash: "5d2d792b8a84d2fc79bd542fcbb8403192fb5bfb59319f408dba2341c937ad9f"
-_pool_draft_saved_at: "2026-11-12T07:16:09.006Z"
+_pool_draft_base_hash: "6718437666166099aea9040c2121bbfda6b7bfcfeb5e7a68b63f8353659fa8cf"
+_pool_draft_saved_at: "2026-11-13T17:04:38.277Z"
 campaign_background: "/assets/images/campaigns/you-re-only-young-once/background-20261112-042225-27aa4ef8.jpg"
 hero_video: "https://youtu.be/wiipOPN2q-I?si=UOew47EUEJAc5erI"
 ---
