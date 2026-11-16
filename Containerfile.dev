@@ -11,6 +11,7 @@ RUN apt-get update \
     libjpeg-turbo-progs \
     nodejs \
     optipng \
+    python3-pil \
     webp \
   && rm -rf /var/lib/apt/lists/*
 

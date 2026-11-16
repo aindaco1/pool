@@ -35,6 +35,8 @@ cannot decode animated WebP. `node --test scripts/inspect-image.test.mjs` exerci
 real static/animated decoding, GIF/WebP timing parity, retiming, temporary
 candidates, and corrupt-input rejection before optimization. Local optimizer
 runs need `python3` with Pillow/WebP support as well as the existing media tools.
+The development image installs the same package; rebuild existing images with
+`PODMAN_REBUILD=1 npm run media:optimize:check:podman` before local validation.
 Every animated frame is decoded and composited; source-preservation and derivative
 size, dimensions, aspect-ratio, and timing gates still apply.
 
