@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-function git(cwd, args) {
+function git(cwd, args, timeout = 30_000) {
   const result = spawnSync('git', args, {
     cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 30_000,
+    timeout,
     maxBuffer: 1024 * 1024,
     env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
   });
@@ -23,8 +23,9 @@ function requireCommit(cwd, sha) {
   const object = `${sha}^{commit}`;
   if (git(cwd, ['cat-file', '-e', object]).status === 0) return;
   // A default Actions checkout is shallow. Fetch only the missing event commit,
-  // never a moving branch, and refuse to guess if it is no longer retrievable.
-  if (git(cwd, ['fetch', '--no-tags', '--depth=1', 'origin', sha]).status !== 0
+  // never a moving branch. Tree comparison does not need old media blobs or
+  // submodule checkouts. Refuse to guess if the exact commit is unavailable.
+  if (git(cwd, ['fetch', '--no-tags', '--no-recurse-submodules', '--filter=blob:none', '--depth=1', 'origin', sha], 120_000).status !== 0
       || git(cwd, ['cat-file', '-e', object]).status !== 0) {
     throw new Error('Exact campaign comparison commit is unavailable');
   }

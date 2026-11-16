@@ -127,14 +127,26 @@ function publicationFixture() {
   const log = path.join(root, 'dispatch.log');
   const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, GITHUB_REF: 'refs/heads/main', MEDIA_TEST_COMMAND_LOG: log };
   const run = (extra = {}) => execFileSync('bash', [path.join(repoRoot, 'scripts/publish-media-optimization.sh'), base, branch, commit], { cwd: root, env: { ...env, ...extra }, stdio: 'pipe' });
-  return { root, base, branch, commit, remote, log, run };
+  return { root, base, branch, commit, remote, log, env, run };
 }
 
 describe('automatic image publication', () => {
   it('fast-forwards the tested commit and explicitly dispatches Pages', () => {
     const f = publicationFixture(); f.run();
     expect(git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split('\t')[0]).toBe(f.commit);
-    expect(fs.readFileSync(f.log, 'utf8')).toContain('workflow run deploy.yml --ref main');
+    expect(fs.readFileSync(f.log, 'utf8')).toContain('workflow run deploy.yml --ref main -f skip_diary_check=true');
+  });
+  it('skips diary broadcasts when refreshing Pages without new image output', () => {
+    const f = publicationFixture();
+    const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',
+      'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))', path.join(repoRoot, '.github/workflows/media-optimization.yml')
+    ], { encoding: 'utf8' }));
+    const publish = workflow.jobs.publish.steps.find((step: any) => step.run);
+    execFileSync('bash', ['-c', publish.run], {
+      cwd: f.root, env: { ...f.env, MEDIA_COMMIT: '' }, stdio: 'pipe'
+    });
+    expect(git(f.root, 'ls-remote', 'origin', 'refs/heads/main').split('\t')[0]).toBe(f.base);
+    expect(fs.readFileSync(f.log, 'utf8')).toContain('workflow run deploy.yml --ref main -f skip_diary_check=true');
   });
   it('requeues current sources when main advances without publishing stale output', () => {
     const f = publicationFixture(); git(f.root, 'switch', '--detach', f.base);

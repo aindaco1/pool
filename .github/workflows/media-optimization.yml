@@ -37,8 +37,9 @@ concurrency:
 jobs:
   optimize:
     runs-on: ubuntu-latest
-    # The 37-source repair backlog took 29m54s including validation.
-    timeout-minutes: 45
+    # The current 103-source backlog reached about 40m before its decoder failure.
+    # Leave room for complete validation while keeping this job bounded.
+    timeout-minutes: 60
     permissions:
       contents: write
     outputs:
@@ -149,7 +150,7 @@ jobs:
             bash scripts/publish-media-optimization.sh "$MEDIA_BASE" "$MEDIA_BRANCH" "$MEDIA_COMMIT"
           else
             # Retry a failed Pages dispatch even when no image work remains.
-            gh workflow run deploy.yml --ref main -f reason='image optimization checked; refresh current source'
+            gh workflow run deploy.yml --ref main -f skip_diary_check=true -f reason='image optimization checked; refresh current source'
           fi
 
   cleanup:

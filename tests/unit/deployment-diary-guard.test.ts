@@ -73,6 +73,20 @@ describe('exact campaign-content comparison', () => {
     expect(campaignContentChanged({ cwd: shallow, before: f.before, after })).toBe(true);
   });
 
+  it('compares missing history without downloading retired media blobs', () => {
+    const f = fixture();
+    git(f.root, 'config', 'uploadpack.allowFilter', 'true');
+    const before = f.commit('assets/retired-image.bin', 'retired asset bytes '.repeat(2048));
+    const retiredBlob = git(f.root, 'rev-parse', `${before}:assets/retired-image.bin`);
+    fs.unlinkSync(path.join(f.root, 'assets/retired-image.bin'));
+    const after = f.commit('_campaigns/example.md', 'diary: [published]\n');
+    const shallow = fs.mkdtempSync(path.join(os.tmpdir(), 'pool-diary-filtered-'));
+    temporary.push(shallow);
+    git(shallow, 'clone', '--depth=1', pathToFileURL(f.root).href, '.');
+    expect(campaignContentChanged({ cwd: shallow, before, after })).toBe(true);
+    expect(git(shallow, 'rev-list', '--objects', '--missing=print', before)).toContain(`?${retiredBlob}`);
+  });
+
   it.each(['', 'main', '--help', '0'.repeat(40), 'z'.repeat(40)])('rejects an invalid event commit %j', (before) => {
     const f = fixture();
     expect(() => campaignContentChanged({ cwd: f.root, before, after: f.before })).toThrow('exact nonzero');
