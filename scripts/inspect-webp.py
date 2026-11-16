@@ -13,6 +13,8 @@ def inspect_webp(filename):
         if image.format != "WEBP":
             raise ValueError("Expected a WebP image")
         width, height = image.size
+        # Orientation changes displayed pixels even when stored RGBA is identical.
+        orientation = image.getexif().get(274, 1)
         digest = hashlib.sha256()
         timeline = []
         elapsed = 0
@@ -23,7 +25,7 @@ def inspect_webp(filename):
             if not isinstance(duration, int) or duration < 0:
                 raise ValueError("Invalid WebP frame duration")
             timeline.append([elapsed, duration * 1000])
-            digest.update(json.dumps([width, height, elapsed, duration]).encode())
+            digest.update(json.dumps([width, height, orientation, elapsed, duration]).encode())
             digest.update(image.convert("RGBA").tobytes())
             elapsed += duration * 1000
         return {"width": width, "height": height, "frames": digest.hexdigest(), "timeline": timeline}

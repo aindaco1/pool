@@ -18,6 +18,9 @@ frames = [Image.new('RGB', (64, 48), color) for color in ['red', 'blue', 'green'
 for name, durations in [('animation.gif', [100, 200, 300]), ('animation.webp', [100, 200, 300]), ('retimed.webp', [100, 210, 300])]:
     frames[0].save(root / name, save_all=True, append_images=frames[1:], duration=durations, loop=0, lossless=True)
 frames[0].save(root / 'still.webp', lossless=True)
+orientation = Image.Exif()
+orientation[274] = 6
+frames[0].save(root / 'oriented.webp', lossless=True, exif=orientation)
 `, root]);
   const source = inspectImage(path.join(root, 'animation.gif'));
   const webp = inspectImage(path.join(root, 'animation.webp'));
@@ -27,7 +30,9 @@ frames[0].save(root / 'still.webp', lossless=True)
   assert.equal(webp.height, 48);
   assert.notDeepEqual(inspectImage(path.join(root, 'retimed.webp')).timeline, source.timeline);
   assert.notEqual(inspectImage(path.join(root, 'retimed.webp')).frames, webp.frames);
-  assert.deepEqual(inspectImage(path.join(root, 'still.webp')).timeline, [[0, 40000]]);
+  const still = inspectImage(path.join(root, 'still.webp'));
+  assert.deepEqual(still.timeline, [[0, 40000]]);
+  assert.notEqual(inspectImage(path.join(root, 'oriented.webp')).frames, still.frames);
   const candidate = path.join(root, 'image.candidate');
   writeFileSync(candidate, readFileSync(path.join(root, 'animation.webp')));
   assert.deepEqual(inspectImage(candidate), webp);
