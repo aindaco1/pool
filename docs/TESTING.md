@@ -29,6 +29,9 @@ eligible. A security fix still requires a reviewed compatible Platform upgrade;
 do not weaken the pin test to bypass it. Continue running both dependency audits
 described in [SECURITY.md](./SECURITY.md#dependency-and-release-security).
 
+Media optimization dispatches Pages with `skip_diary_check=true` so asset
+maintenance does not initiate subscriber diary messages.
+
 Image optimizer validation uses FFmpeg for PNG/JPEG/GIF and Pillow with libwebp
 for WebP. The Ubuntu media workflow installs `python3-pil` because its FFmpeg
 cannot decode animated WebP. `node --test scripts/inspect-image.test.mjs` exercises

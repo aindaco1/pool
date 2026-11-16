@@ -36,4 +36,4 @@ if ! git push origin "$commit:refs/heads/main"; then
 fi
 
 # GITHUB_TOKEN pushes do not trigger push workflows. Dispatch Pages explicitly.
-gh workflow run deploy.yml --ref main -f "reason=validated image optimization $commit"
+gh workflow run deploy.yml --ref main -f skip_diary_check=true -f "reason=validated image optimization $commit"
