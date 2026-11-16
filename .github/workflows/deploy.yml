@@ -44,6 +44,8 @@ jobs:
         with:
           submodules: recursive
           ref: ${{ inputs.ref || github.sha }}
+          # Include the normal push/merge predecessor for exact campaign checks.
+          fetch-depth: 2
 
       - name: Setup Ruby
         uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
