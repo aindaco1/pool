@@ -29,6 +29,17 @@ eligible. A security fix still requires a reviewed compatible Platform upgrade;
 do not weaken the pin test to bypass it. Continue running both dependency audits
 described in [SECURITY.md](./SECURITY.md#dependency-and-release-security).
 
+Image optimizer validation uses FFmpeg for PNG/JPEG/GIF and Pillow with libwebp
+for WebP. The Ubuntu media workflow installs `python3-pil` because its FFmpeg
+cannot decode animated WebP. `node --test scripts/inspect-image.test.mjs` exercises
+real static/animated decoding, GIF/WebP timing parity, retiming, temporary
+candidates, and corrupt-input rejection before optimization. Local optimizer
+runs need `python3` with Pillow/WebP support as well as the existing media tools.
+The development image installs the same package; rebuild existing images with
+`PODMAN_REBUILD=1 npm run media:optimize:check:podman` before local validation.
+Every animated frame is decoded and composited; source-preservation and derivative
+size, dimensions, aspect-ratio, and timing gates still apply.
+
 Campaign media-upload regression checks run with:
 
 ```bash

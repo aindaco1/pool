@@ -52,6 +52,12 @@
   {% else %}
     {% capture campaign_blurb_plain %}{{ campaign_preview_excerpt_source | strip_html | strip_newlines | replace: '&nbsp;', ' ' | replace: '&amp;', '&' | replace: '  ', ' ' | replace: '  ', ' ' | strip }}{% endcapture %}
   {% endif %}
+  {% comment %}A heading-only content block is not a useful campaign description.{% endcomment %}
+  {% assign campaign_blurb_length = campaign_blurb_plain | size %}
+  {% if campaign_blurb_length < 40 %}
+    {% assign campaign_preview_fallback = page.short_blurb | default: site.description %}
+    {% capture campaign_blurb_plain %}{{ campaign_preview_fallback | strip_html | strip_newlines | replace: '&nbsp;', ' ' | replace: '&amp;', '&' | replace: '  ', ' ' | replace: '  ', ' ' | strip }}{% endcapture %}
+  {% endif %}
   {% assign pledged_num = page.pledged_amount | default: 0 | plus: 0 %}
   {% assign goal_num = page.goal_amount | default: 0 | plus: 0 %}
   {% assign now_epoch = 'now' | date: '%s' | plus: 0 %}

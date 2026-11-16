@@ -21,6 +21,8 @@ on:
       - 'scripts/optimize-media.mjs'
       - 'scripts/validate-media-optimization.mjs'
       - 'scripts/inspect-image.mjs'
+      - 'scripts/inspect-webp.py'
+      - 'scripts/inspect-image.test.mjs'
       - 'scripts/publish-media-optimization.sh'
       - '.github/workflows/media-optimization.yml'
 
@@ -61,7 +63,10 @@ jobs:
       - name: Install media tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg optipng libjpeg-turbo-progs gifsicle webp
+          sudo apt-get install -y ffmpeg optipng libjpeg-turbo-progs gifsicle webp python3-pil
+
+      - name: Verify image decoding with the installed media tools
+        run: node --test scripts/inspect-image.test.mjs
 
       - name: Optimize and validate image output
         id: prepare
