@@ -37,8 +37,9 @@ concurrency:
 jobs:
   optimize:
     runs-on: ubuntu-latest
-    # The 37-source repair backlog took 29m54s including validation.
-    timeout-minutes: 45
+    # The current 103-source backlog reached about 40m before its decoder failure.
+    # Leave room for complete validation while keeping this job bounded.
+    timeout-minutes: 60
     permissions:
       contents: write
     outputs:
