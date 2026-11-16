@@ -1,8 +1,20 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { openSync, readSync, closeSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { normalizeFrameHashAspectRatios } from '../shared/dust-wave-platform/packages/media-core/src/frame-hash.js';
 
 export function inspectImage(file) {
+  const header = Buffer.alloc(12);
+  const descriptor = openSync(file, 'r');
+  try { readSync(descriptor, header, 0, header.length, 0); } finally { closeSync(descriptor); }
+  // Ubuntu's FFmpeg cannot decode animated WebP. Use libwebp for all WebP
+  // inputs, including temporary candidates, without weakening frame validation.
+  if (header.toString('ascii', 0, 4) === 'RIFF' && header.toString('ascii', 8, 12) === 'WEBP') {
+    return JSON.parse(execFileSync('python3', [
+      fileURLToPath(new URL('./inspect-webp.py', import.meta.url)), file
+    ], { encoding: 'utf8', timeout: 120_000, maxBuffer: 8 * 1024 * 1024 }));
+  }
   const probe = JSON.parse(execFileSync('ffprobe', [
     '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', file
   ], { encoding: 'utf8', timeout: 120_000 }));
