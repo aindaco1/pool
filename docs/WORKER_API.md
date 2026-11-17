@@ -422,7 +422,8 @@ Notes:
 - `reportType: "pledge"` is the daily live-campaign ledger report
 - `reportType: "fulfillment"` is the one-time post-deadline shipment/export report
 - report emails use short, emoji-free, deliverability-first subjects with the configured prefix plus report kind and campaign title
-- daily pledge emails include campaign-only totals plus a short momentum/coaching note in the body
+- daily pledge emails and campaign-scoped previews include campaign-only totals, allocated Stripe fees and the campaign amount after fees with explicit actual/estimated labels (see [Daily pledge summary](DASHBOARD.md#daily-pledge-summary)); emails also include a short momentum/coaching note
+- pledge CSVs append current per-pledge fee source, whole Stripe fee, campaign fee share, and campaign amount after fees; the [daily pledge summary contract](DASHBOARD.md#daily-pledge-summary) defines the once-per-pledge ledger placement
 - fulfillment sends split by fulfiller:
   - campaign-runner recipients get only the campaign-fulfilled rows
   - `platform.support_email` gets a separate platform-fulfillment email when platform rows exist

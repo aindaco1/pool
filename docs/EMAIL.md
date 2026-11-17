@@ -316,6 +316,7 @@ Current behavior:
   enqueue or sent-marker write failure reuses the queued payload. Explicit manual
   reports retain their payload-based identities and `markAsSent` behavior.
 - CSV attachments are optional by config.
+- Daily pledge summaries include the campaign share of Stripe fees and the campaign amount after fees, using the [shared Analytics calculation and actual/estimated labels](DASHBOARD.md#daily-pledge-summary).
 - Campaign-runner recipients receive campaign-fulfilled rows.
 - `platform.support_email` can receive separate platform-fulfillment rows when platform add-ons need fulfillment.
 - Dashboard Reports previews/downloads are read-only and do not send email or write sent markers.

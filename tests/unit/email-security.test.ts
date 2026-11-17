@@ -399,6 +399,8 @@ describe('email HTML security', () => {
           'Total pledges: 8',
           'New pledges in the previous 24 hours: 0',
           'Pledged total: $1,203.00',
+          'Stripe fees (campaign share, estimated): $37.29',
+          'Campaign amount after Stripe fees (estimated): $1,165.71',
           'Goal progress: $25,000.00 goal (4.8% funded)',
           'Deadline passed 79 days, 15 hours ago'
         ],
@@ -426,6 +428,13 @@ describe('email HTML security', () => {
     expect(payload.html).toContain('Total pledges: <strong>8</strong>');
     expect(payload.html).toContain('New pledges in the previous 24 hours: <strong>0</strong>');
     expect(payload.html).toContain('Pledged total: <strong>$1,203.00</strong>');
+    for (const summaryLine of [
+      'Stripe fees (campaign share, estimated): $37.29',
+      'Campaign amount after Stripe fees (estimated): $1,165.71'
+    ]) {
+      expect(payload.html).toContain(summaryLine);
+      expect(payload.text).toContain(summaryLine);
+    }
     expect(payload.html).toContain('Goal progress: $25,000.00 goal <strong>(4.8% funded)</strong>');
     expect(payload.html).toContain('Deadline passed <strong>79 days, 15 hours ago</strong>');
     expect(payload.html).toContain('Momentum note');

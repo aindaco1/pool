@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Include Stripe fees and the campaign amount after fees in daily pledge email
+  summaries, matching previews, and per-pledge CSV columns. Reuse Analytics,
+  label actual/estimated figures, and count fees once across ledger history.
+
 ## 1.2.26 — 2026-10-28
 
 - Preserve tax estimate coverage and data provenance in public quotes and stored checkout details so the existing estimate labels remain visible.

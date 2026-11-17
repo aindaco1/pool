@@ -220,9 +220,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,smoke-editable,One Frame,,10.00,0.00,10.00,5,0.50,0.79,0.00,11.29,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-smoke-editable',
-      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,smoke-editable,One Frame,,10.00,0.00,10.00,5,0.50,0.79,0.00,11.29,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-smoke-editable,estimated,0.63,0.56,9.44',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder,estimated,1.21,0.97,24.03'
     ]);
   });
 
@@ -313,9 +313,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-only-1',
-      'supporter@example.com,sunder,(tip updated to 9%),,0.00,0.00,0.00,9,1.00,0.00,0.00,1.00,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-only-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-only-1,,,,',
+      'supporter@example.com,sunder,(tip updated to 9%),,0.00,0.00,0.00,9,1.00,0.00,0.00,1.00,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-only-1,estimated,1.23,0.95,24.05'
     ]);
   });
 
@@ -370,9 +370,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-and-support-1',
-      'supporter@example.com,sunder,(modified) +Custom Support $10.00; tip updated to 8%,,10.00,0.00,10.00,8,1.55,0.79,0.00,9.34,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-and-support-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-and-support-1,,,,',
+      'supporter@example.com,sunder,(modified) +Custom Support $10.00; tip updated to 8%,,10.00,0.00,10.00,8,1.55,0.79,0.00,9.34,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-and-support-1,estimated,1.48,1.19,33.81'
     ]);
   });
 
@@ -437,9 +437,9 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker,10.00,3.00,13.00,5,0.65,1.02,3.00,17.67,created,no,2026-04-06T12:00:00.000Z,pool-intent-addon-mod-1',
-      'supporter@example.com,sunder,(modified add-ons; tip updated to 5%),+DUST WAVE Butterfingers T-Shirt (XS); -DUST WAVE Sticker,0.00,22.00,22.00,5,1.10,1.74,0.00,24.84,modified,no,2026-04-06T13:00:00.000Z,pool-intent-addon-mod-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker,10.00,3.00,13.00,5,0.65,1.02,3.00,17.67,created,no,2026-04-06T12:00:00.000Z,pool-intent-addon-mod-1,,,,',
+      'supporter@example.com,sunder,(modified add-ons; tip updated to 5%),+DUST WAVE Butterfingers T-Shirt (XS); -DUST WAVE Sticker,0.00,22.00,22.00,5,1.10,1.74,0.00,24.84,modified,no,2026-04-06T13:00:00.000Z,pool-intent-addon-mod-1,estimated,1.53,0.36,9.64'
     ]);
   });
 
@@ -482,8 +482,8 @@ describe('pledge and fulfillment reports', () => {
     );
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-bundle-1-sunder,estimated,1.21,0.97,24.03'
     ]);
   });
 
@@ -556,8 +556,8 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker x2; DUST WAVE T-Shirt (M),25.00,25.00,50.00,5,2.50,3.94,3.00,59.44,created,no,2026-04-06T12:00:00.000Z,pool-intent-add-ons-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,sunder,Handheld Prop,DUST WAVE Sticker x2; DUST WAVE T-Shirt (M),25.00,25.00,50.00,5,2.50,3.94,3.00,59.44,created,no,2026-04-06T12:00:00.000Z,pool-intent-add-ons-1,estimated,2.02,0.85,24.15'
     ]);
   });
 
@@ -670,8 +670,8 @@ describe('pledge and fulfillment reports', () => {
     });
 
     expect(lines).toEqual([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,smoke-editable,One Frame,First Time Sexpot Condom Pack,16.00,0.00,16.00,5,0.80,1.26,3.00,21.06,created,no,2026-04-06T12:00:00.000Z,pool-intent-campaign-add-on-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,smoke-editable,One Frame,First Time Sexpot Condom Pack,16.00,0.00,16.00,5,0.80,1.26,3.00,21.06,created,no,2026-04-06T12:00:00.000Z,pool-intent-campaign-add-on-1,estimated,0.91,0.69,15.31'
     ]);
   });
 
