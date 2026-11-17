@@ -857,3 +857,13 @@ actionable message; unknown provider errors use a localized request-status
 fallback. Original diagnostics remain on the caught error's `rawData` for debugging
 and are not displayed directly. Creator-authored titles are not translated.
 Missing alt text remains an advisory notice and cannot prevent Save or Publish.
+
+### Shared block editor ownership
+
+The dashboard uses Platform Admin Shell 0.15.0's `block-editor-browser` composer
+for the block model, toolbar, ordering, type changes, alignment, slash insertion
+and event routing. The pinned module and classic script share one implementation.
+The dashboard retains its field/media controls, URL and clipboard policy, data
+projection, preview, save and publish workflow. Upgrading this dependency requires
+the editor characterization tests and browser dashboard suite; rollback reverts
+the adapter and Platform gitlink together.

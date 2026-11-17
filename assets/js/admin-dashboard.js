@@ -1,6 +1,10 @@
 (function() {
   'use strict';
 
+  var sharedBlockEditor = window.DustWaveAdminShellBlockEditor;
+  var contentBlockModel = sharedBlockEditor.createBlockModel({ getTypes: activeContentBlockTypes, getVideoProviders: activeContentVideoProviders });
+  var contentBlockComposers = new WeakMap();
+
   var script = document.currentScript || document.querySelector('script[data-admin-dashboard-script="true"]');
   if (!script) return;
 
@@ -161,7 +165,6 @@
   var loadedContentBaseRevision = '';
   var contentBlocks = [];
   var contentBlockTypes = ['text', 'quote', 'image', 'gallery', 'video', 'audio', 'embed', 'divider'];
-  var contentAlignments = ['left', 'center', 'right', 'justify'];
   var contentTextFormats = ['p', 'h2', 'h3', 'h4'];
   var activeContentEditable = null;
   var activeContentLink = null;
@@ -7017,20 +7020,6 @@
     syncContentMetadataFromSettings();
   }
 
-  function contentBlockLabel(type) {
-    var labels = {
-      text: t('content_block_text', 'Text'),
-      quote: t('content_block_quote', 'Quote'),
-      image: t('content_block_image', 'Image'),
-      gallery: t('content_block_gallery', 'Gallery'),
-      video: t('content_block_video', 'Video'),
-      audio: t('content_block_audio', 'Audio'),
-      embed: t('content_block_embed', 'Embed'),
-      divider: t('content_block_divider', 'Divider')
-    };
-    return labels[type] || labels.text;
-  }
-
   function activeContentBlockTypes() {
     return ['announcement', 'blast'].includes(contentBlocksRoot?.dataset?.contentEditorMode || '')
       ? ['text', 'quote', 'image', 'video', 'divider']
@@ -7048,29 +7037,23 @@
   }
 
   function contentBlockCommand(value) {
-    var type = String(value || '').trim().replace(/^\/+/, '').toLowerCase();
-    return activeContentBlockTypes().indexOf(type) >= 0 ? type : 'text';
+    return contentBlockModel.command(value);
   }
 
   function contentBlockAlignment(value) {
-    var align = String(value || '').trim().toLowerCase();
-    return contentAlignments.indexOf(align) >= 0 ? align : 'left';
+    return contentBlockModel.alignment(value);
   }
 
   function contentGalleryLayout(value) {
-    var layout = String(value || '').trim().toLowerCase();
-    return layout === 'carousel' ? 'carousel' : 'grid';
+    return contentBlockModel.galleryLayout(value);
   }
 
   function contentGalleryCaptionStyle(value) {
-    var style = String(value || '').trim().toLowerCase();
-    return style === 'overlay' ? 'overlay' : 'inline';
+    return contentBlockModel.galleryCaptionStyle(value);
   }
 
   function contentVideoProvider(value) {
-    var provider = String(value || '').trim().toLowerCase();
-    var providers = activeContentVideoProviders();
-    return providers.indexOf(provider) >= 0 ? provider : 'youtube';
+    return contentBlockModel.videoProvider(value);
   }
 
   function contentVideoSourceType(src) {
@@ -7271,72 +7254,16 @@
     return true;
   }
 
-  function defaultContentBlock(type) {
-    var align = 'left';
-    switch (contentBlockCommand(type)) {
-      case 'quote':
-        return { type: 'quote', text: '', author: '', align: align };
-      case 'image':
-        return { type: 'image', src: '', alt: '', decorative: false, caption: '', align: align };
-      case 'gallery':
-        return { type: 'gallery', layout: 'grid', caption_style: 'inline', images: [], caption: '', align: align };
-      case 'video':
-        return { type: 'video', provider: 'youtube', video_id: '', src: '', poster: '', caption: '', align: align };
-      case 'audio':
-        return { type: 'audio', src: '', title: '', caption: '', align: align };
-      case 'embed':
-        return { type: 'embed', provider: 'spotify', src: '', title: '', caption: '', align: align };
-      case 'divider':
-        return { type: 'divider', align: align };
-      default:
-        return { type: 'text', body: '', align: align };
-    }
+  function defaultContentBlock(value) {
+    return contentBlockModel.defaultBlock(value);
   }
 
-  function normalizeContentBlock(block) {
-    if (!block || typeof block !== 'object') return defaultContentBlock('text');
-    var type = contentBlockCommand(block.type);
-    var normalized = defaultContentBlock(type);
-    Object.keys(normalized).forEach(function(key) {
-      if (key === 'type') return;
-      if (key === 'images') {
-        normalized.images = Array.isArray(block.images)
-          ? block.images.map(function(image) {
-            return {
-              src: String(image?.src || ''),
-              alt: String(image?.alt || ''),
-              decorative: image?.decorative === true,
-              caption: String(image?.caption || '')
-            };
-          })
-          : [];
-        return;
-      }
-      if (key === 'layout') {
-        normalized.layout = contentGalleryLayout(block.layout);
-        return;
-      }
-      if (key === 'caption_style') {
-        normalized.caption_style = contentGalleryCaptionStyle(block.caption_style);
-        return;
-      }
-      if (key === 'provider' && type === 'video') {
-        normalized.provider = contentVideoProvider(block.provider);
-        return;
-      }
-      normalized[key] = key === 'decorative' ? block[key] === true : String(block[key] || '');
-    });
-    normalized.align = contentBlockAlignment(block.align);
-    return normalized;
+  function normalizeContentBlock(value) {
+    return contentBlockModel.normalize(value);
   }
 
   function parseContentBlocks(value) {
-    if (Array.isArray(value)) return value.map(normalizeContentBlock);
-    if (typeof value === 'string' && value.trim()) {
-      var parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed.map(normalizeContentBlock) : [];
-    }
-    return [];
+    return contentBlockModel.parse(value);
   }
 
   function galleryImagesToText(images) {
@@ -8219,209 +8146,7 @@
   }
 
   function createIcon(name) {
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('focusable', 'false');
-    svg.classList.add('admin-content-block__icon');
-    var paths = {
-      alignLeft: ['M4 6h16', 'M4 10h11', 'M4 14h16', 'M4 18h11'],
-      alignCenter: ['M4 6h16', 'M7 10h10', 'M4 14h16', 'M7 18h10'],
-      alignRight: ['M4 6h16', 'M9 10h11', 'M4 14h16', 'M9 18h11'],
-      alignJustify: ['M4 6h16', 'M4 10h16', 'M4 14h16', 'M4 18h16'],
-      info: ['M12 16v-4', 'M12 8h.01', 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
-      link: ['M10 13a5 5 0 0 0 7.1 0l1.4-1.4a5 5 0 0 0-7.1-7.1L10.5 5.4', 'M14 11a5 5 0 0 0-7.1 0L5.5 12.4a5 5 0 0 0 7.1 7.1l.9-.9'],
-      list: ['M8 6h13', 'M8 12h13', 'M8 18h13', 'M3 6h.01', 'M3 12h.01', 'M3 18h.01'],
-      listOrdered: ['M10 6h11', 'M10 12h11', 'M10 18h11', 'M4 6h1v4', 'M4 10h2', 'M6 18H4c0-1 2-2 2-3s-1-1.5-2-1'],
-      arrowUp: ['M12 19V5', 'M5 12l7-7 7 7'],
-      arrowDown: ['M12 5v14', 'M19 12l-7 7-7-7'],
-      trash: ['M3 6h18', 'M8 6V4h8v2', 'M19 6l-1 14H6L5 6', 'M10 11v6', 'M14 11v6'],
-      settings: [
-        'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.16.09a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.18a2 2 0 0 1-1 1.73l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.16.09a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.16-.09a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.18a2 2 0 0 1 1-1.73l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.16-.09a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z',
-        'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'
-      ]
-    };
-    (paths[name] || []).forEach(function(definition) {
-      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', definition);
-      svg.append(path);
-    });
-    return svg;
-  }
-
-  function createToolbarGroup(label) {
-    var group = document.createElement('div');
-    group.className = 'admin-content-block__toolbar-group';
-    group.setAttribute('role', 'group');
-    group.setAttribute('aria-label', label);
-    return group;
-  }
-
-  function createContentChrome(block, index) {
-    var chrome = document.createElement('div');
-    chrome.className = 'admin-content-block__chrome';
-    chrome.dataset.contentChrome = 'true';
-    chrome.setAttribute('aria-hidden', 'true');
-    chrome.addEventListener('mousedown', function(event) {
-      if (event.target?.closest?.('button')) {
-        event.preventDefault();
-      }
-    });
-    var typeLabel = document.createElement('label');
-    typeLabel.className = 'admin-content-block__type admin-content-block__toolbar-group admin-content-block__toolbar-group--type';
-    var select = document.createElement('select');
-    select.className = 'admin-content-block__select';
-    select.dataset.contentIndex = String(index);
-    select.dataset.contentAction = 'type';
-    select.setAttribute('aria-label', t('content_block_type', 'Block type'));
-    activeContentBlockTypes().forEach(function(type) {
-      var option = document.createElement('option');
-      option.value = type;
-      option.textContent = contentBlockLabel(type);
-      option.selected = block.type === type;
-      select.append(option);
-    });
-    typeLabel.append(select);
-
-    var headerRow = document.createElement('div');
-    headerRow.className = 'admin-content-block__chrome-row admin-content-block__chrome-row--header';
-    var formatRow = document.createElement('div');
-    formatRow.className = 'admin-content-block__chrome-row admin-content-block__chrome-row--format';
-    var actions = document.createElement('div');
-    actions.className = 'admin-content-block__actions';
-    if (block.type === 'text' || block.type === 'quote') {
-      var formatGroup = createToolbarGroup(t('content_format_group', 'Text styling'));
-      var formatButtons = [
-        { action: 'format-bold', label: t('content_format_bold', 'Bold'), text: 'B' },
-        { action: 'format-italic', label: t('content_format_italic', 'Italic'), text: 'I' },
-        { action: 'format-underline', label: t('content_format_underline', 'Underline'), text: 'U' }
-      ];
-      if (block.type === 'text') {
-        formatButtons.push(
-          { action: 'format-link', label: t('content_format_link', 'Link'), icon: 'link' },
-          { action: 'format-unordered-list', label: t('content_format_unordered_list', 'Unordered list'), icon: 'list' },
-          { action: 'format-ordered-list', label: t('content_format_ordered_list', 'Numbered list'), icon: 'listOrdered' }
-        );
-      }
-      formatButtons.forEach(function(config) {
-        var button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'btn btn--secondary btn--small admin-content-block__format-button admin-content-block__format-button--' + config.action;
-        button.dataset.contentIndex = String(index);
-        button.dataset.contentAction = config.action;
-        button.setAttribute('aria-label', config.label);
-        button.setAttribute('aria-pressed', 'false');
-        if (config.icon) {
-          button.append(createIcon(config.icon));
-        } else {
-          button.textContent = config.text;
-        }
-        formatGroup.append(button);
-      });
-      if (block.type === 'text') {
-        var styleGroup = createToolbarGroup(t('content_format_label', 'Text format'));
-        var formatSelect = document.createElement('select');
-        formatSelect.className = 'admin-content-block__select admin-content-block__format-select';
-        formatSelect.dataset.contentIndex = String(index);
-        formatSelect.dataset.contentAction = 'format-block';
-        formatSelect.setAttribute('aria-label', t('content_format_label', 'Text format'));
-        var multipleOption = document.createElement('option');
-        multipleOption.value = 'multiple';
-        multipleOption.textContent = t('content_format_multiple', 'Multiple');
-        multipleOption.disabled = true;
-        formatSelect.append(multipleOption);
-        [
-          { value: 'p', label: t('content_format_paragraph', 'Paragraph') },
-          { value: 'h2', label: t('content_format_heading_2', 'Heading 2') },
-          { value: 'h3', label: t('content_format_heading_3', 'Heading 3') },
-          { value: 'h4', label: t('content_format_heading_4', 'Heading 4') }
-        ].forEach(function(config) {
-          var option = document.createElement('option');
-          option.value = config.value;
-          option.textContent = config.label;
-          formatSelect.append(option);
-        });
-        styleGroup.append(formatSelect);
-      }
-      actions.append(formatGroup);
-      if (styleGroup) actions.append(styleGroup);
-    }
-    var alignGroup = createToolbarGroup(t('content_align_group', 'Alignment'));
-    alignGroup.classList.add('admin-content-block__toolbar-group--alignment');
-    contentAlignments.forEach(function(align) {
-      var button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'btn btn--secondary btn--small' + (contentBlockAlignment(block.align) === align ? ' is-active' : '');
-      button.dataset.contentIndex = String(index);
-      button.dataset.contentAction = 'align';
-      button.dataset.contentAlign = align;
-      button.setAttribute('aria-label', t('content_align_' + align, align));
-      button.setAttribute('aria-pressed', contentBlockAlignment(block.align) === align ? 'true' : 'false');
-      button.append(createIcon(align === 'left' ? 'alignLeft' : align === 'center' ? 'alignCenter' : align === 'right' ? 'alignRight' : 'alignJustify'));
-      alignGroup.append(button);
-    });
-    actions.append(alignGroup);
-    var blockGroup = createToolbarGroup(t('content_block_actions_group', 'Block actions'));
-    blockGroup.classList.add('admin-content-block__toolbar-group--block-actions');
-    [
-      { action: 'up', label: t('content_block_move_up', 'Move block up'), text: '↑', disabled: index === 0 },
-      { action: 'down', label: t('content_block_move_down', 'Move block down'), text: '↓', disabled: index === contentBlocks.length - 1 },
-      { action: 'delete', label: t('content_block_delete', 'Delete block'), icon: 'trash', disabled: contentBlocks.length === 1 }
-    ].forEach(function(config) {
-      var button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'btn btn--secondary btn--small';
-      button.dataset.contentIndex = String(index);
-      button.dataset.contentAction = config.action;
-      button.setAttribute('aria-label', config.label);
-      if (config.icon) {
-        button.append(createIcon(config.icon));
-      } else {
-        button.textContent = config.text;
-      }
-      button.disabled = config.disabled;
-      blockGroup.append(button);
-    });
-    headerRow.append(typeLabel, blockGroup);
-
-    chrome.append(headerRow);
-    if (actions.children.length) {
-      formatRow.append(actions);
-      chrome.append(formatRow);
-    }
-    if (block.type === 'text') {
-      var linkPanel = document.createElement('div');
-      linkPanel.className = 'admin-content-block__link-panel';
-      linkPanel.dataset.contentLinkPanel = String(index);
-      linkPanel.setAttribute('role', 'group');
-      linkPanel.setAttribute('aria-label', t('content_link_label', 'Link URL'));
-      linkPanel.hidden = true;
-      var linkLabel = document.createElement('label');
-      var linkLabelText = document.createElement('span');
-      linkLabelText.textContent = t('content_link_label', 'Link URL');
-      var linkInput = document.createElement('input');
-      linkInput.type = 'text';
-      linkInput.inputMode = 'url';
-      linkInput.dataset.contentIndex = String(index);
-      linkInput.dataset.contentAction = 'link-url';
-      linkInput.setAttribute('aria-label', t('content_link_label', 'Link URL'));
-      linkLabel.append(linkLabelText, linkInput);
-      var applyButton = document.createElement('button');
-      applyButton.type = 'button';
-      applyButton.className = 'btn btn--secondary btn--small';
-      applyButton.dataset.contentIndex = String(index);
-      applyButton.dataset.contentAction = 'link-apply';
-      applyButton.textContent = t('content_link_apply', 'Apply');
-      var removeButton = document.createElement('button');
-      removeButton.type = 'button';
-      removeButton.className = 'btn btn--secondary btn--small';
-      removeButton.dataset.contentIndex = String(index);
-      removeButton.dataset.contentAction = 'link-remove';
-      removeButton.textContent = t('content_link_remove', 'Remove link');
-      linkPanel.append(linkLabel, applyButton, removeButton);
-      chrome.append(linkPanel);
-    }
-    return chrome;
+    return sharedBlockEditor.createIcon(name, document);
   }
 
   function createMediaPlaceholder() {
@@ -8652,10 +8377,6 @@
     card.append(caption);
   }
 
-  function blockElementName(type) {
-    return type === 'quote' ? 'blockquote' : type === 'text' || type === 'divider' ? 'div' : 'figure';
-  }
-
   function renderContentBlockBody(card, block, index) {
     if (block.type === 'text') {
       card.append(createEditable('div', block, index, 'body', t('content_field_body', 'Body'), 'admin-content-block__editable admin-content-block__editable--prose', { blockMode: true }));
@@ -8775,41 +8496,32 @@
     }
   }
 
-  function createContentInsertControl(index) {
-    var wrap = document.createElement('div');
-    wrap.className = 'admin-content-insert';
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'admin-content-insert__button';
-    button.dataset.contentAction = 'insert-block';
-    button.dataset.contentIndex = String(index);
-    button.setAttribute('aria-label', t('content_block_insert', 'Add content block'));
-    button.textContent = '+';
-    wrap.append(button);
-    return wrap;
+  function contentBlockComposer(root) {
+    root = root || contentBlocksRoot;
+    if (!root) return null;
+    if (!contentBlockComposers.has(root)) contentBlockComposers.set(root, sharedBlockEditor.createBlockEditor(root, {
+      model: contentBlockModel, t: t,
+      getBlocks: function() { return contentBlocks; },
+      setBlocks: function(blocks) { contentBlocks = blocks; },
+      renderBody: renderContentBlockBody,
+      onRender: function() { root.__contentBlocks = contentBlocks; syncContentJsonFromBlocks(); },
+      beforeMutation: function(change) {
+        if (change.action === 'slash') {
+          var snapshot = cloneContentBlocks(contentBlocks);
+          snapshot[change.index] = { type: 'text', body: [change.before, change.after].filter(Boolean).join('\n\n'), align: change.align };
+          pushContentSnapshot(snapshot);
+        } else pushContentHistory();
+        lastContentMutation = 'block';
+      },
+      onMutation: function(change) {
+        if (['type', 'align', 'slash'].includes(change.action)) writeContentDraft();
+      }
+    }));
+    return contentBlockComposers.get(root);
   }
 
   function renderContentBlocks(focusIndex) {
-    if (!contentBlocksRoot) return;
-    contentBlocksRoot.__contentBlocks = contentBlocks;
-    contentBlocksRoot.replaceChildren();
-    if (!contentBlocks.length) contentBlocks = [defaultContentBlock('text')];
-    contentBlocksRoot.append(createContentInsertControl(0));
-    contentBlocks.forEach(function(block, index) {
-      if (index > 0) contentBlocksRoot.append(createContentInsertControl(index));
-      var card = document.createElement(blockElementName(block.type));
-      card.className = 'admin-content-block content-block content-block--' + block.type + ' content-block--align-' + contentBlockAlignment(block.align) + (block.type === 'gallery' ? ' gallery--' + contentGalleryLayout(block.layout) + ' gallery--caption-' + contentGalleryCaptionStyle(block.caption_style) : '');
-      card.dataset.contentIndex = String(index);
-      card.append(createContentChrome(block, index));
-      renderContentBlockBody(card, block, index);
-      contentBlocksRoot.append(card);
-    });
-    contentBlocksRoot.append(createContentInsertControl(contentBlocks.length));
-    syncContentJsonFromBlocks();
-    syncContentChromeAccessibility(contentBlocksRoot);
-    if (typeof focusIndex === 'number') {
-      contentBlocksRoot.querySelector('[data-content-index="' + focusIndex + '"][data-content-field]')?.focus();
-    }
+    contentBlockComposer()?.render(focusIndex);
   }
 
   function contentMediaUploadTarget(control) {
@@ -8958,45 +8670,15 @@
   }
 
   function activateContentBlockForNode(node) {
-    if (!contentBlocksRoot) return;
-    var element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-    var block = element?.closest?.('.admin-content-block');
-    contentBlocksRoot.querySelectorAll('.admin-content-block.is-active').forEach(function(item) {
-      if (item !== block) item.classList.remove('is-active');
-    });
-    if (block instanceof HTMLElement && contentBlocksRoot.contains(block)) {
-      block.classList.add('is-active');
-    }
-    syncContentChromeAccessibility(contentBlocksRoot);
+    contentBlockComposer()?.activate(node);
   }
 
   function deactivateContentBlocks(root) {
-    var scope = root instanceof HTMLElement ? root : contentBlocksRoot;
-    scope?.querySelectorAll?.('.admin-content-block.is-active').forEach(function(item) {
-      item.classList.remove('is-active');
-    });
-    syncContentChromeAccessibility(scope);
-  }
-
-  function setContentChromeInteractive(chrome, active) {
-    if (!(chrome instanceof HTMLElement)) return;
-    chrome.setAttribute('aria-hidden', active ? 'false' : 'true');
-    chrome.querySelectorAll('button, input, select, textarea').forEach(function(control) {
-      if (!(control instanceof HTMLElement)) return;
-      if (active) {
-        control.removeAttribute('tabindex');
-      } else {
-        control.tabIndex = -1;
-      }
-    });
+    contentBlockComposer(root)?.activate(null);
   }
 
   function syncContentChromeAccessibility(root) {
-    var scope = root instanceof HTMLElement ? root : contentBlocksRoot;
-    if (!(scope instanceof HTMLElement)) return;
-    scope.querySelectorAll('.admin-content-block').forEach(function(block) {
-      setContentChromeInteractive(block.querySelector('[data-content-chrome]'), block.classList.contains('is-active'));
-    });
+    contentBlockComposer(root)?.syncChrome();
   }
 
   function updateActiveEditable() {
@@ -9041,35 +8723,8 @@
       || editableForNode(selection.getRangeAt(0).commonAncestorContainer);
   }
 
-  function contentTextFormatForNode(node, editable) {
-    var element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-    var block = element?.closest?.('p,h2,h3,h4');
-    if (block instanceof HTMLElement && editable?.contains(block)) {
-      var tag = block.tagName.toLowerCase();
-      return contentTextFormats.indexOf(tag) >= 0 ? tag : 'p';
-    }
-    return 'p';
-  }
-
   function selectedContentTextFormat(editable) {
-    var selection = window.getSelection();
-    if (!(editable instanceof HTMLElement) || !selection || selection.rangeCount === 0) return 'p';
-    var range = selection.getRangeAt(0);
-    if (selection.isCollapsed) return contentTextFormatForNode(selection.focusNode, editable);
-    var formats = [];
-    editable.querySelectorAll('p,h2,h3,h4').forEach(function(block) {
-      try {
-        if (range.intersectsNode(block)) formats.push(block.tagName.toLowerCase());
-      } catch (error) {
-        // Ignore detached or browser-normalized nodes while the editor is mutating.
-      }
-    });
-    if (!formats.length) formats.push(contentTextFormatForNode(range.commonAncestorContainer, editable));
-    var uniqueFormats = Array.from(new Set(formats.filter(function(format) {
-      return contentTextFormats.indexOf(format) >= 0;
-    })));
-    if (uniqueFormats.length > 1) return 'multiple';
-    return uniqueFormats[0] || 'p';
+    return sharedBlockEditor.selectedTextFormat(editable);
   }
 
   function clearContentLinkInspector() {
@@ -9290,74 +8945,8 @@
     applyContentFormat(ordered ? 'insertOrderedList' : 'insertUnorderedList');
   }
 
-  function applyContentBlockAlignment(index, align) {
-    if (!contentBlocks[index]) return;
-    pushContentHistory();
-    contentBlocks[index].align = contentBlockAlignment(align);
-    lastContentMutation = 'block';
-    renderContentBlocks(index);
-    writeContentDraft();
-  }
-
-  function changeContentBlockType(index, type) {
-    var previous = contentBlocks[index] || defaultContentBlock('text');
-    var next = defaultContentBlock(type);
-    next.align = contentBlockAlignment(previous.align);
-    if (previous.type === 'text' && next.type === 'quote') next.text = previous.body || '';
-    if (previous.type === 'quote' && next.type === 'text') next.body = previous.text || '';
-    pushContentHistory();
-    contentBlocks[index] = next;
-    lastContentMutation = 'block';
-    renderContentBlocks(index);
-    writeContentDraft();
-  }
-
-  function contentEditableCaretOffset(control) {
-    var selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return editableText(control).length;
-    var range = selection.getRangeAt(0);
-    if (!control.contains(range.endContainer)) return editableText(control).length;
-    var preSelection = range.cloneRange();
-    preSelection.selectNodeContents(control);
-    preSelection.setEnd(range.endContainer, range.endOffset);
-    return preSelection.toString().length;
-  }
-
   function insertContentBlockFromSlash(control) {
-    var index = Number(control.dataset.contentIndex);
-    var field = control.dataset.contentField || '';
-    if (field !== 'body' || !contentBlocks[index]) return false;
-    var value = editorHtmlToMarkdown(control);
-    var commandNames = activeContentBlockTypes().join('|');
-    var commandMatch = value.match(new RegExp('(?:^|\\n|\\s)/(?:' + commandNames + ')(?=\\s*$|\\n)', 'i'));
-    if (!commandMatch) return false;
-
-    var commandText = commandMatch[0].match(/\/([a-z]+)/i)?.[1] || 'text';
-    var lineStart = commandMatch.index + commandMatch[0].indexOf('/');
-    var lineEnd = commandMatch.index + commandMatch[0].length;
-    var type = contentBlockCommand(commandText);
-    var beforeText = value.slice(0, lineStart).replace(/\s+$/, '');
-    var afterText = value.slice(lineEnd).replace(/^\s+/, '');
-    var insertAt = index;
-    var originalAlign = contentBlockAlignment(contentBlocks[index].align);
-    var historySnapshot = cloneContentBlocks(contentBlocks);
-    var restoredBody = [beforeText, afterText].filter(Boolean).join('\n\n');
-    historySnapshot[index] = { type: 'text', body: restoredBody, align: originalAlign };
-    pushContentSnapshot(historySnapshot);
-    if (beforeText) {
-      contentBlocks[index].body = beforeText;
-      insertAt = index + 1;
-    } else {
-      contentBlocks.splice(index, 1);
-    }
-    contentBlocks.splice(insertAt, 0, defaultContentBlock(type));
-    if (afterText) {
-      contentBlocks.splice(insertAt + 1, 0, { type: 'text', body: afterText, align: originalAlign });
-    }
-    lastContentMutation = 'block';
-    renderContentBlocks(insertAt);
-    writeContentDraft();
-    return true;
+    return contentBlockComposer()?.insertSlash(control, editorHtmlToMarkdown(control)) || false;
   }
 
   function syncContentBlocksFromJson() {
@@ -11347,26 +10936,12 @@
 
   function attachContentBlockEditor(root, field) {
     if (!(root instanceof HTMLElement)) return;
-    document.addEventListener('pointerdown', function(event) {
-      if (event.target instanceof Node && root.contains(event.target)) return;
-      closeContentSettingsPanels(root);
-      deactivateContentBlocks(root);
-    });
-    root.addEventListener('focusin', function() {
-      runContentEditorAction(root, field, updateActiveEditable);
-    });
-    root.addEventListener('mouseup', function(event) {
-      runContentEditorAction(root, field, function() {
-        refreshContentSelectionState(event);
-      });
-    });
-    root.addEventListener('keyup', function(event) {
-      runContentEditorAction(root, field, function() {
-        refreshContentSelectionState(event);
-      });
-    });
-    root.addEventListener('pointerdown', function(event) {
-      runContentEditorAction(root, field, function() {
+    contentBlockComposer(root).bind({
+      run: function(callback) { return runContentEditorAction(root, field, callback); },
+      outside: function() { closeContentSettingsPanels(root); deactivateContentBlocks(root); },
+      focus: updateActiveEditable,
+      selection: refreshContentSelectionState,
+      pointer: function(event) {
         var settingsButton = contentSettingsButtonForNode(event.target);
         if (settingsButton) {
           event.preventDefault();
@@ -11392,10 +10967,8 @@
           return;
         }
         activateContentBlockForNode(event.target);
-      });
-    });
-    root.addEventListener('input', function(event) {
-      runContentEditorAction(root, field, function() {
+      },
+      input: function(event) {
         var control = event.target;
         if (control instanceof HTMLElement && control.isContentEditable && !control.dataset.contentField) return;
         if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLElement && (control.isContentEditable || control.dataset.contentField)) {
@@ -11403,32 +10976,18 @@
           lastContentMutation = control instanceof HTMLElement && control.isContentEditable ? 'text' : 'field';
           writeContentDraft();
         }
-      });
-    });
-    root.addEventListener('change', function(event) {
-      runContentEditorAction(root, field, function() {
-        var control = event.target;
-        if (control instanceof HTMLSelectElement && control.dataset.contentAction === 'type') {
-          changeContentBlockType(Number(control.dataset.contentIndex), control.value);
-        } else if (control instanceof HTMLSelectElement && control.dataset.contentAction === 'format-block') {
-          applyContentBlockFormat(control.value);
-        } else if (control instanceof HTMLInputElement && ['select-media-upload', 'add-gallery-image-upload'].includes(control.dataset.contentAction || '')) {
-          selectPendingContentMedia(control);
-        } else if (control instanceof HTMLInputElement && control.dataset.contentAction === 'link-url') {
-          applyContentLinkPanel(control);
-        } else if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) {
-          updateContentBlockField(control);
-          writeContentDraft();
+      },
+      fieldChange: function(control) {
+        if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) {
+          updateContentBlockField(control); writeContentDraft();
         }
-      });
-    });
-    root.addEventListener('click', function(event) {
-      runContentEditorAction(root, field, function() {
+      },
+      beforeClick: function(event) {
         var settingsButton = contentSettingsButtonForNode(event.target);
         if (settingsButton && Date.now() < suppressContentSettingsClickUntil) {
           event.preventDefault();
           event.stopPropagation();
-          return;
+          return false;
         }
         var deferActivation = Date.now() < deferContentTouchActivationUntil && editableForNode(event.target);
         if (!deferActivation && !isContentSettingsTarget(event.target)) activateContentBlockForNode(event.target);
@@ -11438,75 +10997,30 @@
           setActiveContentLink(link);
           updateContentFormatState();
         }
-        var button = event.target?.closest?.('[data-content-action]');
-        if (!(button instanceof HTMLButtonElement)) return;
-        var index = Number(button.dataset.contentIndex);
-        var action = button.dataset.contentAction;
-        if (action === 'format-bold') {
-          applyContentFormat('bold');
-        } else if (action === 'format-italic') {
-          applyContentFormat('italic');
-        } else if (action === 'format-underline') {
-          applyContentFormat('underline');
-        } else if (action === 'format-link') {
-          applyContentLink();
-        } else if (action === 'format-unordered-list') {
-          applyContentListFormat(false);
-        } else if (action === 'format-ordered-list') {
-          applyContentListFormat(true);
-        } else if (action === 'link-apply') {
-          applyContentLinkPanel(button.closest('[data-content-link-panel]')?.querySelector('[data-content-action="link-url"]'));
-        } else if (action === 'link-remove') {
-          removeActiveContentLink();
-        } else if (action === 'choose-media-library') {
-          openContentMediaLibrary(button);
-        } else if (action === 'remove-media') {
-          return; // The shared removal control handles this button.
-        } else if (action === 'toggle-media-settings') {
-          toggleMediaSettings(button);
-        } else if (action === 'toggle-gallery-image-settings') {
-          toggleMediaSettings(button);
-        } else if (action === 'align') {
-          applyContentBlockAlignment(index, button.dataset.contentAlign);
-        } else if (action === 'insert-block') {
-          pushContentHistory();
-          contentBlocks.splice(Math.max(0, Math.min(index, contentBlocks.length)), 0, defaultContentBlock('text'));
-          lastContentMutation = 'block';
-          renderContentBlocks(index);
-        } else if (action === 'up' && index > 0) {
-          pushContentHistory();
-          var previous = contentBlocks[index - 1];
-          contentBlocks[index - 1] = contentBlocks[index];
-          contentBlocks[index] = previous;
-          lastContentMutation = 'block';
-          renderContentBlocks(index - 1);
-        } else if (action === 'down' && index < contentBlocks.length - 1) {
-          pushContentHistory();
-          var next = contentBlocks[index + 1];
-          contentBlocks[index + 1] = contentBlocks[index];
-          contentBlocks[index] = next;
-          lastContentMutation = 'block';
-          renderContentBlocks(index + 1);
-        } else if (action === 'delete' && contentBlocks.length > 1) {
-          pushContentHistory();
-          contentBlocks.splice(index, 1);
-          lastContentMutation = 'block';
-          renderContentBlocks(Math.max(0, index - 1));
-        }
-        writeContentDraft();
-      });
-    });
-    root.addEventListener('keydown', function(event) {
-      runContentEditorAction(root, field, function() {
+
+      },
+      actions: {
+        'format-bold': function() { applyContentFormat('bold'); },
+        'format-italic': function() { applyContentFormat('italic'); },
+        'format-underline': function() { applyContentFormat('underline'); },
+        'format-link': applyContentLink,
+        'format-unordered-list': function() { applyContentListFormat(false); },
+        'format-ordered-list': function() { applyContentListFormat(true); },
+        'format-block': function(control) { applyContentBlockFormat(control.value); },
+        'link-apply': function(control) { applyContentLinkPanel(control instanceof HTMLInputElement ? control : control.closest('[data-content-link-panel]')?.querySelector('[data-content-action="link-url"]')); },
+        'link-remove': removeActiveContentLink,
+        'choose-media-library': openContentMediaLibrary,
+        'remove-media': function() {},
+        'toggle-media-settings': toggleMediaSettings,
+        'toggle-gallery-image-settings': toggleMediaSettings,
+        upload: selectPendingContentMedia
+      },
+      afterAction: function(action) { if (action !== 'remove-media') writeContentDraft(); },
+      beforeKey: function(event) {
         var control = event.target;
         if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'z' && lastContentMutation === 'block') {
           if (undoContentBlockMutation()) event.preventDefault();
-          return;
-        }
-        if (control instanceof HTMLInputElement && control.dataset.contentAction === 'link-url' && event.key === 'Enter') {
-          applyContentLinkPanel(control);
-          event.preventDefault();
-          return;
+          return false;
         }
         if (event.key === 'Escape') {
           var panel = control instanceof HTMLElement ? control.closest('[data-content-media-settings], [data-content-gallery-image-settings]') : null;
@@ -11518,16 +11032,13 @@
               button.focus();
             }
             event.preventDefault();
-            return;
+            return false;
           }
         }
-        if (!(control instanceof HTMLElement) || !control.isContentEditable || event.key !== 'Enter') return;
-        if (!insertContentBlockFromSlash(control)) return;
-        event.preventDefault();
-      });
-    });
-    root.addEventListener('paste', function(event) {
-      runContentEditorAction(root, field, function() {
+
+      },
+      slash: insertContentBlockFromSlash,
+      paste: function(event) {
         var control = editableForNode(event.target);
         if (!control) return;
         var sanitized = sanitizedClipboardHtml(event, control.dataset.contentField === 'body');
@@ -11535,7 +11046,7 @@
         event.preventDefault();
         document.execCommand('insertHTML', false, sanitized);
         control.dispatchEvent(new Event('input', { bubbles: true }));
-      });
+      }
     });
   }
 
