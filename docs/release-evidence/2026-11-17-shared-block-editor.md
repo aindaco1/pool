@@ -30,22 +30,27 @@ No campaign content, storage schema or Worker implementation changed.
   they are not evidence of live payments, publishing or email delivery.
 - Platform's 401 tests and clean-checkout recipe checks pass on the pinned SHA.
 
-## Deployment status and dependency finding
+## Approved development dependency exception
 
-Implementation and local verification are complete. Merge/deployment is pending.
-The root production audit and both Worker audits are clean. The full root audit
-reports [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
-in existing `picomatch` 4.0.7, inherited by the Vite/Vitest development toolchain.
-The advisory was updated November 17 and currently lists no patched version.
-No dependency version was changed by this migration. The package is absent from
-production dependencies; authored content does not supply its glob patterns.
-The potential denial of service concerns tooling accepting malicious glob
-patterns, not the deployed editor runtime.
+On November 17, 2026, the repository owner explicitly authorized: “Approve a
+scoped development-only exception and deploy.” This approval is limited to
+this shared block editor release and its existing locked picomatch 4.0.7
+Vite/Vitest development dependency chain, covering
+[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf).
+It expires December 1, 2026. Subsequent releases must recheck for a supported
+fix; this is not a standing waiver or permission for later dependency changes.
 
-This is an actual failed audit, not a clean result or approved exception.
-[TESTING.md](../TESTING.md#dependency-audits) requires all four audits and smoke
-to pass before merge. Preserve that gate until a supported fix or an explicitly
-authorized scoped exception is available. No threshold or CI check was weakened.
+Both root production audits and full Worker audits are clean. The refactor
+changes no dependency versions. The affected package is development tooling,
+not deployed application code, and authored content does not supply its glob
+patterns. The remaining risk is tooling denial of service from malicious glob
+patterns. The advisory currently lists no patched release.
+
+The full root audit remains a failed check and must remain visible. Its CI job,
+threshold and classification are unchanged. The owner's approval authorizes
+this specific exception to the normal all-audits-pass release rule. Deployment
+still requires the remaining smoke checks to pass. No live payment, email or
+content mutation is part of the release validation.
 
 Rollback: revert the consumer migration, including its Platform gitlink and
 adapter, together. No data rollback or migration is needed. Original user
