@@ -21,6 +21,7 @@ describe('admin dashboard content editor serialization', () => {
     setupAdminContentEditorDom();
     await import('../../shared/dust-wave-platform/packages/admin-shell/src/editor-codec.js');
     await import('../../shared/dust-wave-platform/packages/admin-shell/src/editor-media.js');
+    await import('../../shared/dust-wave-platform/packages/admin-shell/src/block-editor.js');
     await import('../../shared/dust-wave-platform/packages/admin-shell/src/feedback.js');
     (window as unknown as { POOL_CONFIG?: unknown }).POOL_CONFIG = {
       i18n: { currentLang: 'en', messages: { admin: {} } },
