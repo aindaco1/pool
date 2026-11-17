@@ -80,12 +80,12 @@ long_content:
       - **Director of Photography**: Ella Daniel (elladanieldp.com)
       - **Gaffer**: Luis Gutierrez
       - **Producer & Costume Designer:** Ria Suarez (Costume Designer for *Worst Movie Ever & Bewildered!*)
-      - **Producer & Assistant Director:** Massimilliano Mraz (Lead Producer on *The Arsonists* and Associate Producer on *Every Type of Orange*)
+      - **Producer & Assistant Director:** Massimilliano Mraz (Lead Producer for *The Arsonists* and Associate Producer for *Every Type of Orange*)
       - **Art Director**: Stella Cole ()
       
       **<u>PRIMARY CAST</u>**
       
-      - **Ian**: TBD
+      - **Ian**: Jacob Romang
       - **Elise**: Lucinda Marker
       
       We are in final talks with the diner to officially secure the location for our three-day shoot in January 2027. After production is completed, we're poised to move swiftly into post-production to be ready for our premiere in May!
@@ -202,7 +202,7 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-17T21:09:17.861Z"
+_pool_draft_saved_at: "2026-11-17T22:35:36.317Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 campaign_background: "/assets/images/campaigns/possessions/background-20261117-205054-171fb512.jpg"
 ---
