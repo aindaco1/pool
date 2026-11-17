@@ -1,3 +1,5 @@
+import { applyPledgeToFinancialTotals, emptyPledgeFinancialTotals } from './pledge-financials.js';
+
 const DEFAULT_PLATFORM_FULFILLER = 'Platform';
 
 const TIER_NAMES = {
@@ -269,7 +271,11 @@ export function buildPledgeLedgerReport(pledges = [], { campaign = null } = {}) 
     'status',
     'charged',
     'created_at',
-    'order_id'
+    'order_id',
+    'current_stripe_fee_source',
+    'current_stripe_fee',
+    'current_campaign_stripe_fee',
+    'current_campaign_amount_after_fees'
   ];
 
   const rows = [];
@@ -283,6 +289,23 @@ export function buildPledgeLedgerReport(pledges = [], { campaign = null } = {}) 
     const orderId = String(pledge?.orderId || '').trim();
     const charged = pledge?.charged === true ? 'yes' : 'no';
     const history = Array.isArray(pledge?.history) ? pledge.history : [];
+    const firstPledgeRow = rows.length;
+    const appendFinancialSnapshot = () => {
+      if (rows.length === firstPledgeRow) return;
+      const totals = emptyPledgeFinancialTotals();
+      applyPledgeToFinancialTotals(totals, pledgeCampaign, pledge);
+      // These are current per-pledge totals, not historical ledger deltas.
+      // Fill only the final row so summing the columns counts each pledge once.
+      for (let index = firstPledgeRow; index < rows.length - 1; index += 1) {
+        rows[index].push('', '', '', '');
+      }
+      rows[rows.length - 1].push(
+        totals.actualStripeFinancialPledgeCount ? 'actual' : totals.estimatedStripeFeePledgeCount ? 'estimated' : 'not_applicable',
+        formatCents(totals.actualStripeFeeAmount + totals.estimatedStripeFeeAmount),
+        formatCents(totals.processorFeeAllocatedToCampaignRevenue),
+        formatCents(totals.netCampaignRevenue)
+      );
+    };
 
     if (history.length > 0) {
       let previousCounts = new Map();
@@ -439,6 +462,7 @@ export function buildPledgeLedgerReport(pledges = [], { campaign = null } = {}) 
         }
       }
 
+      appendFinancialSnapshot();
       continue;
     }
 
@@ -481,6 +505,7 @@ export function buildPledgeLedgerReport(pledges = [], { campaign = null } = {}) 
       String(pledge?.createdAt || ''),
       orderId
     ]);
+    appendFinancialSnapshot();
   }
 
   return {

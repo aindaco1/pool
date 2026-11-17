@@ -511,10 +511,20 @@ describe('worker operational integrity', () => {
         'Total pledges: 2',
         'New pledges in the previous 24 hours: 1',
         'Pledged total: $15.00',
+        'Stripe fees (campaign share, estimated): $0.97',
+        'Campaign amount after Stripe fees (estimated): $14.03',
         'Goal progress: $25,000.00 goal (0.1% funded)'
       ])
     }));
     await expect(kv.get('campaign-runner-report:pledge:hand-relations:2026-04-21')).resolves.toBeTruthy();
+    const csvLines = mockSendCampaignRunnerReportEmail.mock.calls[0][1].csvContent.split('\n').map((line: string) => line.split(','));
+    expect(csvLines[0].slice(-4)).toEqual([
+      'current_stripe_fee_source', 'current_stripe_fee', 'current_campaign_stripe_fee', 'current_campaign_amount_after_fees'
+    ]);
+    expect(csvLines.slice(1).map((row: string[]) => row.slice(-4))).toEqual([
+      ['estimated', '0.46', '0.41', '4.59'],
+      ['estimated', '0.63', '0.56', '9.44']
+    ]);
     await expect(kv.get('cron:lastCampaignRunnerReportRun')).resolves.toBeTruthy();
   });
 

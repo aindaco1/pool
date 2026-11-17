@@ -4783,6 +4783,10 @@ diary:
     });
     expect(body.header).toContain('email');
     expect(body.previewRows[0]).toContain('reader@example.com');
+    expect(body.statsSummary).toEqual(expect.arrayContaining([
+      'Stripe fees (campaign share, estimated): $1.58',
+      'Campaign amount after Stripe fees (estimated): $43.42'
+    ]));
     expect(JSON.stringify(body)).not.toContain('stripePaymentMethodId');
 
     expect(pledges.putCalls).toBe(0);
@@ -4791,6 +4795,42 @@ diary:
     expect((env.RATELIMIT as CountingKVNamespace).putCalls).toBe(0);
     expect((env.RATELIMIT as CountingKVNamespace).deleteCalls).toBe(0);
     expect((env.RATELIMIT as CountingKVNamespace).listCalls).toBe(0);
+  });
+
+  it.each([
+    { name: 'recorded actual fees', fields: { charged: true, stripeFinancials: { source: 'actual', feeAmount: 200, netAmount: 4800 } }, fee: 'Stripe fees (campaign share, actual): $1.80', net: 'Campaign amount after Stripe fees (actual): $43.20' },
+    { name: 'legacy actual fields', fields: { charged: true, stripeFinancialsSource: 'actual', stripeFeeAmount: 200, stripeNetAmount: 4800 }, fee: 'Stripe fees (campaign share, actual): $1.80', net: 'Campaign amount after Stripe fees (actual): $43.20' },
+    { name: 'pending actual fees', fields: { charged: true, stripeFinancials: { source: 'pending' } }, fee: 'Stripe fees (campaign share, estimated): $1.58', net: 'Campaign amount after Stripe fees (estimated): $43.42' },
+    { name: 'missing actual fees', fields: { charged: true }, fee: 'Stripe fees (campaign share, estimated): $1.58', net: 'Campaign amount after Stripe fees (estimated): $43.42' },
+    { name: 'cancelled pledge', fields: { pledgeStatus: 'cancelled' }, fee: 'Stripe fees (campaign share): $0.00', net: 'Campaign amount after Stripe fees: $0.00' },
+    { name: 'failed payment', fields: { pledgeStatus: 'payment_failed' }, fee: 'Stripe fees (campaign share): $0.00', net: 'Campaign amount after Stripe fees: $45.00' },
+    { name: 'zero-value pledge', fields: { amount: 0, subtotal: 0, tipAmount: 0 }, fee: 'Stripe fees (campaign share, estimated): $0.00', net: 'Campaign amount after Stripe fees (estimated): $0.00' }
+  ])('uses current pledge financials in report previews: $name', async ({ fields, fee, net }) => {
+    const env = createEnv();
+    const { ctx, cookie } = await signInAdmin(env);
+    const pledges = env.PLEDGES as CountingKVNamespace;
+    pledges.store.set('campaign-pledges:hand-relations', JSON.stringify(['report-fees']));
+    pledges.store.set('pledge:report-fees', JSON.stringify({
+      orderId: 'report-fees', email: 'reader@example.com', campaignSlug: 'hand-relations',
+      pledgeStatus: 'active', amount: 5000, subtotal: 4500, tipAmount: 500,
+      createdAt: '2026-04-01T12:00:00.000Z',
+      history: [
+        { type: 'created', amount: 3000, subtotal: 2700, at: '2026-04-01T12:00:00.000Z' },
+        { type: 'modified', amountDelta: 2000, subtotalDelta: 1800, at: '2026-04-02T12:00:00.000Z' }
+      ],
+      ...fields
+    }));
+    resetKvCounters(env);
+    const response = await worker.fetch(new Request('https://pledge.pool.test/admin/reports/campaign-runner/preview?campaignSlug=hand-relations&reportType=pledge', {
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toContain('no-store');
+    const body = await response.json();
+    expect(body.statsSummary).toEqual(expect.arrayContaining([fee, net]));
+    expect(body.statsSummary.some((line: string) => line.startsWith('Fee basis:'))).toBe(fee.includes('estimated'));
+    expectNoKvWritesOrLists(env, 'fee report preview');
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('api.stripe.com'))).toBe(false);
   });
 
   it('previews all role-scoped campaign-runner reports without KV writes or list scans', async () => {
@@ -5010,6 +5050,24 @@ diary:
       digitalPledgeCount: 2,
       digitalPledgeAmount: 12000
     });
+    const reportResponse = await worker.fetch(new Request('https://pledge.pool.test/admin/reports/campaign-runner/preview?campaignSlug=hand-relations&reportType=pledge', {
+      headers: { Cookie: cookie }
+    }), env, ctx);
+    expect(reportResponse.status).toBe(200);
+    const report = await reportResponse.json();
+    expect(report.statsSummary).toEqual(expect.arrayContaining([
+      'Stripe fees (campaign share, includes estimates): $3.37',
+      'Campaign amount after Stripe fees (includes estimates): $95.63'
+    ]));
+    for (const [column, total] of [
+      ['current_stripe_fee', body.totals.actualStripeFeeAmount + body.totals.estimatedStripeFeeAmount],
+      ['current_campaign_stripe_fee', body.totals.processorFeeAllocatedToCampaignRevenue],
+      ['current_campaign_amount_after_fees', body.totals.netCampaignRevenue]
+    ] as const) {
+      const index = report.header.indexOf(column);
+      expect(index).toBeGreaterThan(-1);
+      expect(report.rows.reduce((sum: number, row: string[]) => sum + Math.round(Number(row[index] || 0) * 100), 0)).toBe(total);
+    }
     expect(body.statusBreakdown).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'active', count: 1, amount: 7000 }),
       expect.objectContaining({ key: 'charged', count: 1, amount: 5000 })

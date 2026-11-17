@@ -138,6 +138,12 @@ import { normalizeShippingDestination, quoteCampaignShipment } from './shipping.
 import { normalizeTaxDestination, quoteTax } from './tax.js';
 import { buildFulfillmentReport, buildPledgeLedgerReport, rebuildCsvReport } from './reports.js';
 import {
+  STRIPE_FEE_ESTIMATE_BPS, STRIPE_FEE_ESTIMATE_FIXED_CENTS,
+  allocateIntegerTotal, applyPledgeToFinancialTotals, emptyPledgeFinancialTotals,
+  getStoredStripeFinancials, getPledgeStatusLabel, isCampaignScopedBundleAddOn,
+  getCampaignBundleAddOnSubtotal, getPlatformBundleAddOnSubtotal
+} from './pledge-financials.js';
+import {
   adminPoolPledgeSnapshotIsUnchanged,
   buildAdminPoolPledgeSnapshotMetadata,
   normalizePoolPledgeOrderId,
@@ -2392,36 +2398,6 @@ async function retrieveStripePaymentIntentFinancials(stripe, paymentIntentId) {
   return extractStripePaymentIntentFinancials(paymentIntent);
 }
 
-function allocateIntegerTotal(totalCents, items = []) {
-  const total = Math.trunc(Number(totalCents || 0) || 0);
-  const count = Array.isArray(items) ? items.length : 0;
-  if (count <= 0) return [];
-  if (total === 0) return new Array(count).fill(0);
-
-  const sign = total < 0 ? -1 : 1;
-  const absTotal = Math.abs(total);
-  const weights = items.map((item) => Math.max(0, Number(item?.amount || 0) || 0));
-  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
-  if (weightTotal <= 0) {
-    const allocations = new Array(count).fill(0);
-    allocations[0] = total;
-    return allocations;
-  }
-
-  const rows = weights.map((weight, index) => {
-    const exact = (absTotal * weight) / weightTotal;
-    const base = Math.floor(exact);
-    return { index, base, remainder: exact - base };
-  });
-  let allocated = rows.reduce((sum, row) => sum + row.base, 0);
-  rows.sort((a, b) => b.remainder - a.remainder || a.index - b.index);
-  for (let index = 0; allocated < absTotal; index += 1, allocated += 1) {
-    rows[index % rows.length].base += 1;
-  }
-  rows.sort((a, b) => a.index - b.index);
-  return rows.map((row) => row.base * sign);
-}
-
 function applyStripeFinancialsToPledges(pledges = [], paymentIntent = {}, financials = null, updatedAt = new Date().toISOString()) {
   const normalizedFinancials = financials || extractStripePaymentIntentFinancials(paymentIntent);
   if (!normalizedFinancials) return null;
@@ -2541,33 +2517,6 @@ function getBundleAddOnSubtotal(bundleAddOns = []) {
   return (bundleAddOns || []).reduce((sum, addOn) => (
     sum + ((Number(addOn?.unitPrice || 0) || 0) * (Number(addOn?.quantity || 0) || 0))
   ), 0);
-}
-
-function isCampaignScopedBundleAddOn(addOn) {
-  return String(addOn?.scope || '').trim().toLowerCase() === 'campaign';
-}
-
-function getCampaignBundleAddOnSubtotal(bundleAddOns = [], campaignSlug = '') {
-  const normalizedCampaignSlug = String(campaignSlug || '').trim();
-  return (bundleAddOns || []).reduce((sum, addOn) => {
-    const quantity = Number(addOn?.quantity || 0) || 0;
-    const unitPrice = Number(addOn?.unitPrice || 0) || 0;
-    if (quantity <= 0 || unitPrice <= 0) return sum;
-    if (!isCampaignScopedBundleAddOn(addOn)) return sum;
-    if (normalizedCampaignSlug && String(addOn?.campaignSlug || '').trim() !== normalizedCampaignSlug) {
-      return sum;
-    }
-    return sum + (unitPrice * quantity);
-  }, 0);
-}
-
-function getPlatformBundleAddOnSubtotal(bundleAddOns = []) {
-  return (bundleAddOns || []).reduce((sum, addOn) => {
-    const quantity = Number(addOn?.quantity || 0) || 0;
-    const unitPrice = Number(addOn?.unitPrice || 0) || 0;
-    if (quantity <= 0 || unitPrice <= 0) return sum;
-    return isCampaignScopedBundleAddOn(addOn) ? sum : sum + (unitPrice * quantity);
-  }, 0);
 }
 
 function getCampaignScopedBundleAddOns(bundleAddOns = [], campaignSlug = '') {
@@ -10905,6 +10854,22 @@ function getCampaignRunnerStatsSummary(campaign, stats, env, reportKind, pledges
   summary.push(`Total pledges: ${totalPledges}`);
   summary.push(`New pledges in the previous 24 hours: ${newPledgesLast24Hours}`);
   summary.push(`Pledged total: ${formatUsdCents(pledgedAmountCents)}`);
+
+  // Use current pledge records and the same fee allocation as Analytics, not
+  // ledger history rows (which would count modifications more than once).
+  const financialTotals = emptyPledgeFinancialTotals();
+  for (const pledge of pledges) {
+    applyPledgeToFinancialTotals(financialTotals, campaign, pledge);
+  }
+  const feeBasis = financialTotals.estimatedStripeFeePledgeCount > 0
+    ? (financialTotals.actualStripeFinancialPledgeCount > 0 ? 'includes estimates' : 'estimated')
+    : (financialTotals.actualStripeFinancialPledgeCount > 0 ? 'actual' : '');
+  summary.push(`Stripe fees (campaign share${feeBasis ? `, ${feeBasis}` : ''}): ${formatUsdCents(financialTotals.processorFeeAllocatedToCampaignRevenue)}`);
+  summary.push(`Campaign amount after Stripe fees${feeBasis ? ` (${feeBasis})` : ''}: ${formatUsdCents(financialTotals.netCampaignRevenue)}`);
+  if (financialTotals.estimatedStripeFeePledgeCount > 0) {
+    summary.push(`Fee basis: recorded Stripe fees where available; otherwise ${STRIPE_FEE_ESTIMATE_BPS / 100}% + ${formatUsdCents(STRIPE_FEE_ESTIMATE_FIXED_CENTS)} per pledge. Actual fees may vary.`);
+  }
+
   if (goalAmountCents > 0) {
     summary.push(`Goal progress: ${formatUsdCents(goalAmountCents)} goal (${percentFunded}% funded)`);
   }
@@ -17398,12 +17363,6 @@ function getPledgeDisplayName(pledge = {}) {
   ).trim();
 }
 
-function getPledgeStatusLabel(pledge = {}) {
-  const rawStatus = String(pledge?.pledgeStatus || 'active').trim().toLowerCase();
-  if (pledge?.charged === true) return 'charged';
-  return rawStatus || 'active';
-}
-
 function hasPhysicalReward(pledge = {}) {
   if (pledge?.shippingAddress) return true;
   const addOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
@@ -17463,96 +17422,6 @@ function publicAdminSupporterRecord(pledge = {}) {
     createdAt: pledge?.createdAt || null,
     updatedAt: pledge?.updatedAt || null,
     chargedAt: pledge?.chargedAt || null
-  };
-}
-
-function emptyAdminAnalyticsTotals() {
-  return {
-    campaignCount: 0,
-    indexedPledgeCount: 0,
-    pledgeCount: 0,
-    uniqueSupporters: 0,
-    activePledgeCount: 0,
-    chargedPledgeCount: 0,
-    cancelledPledgeCount: 0,
-    paymentFailedPledgeCount: 0,
-    pledgedAmount: 0,
-    chargedAmount: 0,
-    paymentFailedAmount: 0,
-    campaignRevenue: 0,
-    campaignAddOnRevenue: 0,
-    platformAddOnRevenue: 0,
-    platformTipRevenue: 0,
-    platformRevenue: 0,
-    taxTotal: 0,
-    shippingTotal: 0,
-    actualStripeFeeAmount: 0,
-    actualStripeNetAmount: 0,
-    actualStripeGrossAmount: 0,
-    actualStripeFinancialPledgeCount: 0,
-    pendingStripeFinancialPledgeCount: 0,
-    estimatedStripeFeeAmount: 0,
-    estimatedStripeFeePledgeCount: 0,
-    processorFeeAllocatedToCampaignRevenue: 0,
-    processorFeeAllocatedToPlatformRevenue: 0,
-    processorFeeAllocatedToTax: 0,
-    processorFeeAllocatedToShipping: 0,
-    netCampaignRevenue: 0,
-    netPlatformRevenue: 0,
-    physicalPledgeCount: 0,
-    physicalPledgeAmount: 0,
-    digitalPledgeCount: 0,
-    digitalPledgeAmount: 0,
-    platformAddOnPledgeCount: 0
-  };
-}
-
-function allocateAdminAnalyticsProcessorFees(feeAmount, {
-  campaignRevenue = 0,
-  platformRevenue = 0,
-  taxTotal = 0,
-  shippingTotal = 0
-} = {}) {
-  const [campaignFee, platformFee, taxFee, shippingFee] = allocateIntegerTotal(feeAmount, [
-    { amount: campaignRevenue },
-    { amount: platformRevenue },
-    { amount: taxTotal },
-    { amount: shippingTotal }
-  ]);
-  return {
-    campaignRevenue: Math.max(0, Number(campaignFee || 0) || 0),
-    platformRevenue: Math.max(0, Number(platformFee || 0) || 0),
-    tax: Math.max(0, Number(taxFee || 0) || 0),
-    shipping: Math.max(0, Number(shippingFee || 0) || 0)
-  };
-}
-
-const ADMIN_STRIPE_FEE_ESTIMATE_BPS = 290;
-const ADMIN_STRIPE_FEE_ESTIMATE_FIXED_CENTS = 30;
-
-function estimateAdminStripeFeeCents(amountCents) {
-  const amount = Number(amountCents || 0) || 0;
-  if (amount <= 0) return 0;
-  return Math.round((amount * ADMIN_STRIPE_FEE_ESTIMATE_BPS) / 10000) + ADMIN_STRIPE_FEE_ESTIMATE_FIXED_CENTS;
-}
-
-function getStoredStripeFinancials(pledge = {}) {
-  const nested = pledge?.stripeFinancials && typeof pledge.stripeFinancials === 'object'
-    ? pledge.stripeFinancials
-    : {};
-  const source = String(nested.source || pledge?.stripeFinancialsSource || '').trim();
-  if (source !== 'actual') {
-    return source === 'pending' ? { source: 'pending' } : null;
-  }
-  const grossAmount = Number(nested.grossAmount ?? pledge?.stripeGrossAmount);
-  const feeAmount = Number(nested.feeAmount ?? pledge?.stripeFeeAmount);
-  const netAmount = Number(nested.netAmount ?? pledge?.stripeNetAmount);
-  if (!Number.isFinite(feeAmount) || !Number.isFinite(netAmount)) return null;
-  return {
-    source: 'actual',
-    grossAmount: Number.isFinite(grossAmount) ? grossAmount : feeAmount + netAmount,
-    feeAmount,
-    netAmount
   };
 }
 
@@ -17616,77 +17485,10 @@ function getAdminUtmKey(pledge = {}, field = 'source') {
 }
 
 function applyPledgeToAdminAnalytics(analytics, campaign, pledge = {}, supporterEmails) {
-  const campaignSlug = String(campaign?.slug || pledge?.campaignSlug || '');
+  applyPledgeToFinancialTotals(analytics.totals, campaign, pledge);
   const status = getPledgeStatusLabel(pledge);
-  const subtotal = Number(pledge?.subtotal || 0) || 0;
   const amount = Number(pledge?.amount || 0) || 0;
-  const bundleAddOns = Array.isArray(pledge?.bundleAddOns) ? pledge.bundleAddOns : [];
-  const platformAddOnRevenue = getPlatformBundleAddOnSubtotal(bundleAddOns);
-  const campaignAddOnRevenue = getCampaignBundleAddOnSubtotal(bundleAddOns, campaignSlug);
-  const platformTipRevenue = Number(pledge?.tipAmount || 0) || 0;
-  const platformRevenue = platformAddOnRevenue + platformTipRevenue;
-  const campaignRevenue = Math.max(0, subtotal - platformAddOnRevenue);
-  const taxTotal = Number(pledge?.tax || 0) || 0;
-  const shippingTotal = Number(pledge?.shipping || 0) || 0;
-  const isCancelled = status === 'cancelled';
-  const countsTowardPledged = !isCancelled;
-  const countsTowardStripeFeeEstimate = status === 'active' || status === 'charged';
-  const storedStripeFinancials = getStoredStripeFinancials(pledge);
-  let processorFeeForAllocation = 0;
-
-  analytics.totals.pledgeCount += 1;
-  if (countsTowardPledged) {
-    analytics.totals.activePledgeCount += status === 'active' || status === 'charged' ? 1 : 0;
-    analytics.totals.pledgedAmount += amount;
-    analytics.totals.campaignRevenue += campaignRevenue;
-    analytics.totals.campaignAddOnRevenue += campaignAddOnRevenue;
-    analytics.totals.platformAddOnRevenue += platformAddOnRevenue;
-    analytics.totals.platformTipRevenue += platformTipRevenue;
-    analytics.totals.platformRevenue += platformRevenue;
-    analytics.totals.taxTotal += taxTotal;
-    analytics.totals.shippingTotal += shippingTotal;
-  } else {
-    analytics.totals.cancelledPledgeCount += 1;
-  }
-
-  if (status === 'charged' && storedStripeFinancials?.source === 'actual') {
-    analytics.totals.actualStripeFinancialPledgeCount += 1;
-    processorFeeForAllocation = Math.max(0, Number(storedStripeFinancials.feeAmount || 0) || 0);
-    analytics.totals.actualStripeFeeAmount += processorFeeForAllocation;
-    analytics.totals.actualStripeNetAmount += Math.max(0, Number(storedStripeFinancials.netAmount || 0) || 0);
-    analytics.totals.actualStripeGrossAmount += Math.max(0, Number(storedStripeFinancials.grossAmount || 0) || 0);
-  } else if (countsTowardStripeFeeEstimate) {
-    processorFeeForAllocation = estimateAdminStripeFeeCents(amount);
-    analytics.totals.estimatedStripeFeePledgeCount += 1;
-    analytics.totals.estimatedStripeFeeAmount += processorFeeForAllocation;
-    if (status === 'charged' && storedStripeFinancials?.source === 'pending') {
-      analytics.totals.pendingStripeFinancialPledgeCount += 1;
-    }
-  }
-
-  if (countsTowardPledged) {
-    const processorFeeAllocations = allocateAdminAnalyticsProcessorFees(processorFeeForAllocation, {
-      campaignRevenue,
-      platformRevenue,
-      taxTotal,
-      shippingTotal
-    });
-    analytics.totals.processorFeeAllocatedToCampaignRevenue += processorFeeAllocations.campaignRevenue;
-    analytics.totals.processorFeeAllocatedToPlatformRevenue += processorFeeAllocations.platformRevenue;
-    analytics.totals.processorFeeAllocatedToTax += processorFeeAllocations.tax;
-    analytics.totals.processorFeeAllocatedToShipping += processorFeeAllocations.shipping;
-    analytics.totals.netCampaignRevenue += Math.max(0, campaignRevenue - processorFeeAllocations.campaignRevenue);
-    analytics.totals.netPlatformRevenue += Math.max(0, platformRevenue - processorFeeAllocations.platformRevenue);
-  }
-
-  if (status === 'charged') {
-    analytics.totals.chargedPledgeCount += 1;
-    analytics.totals.chargedAmount += amount;
-  }
-  if (status === 'payment_failed') {
-    analytics.totals.paymentFailedPledgeCount += 1;
-    analytics.totals.paymentFailedAmount += amount;
-  }
+  const countsTowardPledged = status !== 'cancelled';
 
   if (hasPhysicalReward(pledge)) {
     analytics.totals.physicalPledgeCount += 1;
@@ -17729,7 +17531,7 @@ async function buildAdminCampaignAnalytics(env, campaign) {
     effectiveState: getEffectiveState(campaign, env) || campaign?.state || 'unknown',
     goalAmount: Number(campaign?.goal_amount || 0),
     indexedPledgeCount: normalizedOrderIds.length,
-    totals: emptyAdminAnalyticsTotals(),
+    totals: emptyPledgeFinancialTotals(),
     statusBreakdown: new Map(),
     languageBreakdown: new Map(),
     referralBreakdown: new Map(),
@@ -17861,7 +17663,7 @@ async function handleAdminAnalytics(request, env) {
     .filter((campaign) => campaign.pledgeIndexPresent === false)
     .map((campaign) => ({ slug: campaign.slug, title: campaign.title }));
 
-  const totals = emptyAdminAnalyticsTotals();
+  const totals = emptyPledgeFinancialTotals();
   totals.campaignCount = campaignAnalytics.length;
   totals.uniqueSupporters = supporterEmails.size;
   const statusBreakdown = new Map();

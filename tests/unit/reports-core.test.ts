@@ -83,6 +83,33 @@ function buildPledge({
 }
 
 describe('reports core', () => {
+  it('exports actual and estimated current fees once per pledge, including cancelled and failed records', () => {
+    const base = {
+      email: 'supporter@example.com', campaignSlug: 'sunder',
+      amount: 5000, subtotal: 4500, tipAmount: 500,
+      createdAt: '2026-04-06T12:00:00.000Z',
+      history: [
+        { type: 'created', amount: 3000, subtotal: 2700, at: '2026-04-06T12:00:00.000Z' },
+        { type: 'modified', amountDelta: 2000, subtotalDelta: 1800, at: '2026-04-06T13:00:00.000Z' }
+      ]
+    };
+    const report = buildPledgeLedgerReport([
+      { ...base, orderId: 'actual', charged: true, stripeFinancials: { source: 'actual', feeAmount: 200, netAmount: 4800 } },
+      { ...base, orderId: 'estimated', pledgeStatus: 'active' },
+      { ...base, orderId: 'cancelled', pledgeStatus: 'cancelled', history: [] },
+      { ...base, orderId: 'failed', pledgeStatus: 'payment_failed', history: [] }
+    ]);
+    expect(report.rows.every((row: string[]) => row.length === report.header.length)).toBe(true);
+    expect(report.rows.map((row: string[]) => row.slice(-4))).toEqual([
+      ['', '', '', ''],
+      ['actual', '2.00', '1.80', '43.20'],
+      ['', '', '', ''],
+      ['estimated', '1.75', '1.58', '43.42'],
+      ['not_applicable', '0.00', '0.00', '0.00'],
+      ['not_applicable', '0.00', '0.00', '45.00']
+    ]);
+  });
+
   it('builds a pledge ledger csv for history entries', () => {
     const report = buildPledgeLedgerReport([
       {
@@ -131,9 +158,9 @@ describe('reports core', () => {
     ]);
 
     expect(report.csv).toBe([
-      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id',
-      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-only-1',
-      'supporter@example.com,sunder,(tip updated to 9%),,0.00,0.00,0.00,9,1.00,0.00,0.00,1.00,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-only-1'
+      'email,campaign,items,add_on_items,campaign_subtotal,platform_add_on_subtotal,subtotal,tip_percent,tip,tax,shipping,total,status,charged,created_at,order_id,current_stripe_fee_source,current_stripe_fee,current_campaign_stripe_fee,current_campaign_amount_after_fees',
+      'supporter@example.com,sunder,Handheld Prop,,25.00,0.00,25.00,5,1.25,1.97,3.00,31.22,created,no,2026-04-06T12:00:00.000Z,pool-intent-tip-only-1,,,,',
+      'supporter@example.com,sunder,(tip updated to 9%),,0.00,0.00,0.00,9,1.00,0.00,0.00,1.00,modified,no,2026-04-06T13:00:00.000Z,pool-intent-tip-only-1,estimated,1.23,0.95,24.05'
     ].join('\n'));
   });
 

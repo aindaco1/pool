@@ -1928,7 +1928,12 @@ export async function sendCampaignRunnerReportEmail(
   <div style="${getEmailCardStyle(theme)}">
     <h2 style="margin: 0 0 12px 0; font-size: 18px; font-family: ${theme.headingFontFamily};">Summary</h2>
     <ul style="margin: 0; padding-left: 18px;">
-      ${statsRows.map((line) => `<li style="margin: 0 0 8px 0;">${renderSummaryLine(line)}</li>`).join('')}
+      ${statsRows.map((line) => {
+        const style = String(line).startsWith('Fee basis: ')
+          ? 'margin: 0 0 8px 18px; font-size: 0.875em;'
+          : 'margin: 0 0 8px 0;';
+        return `<li style="${style}">${renderSummaryLine(line)}</li>`;
+      }).join('')}
     </ul>
   </div>`
     : '';
