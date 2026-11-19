@@ -4,7 +4,7 @@ title: What Is This?
 lang: en
 translation_key: about
 description: Learn how The Pool handles all-or-nothing pledges, physical rewards, supporter access, privacy, and independent creative campaigns.
-last_modified_at: 2026-10-28
+last_modified_at: 2026-11-19
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
@@ -57,6 +57,10 @@ Campaign teams can configure all-or-nothing funding, digital and physical reward
 
 A private, role-scoped dashboard supports campaign content, rewards, reports, supporters, fulfillment, analytics, marketing links, and authorized users. Sensitive pricing and totals are verified by the server rather than trusted from the browser.
 
+Creators can arrange text, images, galleries, and other content blocks in the dashboard. Uploaded images remain the source for responsive versions; optimization publishes a smaller replacement only after verifying that its visual content is preserved.
+
+Daily pledge summaries and CSV exports show the campaign's share of Stripe processing fees and its amount after those fees. Recorded fees are used when available, and estimates are labeled. Campaign goal progress remains the gross campaign contribution; an amount after fees is a planning figure, not a guaranteed payout.
+
 Teams can save a shared working copy, review it through a protected preview, then publish it explicitly. Saving does not change the public campaign. The dashboard tracks publication through deployment and reports Live only when the saved revision is deployed. Browser-local drafts remain separate recovery copies, and conflicting edits must be resolved before replacing a newer shared working copy.
 
 ## Privacy, access, and safety
@@ -73,4 +77,4 @@ Questions? Email [{{ support_email }}](mailto:{{ support_email }}).
 
 ---
 
-_Last updated: October 28, 2026_
+_Last updated: November 19, 2026_

@@ -17,6 +17,7 @@ multiple campaigns, each persisted and settled as a separate campaign pledge.
 - Accountless pledging and order-scoped magic links to manage, cancel, or update a card.
 - Worker-verified pricing, tax, shipping, optional platform tips, and limited-reward inventory.
 - Physical and digital tiers, campaign and platform add-ons, variant prices, and fulfillment reports.
+- Daily pledge summaries and CSV exports with actual or estimated Stripe fees and campaign amounts after fees.
 - Campaign timelines, stretch goals, production diaries, and supporter-only decisions.
 - A private, role-scoped dashboard for campaigns, settings, products, reports, supporters, analytics, marketing, and users.
 - [Project Save, protected Preview, and explicit Publish](docs/DASHBOARD.md#saving-and-publishing) for new campaigns and unpublished revisions of live campaigns.

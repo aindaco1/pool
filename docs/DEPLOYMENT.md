@@ -64,6 +64,10 @@ and ordinary manual/campaign dispatches retain the diary check; the manual
 skip input defaults to `false`. A maintenance skip does not pause later
 scheduled diary checks or other existing notification processing.
 
+The image-optimization workflow explicitly dispatches its Pages refresh with
+`skip_diary_check=true`. Publishing optimized media therefore refreshes the site
+without initiating a diary broadcast.
+
 Campaign publishing dispatches **Refresh Production Pages** with the saved
 commit in its optional `ref` input. Both jobs use that revision; the run title
 records it as `Deploy <sha>` so dashboard progress can track the correct build

@@ -26,6 +26,11 @@ Provider transport uses Cloudflare-compatible manual redirect mode and rejects
 3xx responses explicitly. This keeps live lookups usable in the Worker runtime
 without forwarding provider credentials or address queries to redirect targets.
 
+The shared provider deadline covers both response headers and body consumption,
+so a stalled body cannot leave a quote waiting indefinitely. Timeouts surface as
+`tax_provider_timeout`; Pool retains the provider-specific fallback and estimate
+policy described below. This does not add automatic retries or cache tax quotes.
+
 The Worker remains the source of truth. The browser can request previews, but
 persisted totals come from Worker-side calculation. The accepted first-party
 checkout quote is hash-verified at completion and its totals are retained. Completion

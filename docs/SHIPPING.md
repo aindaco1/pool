@@ -461,6 +461,11 @@ Practical operational note for this platform:
 
 That keeps the platform aligned with USPS's quota model without turning shipping quotes into a KV-heavy subsystem.
 
+The shared USPS request deadline covers reading the response body as well as
+receiving headers, for both authentication and rate requests. A timeout enters
+the existing cooldown and fallback path; it does not change the saved shipping
+amount on an already confirmed pledge.
+
 Only call USPS at high-intent moments:
 
 - checkout start

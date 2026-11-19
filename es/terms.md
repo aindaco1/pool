@@ -5,14 +5,14 @@ lang: es
 translation_key: terms
 permalink: /es/terms/
 description: Revisa las políticas de The Pool sobre aportes, pagos, envío, no devoluciones, entrega, privacidad y contribuciones creativas.
-last_modified_at: 2026-10-28
+last_modified_at: 2026-11-19
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
 
 # Términos y pautas creativas
 
-**Vigentes desde el 28 de octubre de 2026.** Estos términos rigen el uso de The Pool, un servicio de crowdfunding operado por {{ operator_name }}. Al usar el sitio, enviar un aporte o proporcionar contenido, aceptas estos términos y las condiciones específicas de la campaña que se muestren antes de confirmar el pago. Si una condición específica de campaña entra en conflicto con estos términos, se aplica la más específica para esa campaña, salvo que la ley lo prohíba.
+**Vigentes desde el 19 de noviembre de 2026.** Estos términos rigen el uso de The Pool, un servicio de crowdfunding operado por {{ operator_name }}. Al usar el sitio, enviar un aporte o proporcionar contenido, aceptas estos términos y las condiciones específicas de la campaña que se muestren antes de confirmar el pago. Si una condición específica de campaña entra en conflicto con estos términos, se aplica la más específica para esa campaña, salvo que la ley lo prohíba.
 
 ## 1. Elegibilidad y uso aceptable
 
@@ -34,6 +34,8 @@ Los precios se muestran en dólares estadounidenses. El servidor verifica los pr
 Cambiar los datos de contacto o dirección durante el proceso de pago actualiza la preparación del pago y los totales mostrados; por sí solo no confirma un aporte ni autoriza un cobro de campaña. Debes corregir los conflictos conocidos entre el código postal y el estado antes de continuar. Las sugerencias de ciudad son opcionales, y la comprobación de dirección no verifica que se pueda entregar en una dirección concreta. Revisa el resumen actualizado antes de confirmar. Actualizar los datos de referencia de impuestos no cambia el precio de un aporte ya confirmado.
 
 Stripe gestiona los números completos de tarjeta y los códigos de seguridad; The Pool no los almacena. Los impuestos sobre ventas y el envío aplicables se muestran durante el proceso de pago cuando pueden calcularse. Las propinas y los complementos opcionales se identifican por separado antes de que confirmes el aporte.
+
+El avance hacia la meta se mide antes de descontar las comisiones de Stripe. Los reportes para creadores muestran por separado las comisiones registradas o estimadas y el monto de la campaña después de descontar la parte que le corresponde. Estas estimaciones de los reportes no añaden un cargo a tu aporte guardado ni garantizan el desembolso final al creador.
 
 ## 4. Envío y preparación de recompensas
 {: #shipping-policy}

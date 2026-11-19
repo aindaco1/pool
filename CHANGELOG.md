@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Adopt Platform 0.51.1: provider deadlines cover response bodies for GitHub, tax, and USPS requests, and stale editor cleanup preserves the active binding.
+- Use the shared block editor for block controls and composition while retaining Pool's media, draft recovery, preview, and publishing behavior.
+- Stop automatic outbox retries 23 hours after the first possible provider send, including jobs checkpointed by older workers. Preserve uncertain outcomes for reconciliation.
+- Verify off-device backup copies against the selected archive digest. Validate complete retention plans and preview-restore cleanup targets before deletion.
+- Preserve decoded source-image evidence, including animated WebP timing and orientation, during optimization. Media-only Pages refreshes skip diary broadcasts.
+- Use the campaign synopsis for social descriptions when the first rendered text block has fewer than 40 characters.
+- Mount Worker dependencies into Podman browser tests, tie browser images to the locked Playwright version, and serve a fixed Jekyll build in CI.
+
 - Include Stripe fees and the campaign amount after fees in daily pledge email
   summaries, matching previews, and per-pledge CSV columns. Reuse Analytics,
   label actual/estimated figures, and count fees once across ledger history.

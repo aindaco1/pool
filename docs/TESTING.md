@@ -251,6 +251,11 @@ and unknown model versions become review. A completed pilot may contain failures
 it does not establish native-Spanish, browser-layout, Stripe, delivery or release
 acceptance. Existing deterministic tests retain authority over money and access.
 
+Before proposing a CI gate, obtain fluent English/Spanish ratings, keep
+calibration examples separate from held-out examples, and measure repeated-run
+stability. Record that evidence with the pilot; the current controls do not
+establish those acceptance criteria.
+
 The pilot stays outside `npm test`, premerge and CI gates. Exit 0 means an explicit
 preview or a completed advisory run, even when findings need review; exit 2 means
 setup, authentication or incomplete evaluation. There are no retries, provider

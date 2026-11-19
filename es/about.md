@@ -5,7 +5,7 @@ lang: es
 translation_key: about
 permalink: /es/about/
 description: Conoce cómo The Pool gestiona aportes de todo o nada, recompensas físicas, acceso de patrocinadores, privacidad y campañas creativas independientes.
-last_modified_at: 2026-10-28
+last_modified_at: 2026-11-19
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
@@ -58,6 +58,10 @@ Los equipos de campaña pueden configurar financiación de todo o nada, niveles 
 
 Un panel privado con acceso según el rol permite gestionar contenido de campaña, recompensas, reportes, patrocinadores, preparación y entrega, análisis, enlaces de promoción y personas usuarias autorizadas. El servidor verifica los precios y totales sensibles en vez de confiar en el navegador.
 
+Los creadores pueden organizar texto, imágenes, galerías y otros bloques de contenido en el panel. Las imágenes cargadas siguen siendo la fuente de sus versiones adaptables; la optimización publica una versión más pequeña solo después de verificar que conserva el contenido visual.
+
+Los resúmenes diarios de aportes y las exportaciones CSV muestran la parte de las comisiones de Stripe que corresponde a la campaña y su monto después de esas comisiones. Se usan las comisiones registradas cuando están disponibles y se identifican las estimaciones. El avance hacia la meta sigue contando la contribución bruta a la campaña; el monto después de comisiones sirve para planificar, no garantiza un desembolso.
+
 Los equipos pueden guardar una copia de trabajo compartida, revisarla mediante una vista previa protegida y publicarla de forma explícita. Guardar no cambia la campaña pública. El panel sigue el despliegue de la publicación y solo indica que está en línea cuando se ha desplegado la revisión guardada. Los borradores locales del navegador siguen siendo copias de recuperación separadas, y los conflictos de edición deben resolverse antes de reemplazar una copia de trabajo compartida más reciente.
 
 ## Privacidad, acceso y seguridad
@@ -74,4 +78,4 @@ El sitio público, el Worker de Cloudflare, la automatización, la localización
 
 ---
 
-_Última actualización: 28 de octubre de 2026_
+_Última actualización: 19 de noviembre de 2026_

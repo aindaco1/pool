@@ -4,14 +4,14 @@ title: Terms & Creative Guidelines
 lang: en
 translation_key: terms
 description: Review The Pool's pledge, payment, shipping, no-returns, fulfillment, privacy, and creative-submission policies.
-last_modified_at: 2026-10-28
+last_modified_at: 2026-11-19
 ---
 {% assign operator_name = site.platform.company_name | default: site.author %}
 {% assign support_email = site.platform.support_email %}
 
 # Terms & Creative Guidelines
 
-**Effective October 28, 2026.** These terms govern use of The Pool, a crowdfunding service operated by {{ operator_name }}. By using the site, submitting a pledge, or providing content, you agree to these terms and to any campaign-specific terms shown before checkout. If campaign-specific terms conflict with these terms, the more specific term controls for that campaign unless prohibited by law.
+**Effective November 19, 2026.** These terms govern use of The Pool, a crowdfunding service operated by {{ operator_name }}. By using the site, submitting a pledge, or providing content, you agree to these terms and to any campaign-specific terms shown before checkout. If campaign-specific terms conflict with these terms, the more specific term controls for that campaign unless prohibited by law.
 
 ## 1. Eligibility and acceptable use
 
@@ -33,6 +33,8 @@ Prices are shown in U.S. dollars. The server verifies prices, selected variants,
 Changing contact or address details during checkout refreshes payment setup and the displayed totals; it does not itself confirm a pledge or authorize a campaign charge. Known U.S. ZIP/state conflicts must be corrected before proceeding. Suggested city names are optional, and the address check does not verify street-level deliverability. Review the updated summary before confirming. Refreshing reference tax data does not reprice an already confirmed pledge.
 
 Stripe handles full card numbers and security codes; The Pool does not store them. Applicable sales tax and shipping are shown during checkout when they can be calculated. Optional platform tips and optional add-ons are identified separately before you confirm the pledge.
+
+Campaign goal progress is measured before Stripe processing fees. Creator reports separately show recorded or estimated fees and the campaign amount after its allocated share. These reporting estimates do not add a charge to your saved pledge or guarantee the creator's eventual payout.
 
 ## 4. Shipping and fulfillment
 {: #shipping-policy}
