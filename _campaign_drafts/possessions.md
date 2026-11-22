@@ -92,6 +92,9 @@ long_content:
       
       The only thing missing is the funding to put all of this on screen!
   - type: "image"
+    src: ""
+    alt: ""
+  - type: "image"
     src: "/assets/images/campaigns/possessions/content-bernie-sanders-i-am-once-again-20261104-182052-5967db91.gif"
     alt: ""
   - type: "text"
@@ -202,7 +205,7 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-17T22:35:36.317Z"
+_pool_draft_saved_at: "2026-11-22T21:02:27.031Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 campaign_background: "/assets/images/campaigns/possessions/background-20261117-205054-171fb512.jpg"
 ---
