@@ -7843,6 +7843,141 @@
       "references": []
     },
     {
+      "path": "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000.png",
+      "publicPath": "/assets/images/campaigns/possessions/background-20261123-214532-cf0c7000.png",
+      "name": "background-20261123-214532-cf0c7000.png",
+      "label": "background 20261123 214532 cf0c7000",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "possessions",
+      "bytes": 205916,
+      "sha256": "8ce83455d5f66cdd7fdfebeea023babefbbb47edebba338c6a8fad189853ccac",
+      "width": 1920,
+      "height": 1080,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-320.webp",
+        "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-480.webp",
+        "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-640.webp",
+        "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-960.webp",
+        "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-320.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-320.webp",
+          "bytes": 10270,
+          "sha256": "2e85e1ff5162b74ad0b6445ef844838ddfd76e9b8440bd1c10c4725a2165e130",
+          "sourceSha256": "8ce83455d5f66cdd7fdfebeea023babefbbb47edebba338c6a8fad189853ccac",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-480.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-480.webp",
+          "bytes": 18762,
+          "sha256": "a6fd84d4ae113e792ec6fb7298994db7438741b1fb0903f2442026f31440a79c",
+          "sourceSha256": "8ce83455d5f66cdd7fdfebeea023babefbbb47edebba338c6a8fad189853ccac",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-640.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-640.webp",
+          "bytes": 27534,
+          "sha256": "eeb0dc2e697bece99fe6b8d3e4938722d6b1e4bc03b7b4495d783348867a0f49",
+          "sourceSha256": "8ce83455d5f66cdd7fdfebeea023babefbbb47edebba338c6a8fad189853ccac",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-960.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-960.webp",
+          "bytes": 46614,
+          "sha256": "30bd64730e1a87900e39956d97fc1cc5dabaa1d3844bcfa02df09e88f9a1b5cc",
+          "sourceSha256": "8ce83455d5f66cdd7fdfebeea023babefbbb47edebba338c6a8fad189853ccac",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-1600.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214532-cf0c7000-1600.webp",
+          "bytes": 85110,
+          "sha256": "2a4ac6e484aeff454c12d0811068d77aaf926886f288d3041e749eb783c27de7",
+          "sourceSha256": "8ce83455d5f66cdd7fdfebeea023babefbbb47edebba338c6a8fad189853ccac",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/possessions/background-20261123-214639-a36f06db.jpg",
+      "publicPath": "/assets/images/campaigns/possessions/background-20261123-214639-a36f06db.jpg",
+      "name": "background-20261123-214639-a36f06db.jpg",
+      "label": "background 20261123 214639 a36f06db",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "possessions",
+      "bytes": 312503,
+      "sha256": "f19e38be3da71e17f810f672b1288d180e7ad6503ca52c6867aa8b870694c7e2",
+      "width": 1920,
+      "height": 1080,
+      "durationMs": 40,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-320.webp",
+        "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-480.webp",
+        "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-640.webp",
+        "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-960.webp",
+        "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-320.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214639-a36f06db-320.webp",
+          "bytes": 5872,
+          "sha256": "855e79a304d59ccb328e5e6745937584cd1d175738a56a9bb71a9e26f55132b7",
+          "sourceSha256": "f19e38be3da71e17f810f672b1288d180e7ad6503ca52c6867aa8b870694c7e2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-480.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214639-a36f06db-480.webp",
+          "bytes": 11044,
+          "sha256": "e3f5928d913ff47bedeec7d79aee88f73b36fe36a949661000c91eabbdaa80ae",
+          "sourceSha256": "f19e38be3da71e17f810f672b1288d180e7ad6503ca52c6867aa8b870694c7e2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-640.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214639-a36f06db-640.webp",
+          "bytes": 16448,
+          "sha256": "0022941387ff9159579d5944efd455bebde95219fccf939b33eefa703467830f",
+          "sourceSha256": "f19e38be3da71e17f810f672b1288d180e7ad6503ca52c6867aa8b870694c7e2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-960.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214639-a36f06db-960.webp",
+          "bytes": 28332,
+          "sha256": "454df0ae7e4cc43aae3d36bf2e9760a1e6038c2c132129663cc78bc0b56ba668",
+          "sourceSha256": "f19e38be3da71e17f810f672b1288d180e7ad6503ca52c6867aa8b870694c7e2",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/possessions/background-20261123-214639-a36f06db-1600.webp",
+          "publicPath": "/assets/images/campaigns/possessions/background-20261123-214639-a36f06db-1600.webp",
+          "bytes": 50598,
+          "sha256": "9490570b55362d9264f4b4e544927ad322091c9763334a290d4b6be98ae51cc6",
+          "sourceSha256": "f19e38be3da71e17f810f672b1288d180e7ad6503ca52c6867aa8b870694c7e2",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
       "path": "assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg",
       "publicPath": "/assets/images/campaigns/possessions/content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg",
       "name": "content-1-nighthawks-by-edward-hopper-1942-20261104-175840-15af4736.jpg",
@@ -8541,6 +8676,73 @@
           "sha256": "5858c6f56d230fe160f9af05224fb2d40827909453ad352571841a77152b7708",
           "sourceSha256": "f59e9e4b0b603de30b7ecbbe29527d28d54042e04e08b76d87d53e62d2c9a914",
           "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac.png",
+      "publicPath": "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac.png",
+      "name": "progress-20261123-212709-6b715aac.png",
+      "label": "progress 20261123 212709 6b715aac",
+      "type": "image",
+      "scope": "campaign",
+      "campaignSlug": "possessions",
+      "bytes": 121581,
+      "sha256": "57638acc07dc534f9767a0319f37a221798b3f68c1d23557b961df10b8f93688",
+      "width": 3800,
+      "height": 700,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-320.webp",
+        "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-480.webp",
+        "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-640.webp",
+        "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-960.webp",
+        "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-320.webp",
+          "publicPath": "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-320.webp",
+          "bytes": 4842,
+          "sha256": "980a18fefa0fdd0cdeeba6ee2125aadb3f170fab4810937222f23e6b60b5f3eb",
+          "sourceSha256": "57638acc07dc534f9767a0319f37a221798b3f68c1d23557b961df10b8f93688",
+          "width": 320
+        },
+        {
+          "path": "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-480.webp",
+          "publicPath": "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-480.webp",
+          "bytes": 8160,
+          "sha256": "f5c3faabe99003deca4cc7d730a41e37ed879834758d0bc96109a5dcac110858",
+          "sourceSha256": "57638acc07dc534f9767a0319f37a221798b3f68c1d23557b961df10b8f93688",
+          "width": 480
+        },
+        {
+          "path": "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-640.webp",
+          "publicPath": "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-640.webp",
+          "bytes": 11876,
+          "sha256": "7767bd4fdac13f6cbc669095912b5108e73cdd30fd96d97c89dadef6da61a9ed",
+          "sourceSha256": "57638acc07dc534f9767a0319f37a221798b3f68c1d23557b961df10b8f93688",
+          "width": 640
+        },
+        {
+          "path": "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-960.webp",
+          "publicPath": "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-960.webp",
+          "bytes": 20118,
+          "sha256": "931f0056319c6c802f8a718fc145555d527358163d80309cf5e8df0a52bd6e84",
+          "sourceSha256": "57638acc07dc534f9767a0319f37a221798b3f68c1d23557b961df10b8f93688",
+          "width": 960
+        },
+        {
+          "path": "assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-1600.webp",
+          "publicPath": "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac-1600.webp",
+          "bytes": 38020,
+          "sha256": "4b755c5812635a79ac8ba6366addf667798eac8d34374e68a37a338843b74a16",
+          "sourceSha256": "57638acc07dc534f9767a0319f37a221798b3f68c1d23557b961df10b8f93688",
+          "width": 1600
         }
       ],
       "warnings": [],
