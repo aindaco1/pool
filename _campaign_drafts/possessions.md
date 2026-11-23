@@ -80,7 +80,7 @@ long_content:
       - **Director of Photography**: Ella Daniel (elladanieldp.com)
       - **Producer & Assistant Director:** Massimilliano Mraz (Lead Producer for *The Arsonists* and Associate Producer for *Every Type of Orange*)
       - **Producer & Costume Designer:** Ria Suarez (Costume Designer for *Worst Movie Ever & Bewildered!*)
-      - **Art Director**: Stella Cole ()
+      - **Art Director**: Stella Cole (Art Director on *Worst Movie Ever* & *Joint Venture*)
       
       **<u>PRIMARY CAST</u>**
       
@@ -204,7 +204,7 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-23T21:46:51.720Z"
+_pool_draft_saved_at: "2026-11-23T21:55:03.503Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 campaign_background: "/assets/images/campaigns/possessions/background-20261123-214639-a36f06db.jpg"
 progress_background: "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac.png"
