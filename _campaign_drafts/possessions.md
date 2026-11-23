@@ -205,7 +205,8 @@ decisions:
     eligible: "backers"
     status: "open"
 _pool_draft_base_hash: "cef7f15ae2b521c74e2830b98e1d017b97435571b022a48c902740ace0e8e1c7"
-_pool_draft_saved_at: "2026-11-22T21:02:27.031Z"
+_pool_draft_saved_at: "2026-11-23T21:30:01.430Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 campaign_background: "/assets/images/campaigns/possessions/background-20261117-205054-171fb512.jpg"
+progress_background: "/assets/images/campaigns/possessions/progress-20261123-212709-6b715aac.png"
 ---
