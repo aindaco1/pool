@@ -192,17 +192,7 @@ stretch_goals:
     status: "locked"
 ongoing_items: []
 diary: []
-decisions:
-  - id: "what-s-in-ian-s-drawer-of-shame"
-    type: "poll"
-    title: "What's in Ian's drawer of shame?"
-    deadline: "2027-01-01"
-    options:
-      - "A magic 8 ball"
-      - "A box of dry breakfast cereal"
-      - "A broken plastic trophey"
-    eligible: "backers"
-    status: "open"
+decisions: []
 preview_updated_at: "2026-11-17T20:46:39.108Z"
 instagram: "https://www.instagram.com/possessions.film/?hl=en"
 hero_video: "https://youtu.be/9k33FVVWUss"
