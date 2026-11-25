@@ -1,3 +1,4 @@
+import { base64Encode } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 import { checkAddressConsistency } from './address-consistency.js';
 import { getGitHubWorkflowRun } from './deployment-status.js';
 import { buildDiaryExcerpt } from './diary.js';
@@ -432,17 +433,6 @@ function stripHtmlTags(value) {
     .trim();
 }
 
-function encodeArrayBufferAsBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
-
 async function fetchImageAsDataUrl(url) {
   if (!url) return '';
   try {
@@ -450,7 +440,7 @@ async function fetchImageAsDataUrl(url) {
     if (!response.ok) return '';
     const contentType = response.headers.get('Content-Type') || 'image/png';
     const buffer = await response.arrayBuffer();
-    return `data:${contentType};base64,${encodeArrayBufferAsBase64(buffer)}`;
+    return `data:${contentType};base64,${base64Encode(buffer)}`;
   } catch {
     return '';
   }
