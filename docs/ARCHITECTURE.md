@@ -24,8 +24,8 @@ of creating a second content catalog in KV. Save writes a working copy; Publish 
 
 ### Shared Foundations
 
-Immutable gitlinks pin Dust Wave Platform 0.51.1 (`d0b9e9595e2f57cbff26219db2bf78c26235d2f9`)
-and Dust Wave Jekyll Template. Admin Shell 0.15.1 supplies the shared block composer. Site Shell 0.6.1 supplies checkout utilities,
+Immutable gitlinks pin Dust Wave Platform 0.58.0 (`d90ab548158005acdab483a0e76034aeb1a61726`)
+and Dust Wave Jekyll Template. Admin Shell 0.20.2 supplies the shared block composer. Site Shell 0.6.1 supplies checkout utilities,
 Tax Core 0.4.1 supplies postal/local-rate references, and Design Core 0.3.1
 supplies mobile input sizing.
 Platform supplies characterized Worker, admin, browser, design, build, release,

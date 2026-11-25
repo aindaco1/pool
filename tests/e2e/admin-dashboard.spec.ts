@@ -2501,6 +2501,20 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/utm_source=newsletter/);
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/utm_campaign=hand-relations/);
     await expect(page.locator('#admin-marketing-url')).toHaveValue(/ref=launch-list/);
+    for (const extension of ['svg', 'png']) {
+      const event = page.waitForEvent('download');
+      await page.locator('#admin-marketing-qr-download-' + extension).click();
+      const file = await event;
+      expect(file.suggestedFilename()).toMatch(new RegExp('\\.' + extension + '$'));
+      const bytes = fs.readFileSync((await file.path())!);
+      if (extension === 'svg') {
+        expect(bytes.toString()).toContain('role="img" aria-label=');
+        expect(bytes.toString()).toContain('fill="#000"');
+      } else {
+        expect(bytes.readUInt32BE(0)).toBe(0x89504e47);
+        expect(bytes.readUInt32BE(16)).toBe(bytes.readUInt32BE(20));
+      }
+    }
     await expect.poll(() => calls.liveSnapshots.length).toBeGreaterThan(0);
     const embedPreview = page.locator('#admin-panel-marketing .campaign-embed-widget');
     await expect(embedPreview.locator('.campaign-embed-card__media img')).toBeVisible();
