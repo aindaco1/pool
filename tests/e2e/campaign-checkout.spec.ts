@@ -663,23 +663,11 @@ test.describe('Cart Flow', () => {
   });
 
   test('cart shows tip-aware fee summary after adding an item', async ({ page }) => {
-    test.setTimeout(60_000);
-
-    await page.goto('/campaigns/sunder/');
-
-    const tierButton = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR).first();
-    if (await tierButton.count() === 0) {
-      test.skip();
-      return;
-    }
-
-    await tierButton.click();
+    await page.goto('/campaigns/cart-single/');
+    await page.locator('aside [data-item-id="cart-single__standard"]').click();
     await openCartViaClient(page);
 
-    const cartRuntime = await page.evaluate(() => {
-      return (window as any).PoolCartProvider?.activeRuntime || (window as any).POOL_CONFIG?.cartRuntime || 'first_party';
-    });
-
+    const cartRuntime = await getActiveRuntime(page);
     if (cartRuntime === 'first_party') {
       await expect(page.locator('.pool-first-party-cart__tip-box')).toBeVisible({ timeout: 15000 });
       await expect(page.locator('.pool-first-party-cart__checkout-summary')).toBeVisible();
@@ -798,113 +786,41 @@ test.describe('Cart Flow', () => {
   });
 
   test('single-tier campaigns replace the previous cart item instead of stacking', async ({ page }) => {
-    test.setTimeout(60_000);
+    await page.goto('/campaigns/cart-single/');
+    await page.locator('aside [data-item-id="cart-single__standard"]').click();
+    const cartItems = page.locator('.pool-first-party-cart__item');
+    await expect(cartItems).toHaveText([/Standard/]);
 
-    await page.goto('/campaigns/sunder/');
-
-    const tierButtons = page.locator(ENABLED_SIDEBAR_CART_BUTTON_SELECTOR);
-    if (await tierButtons.count() < 2) {
-      test.skip();
-      return;
-    }
-
-    const firstTierId = await tierButtons.nth(0).getAttribute('data-item-id');
-    const secondTierId = await tierButtons.nth(1).getAttribute('data-item-id');
-    const firstTierName = await tierButtons.nth(0).getAttribute('data-item-name');
-    const secondTierName = await tierButtons.nth(1).getAttribute('data-item-name');
-
-    expect(firstTierId).toBeTruthy();
-    expect(secondTierId).toBeTruthy();
-
-    await tierButtons.nth(0).click();
-    await page.waitForTimeout(1500);
-
-    await page.evaluate(async (itemId) => {
-      const button = document.querySelector(`aside.campaign-sidebar button[data-item-id="${itemId}"]`) as HTMLButtonElement | null;
-      const provider = (window as any).PoolCartProvider;
-      if (provider?.whenReady) {
-        await provider.whenReady();
-      }
-
-      const client = provider?.getApi?.();
-      if (!button || !client?.api?.cart?.items?.add) return;
-
-      await client.api.cart.items.add({
-        id: button.dataset.itemId,
-        name: button.dataset.itemName,
-        price: Number(button.dataset.itemPrice || '0'),
-        url: button.dataset.itemUrl,
-        description: button.dataset.itemDescription || '',
-        stackable: button.dataset.itemStackable === 'always',
-        shippable: button.dataset.itemShippable === 'true',
-        maxQuantity: Number(button.dataset.itemMaxQuantity || '99')
-      });
-    }, secondTierId);
-
-    await page.waitForFunction(() => {
-      const provider = (window as any).PoolCartProvider;
-      const client = provider?.getApi?.();
-      const state = provider?.store?.getState?.() || client?.store?.getState?.();
-      const items = state?.cart?.items?.items || [];
-      return items.length === 1;
-    }, null, { timeout: 15000 });
-
-    const cartState = (await getCartSnapshot(page)).items.map((item: any) => ({
-      name: item.name,
-      quantity: item.quantity
-    }));
-
-    expect(cartState).toHaveLength(1);
-    expect(cartState[0].quantity).toBe(1);
-    expect(cartState[0].name).toBe(secondTierName);
-    expect(cartState[0].name).not.toBe(firstTierName);
+    // Exercise the cart API as well as the button's single-tier replacement path.
+    await addCartItemViaClient(page, {
+      id: 'cart-single__premium', name: 'cart-single — Premium', price: 25,
+      url: '/campaigns/cart-single/#tier-premium', stackable: false, maxQuantity: 1
+    });
+    await expect(cartItems).toHaveText([/Premium/]);
+    expect((await getCartSnapshot(page)).items).toEqual([
+      expect.objectContaining({ id: 'cart-single__premium', quantity: 1 })
+    ]);
   });
 
   test('single-tier replacement keeps tier items from other campaigns in the cart', async ({ page }) => {
-    test.setTimeout(60_000);
-
-    await page.goto('/campaigns/smoke-editable/');
-
-    const otherCampaignButton = page.locator(ENABLED_TIER_CARD_BUTTON_SELECTOR).first();
-    if (await otherCampaignButton.count() === 0) {
-      test.skip();
-      return;
-    }
-
-    const otherCampaignId = await otherCampaignButton.getAttribute('data-item-id');
-    const otherCampaignName = await otherCampaignButton.getAttribute('data-item-name');
-    expect(otherCampaignId).toBeTruthy();
-    expect(otherCampaignName).toBeTruthy();
-    await otherCampaignButton.click();
-
-    await page.goto('/campaigns/sunder/');
-
-    const sunderButton = page
-      .locator(`${ENABLED_SIDEBAR_CART_BUTTON_SELECTOR}, ${ENABLED_TIER_CARD_BUTTON_SELECTOR}`)
-      .first();
-    if (await sunderButton.count() === 0) {
-      test.skip();
-      return;
-    }
-
-    const secondTierId = await sunderButton.getAttribute('data-item-id');
-    const secondTierName = await sunderButton.getAttribute('data-item-name');
-    expect(secondTierId).toBeTruthy();
-    expect(secondTierName).toBeTruthy();
-    await sunderButton.click();
-
     const cartItems = page.locator('.pool-first-party-cart__item');
-    await expect(cartItems).toHaveCount(2, { timeout: 15000 });
+    await page.goto('/campaigns/cart-other/');
+    await page.locator('aside [data-item-id="cart-other__standard"]').click();
+    await expect(cartItems).toHaveText([/cart-other — Standard/]);
 
-    const cartState = (await getCartSnapshot(page)).items.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      quantity: item.quantity
-    }));
+    await page.goto('/campaigns/cart-single/');
+    await page.locator('aside [data-item-id="cart-single__standard"]').click();
+    await expect(cartItems).toHaveCount(2);
+    await page.getByRole('button', { name: 'Close cart', exact: true }).click();
+    await page.locator('aside [data-item-id="cart-single__premium"]').click();
+    await expect(cartItems.filter({ hasText: 'cart-single — Premium' })).toBeVisible();
 
-    expect(cartState).toHaveLength(2);
-    expect(cartState.some((item: any) => item.id === otherCampaignId)).toBe(true);
-    expect(cartState.some((item: any) => item.id === secondTierId && item.quantity === 1)).toBe(true);
+    const items = (await getCartSnapshot(page)).items;
+    expect(items).toHaveLength(2);
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'cart-other__standard', quantity: 1 }),
+      expect.objectContaining({ id: 'cart-single__premium', quantity: 1 })
+    ]));
   });
 });
 
