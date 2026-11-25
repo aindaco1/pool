@@ -813,7 +813,7 @@ These site-config values are also reflected into the Worker env values in [`work
 - `design.color_text_muted` -> `EMAIL_COLOR_MUTED`
 - `design.color_surface_subtle` -> `EMAIL_COLOR_SURFACE`
 - `design.color_border` -> `EMAIL_COLOR_BORDER`
-- `design.color_primary` -> `EMAIL_COLOR_PRIMARY`
+- `design.color_primary` -> `EMAIL_COLOR_PRIMARY`. For a three- or six-digit hex background, primary email buttons pick the first of white, near-black and black that reaches 4.5:1 text contrast.
 - `design.radius_lg` -> `EMAIL_BUTTON_RADIUS`
 - `pricing.sales_tax_rate` -> `SALES_TAX_RATE`
 - `tax.provider` -> `TAX_PROVIDER`

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  sendAdminLoginEmail,
   sendAnnouncementEmail,
   sendCampaignAssignmentEmail,
   sendCampaignPreviewEmail,
@@ -43,6 +44,20 @@ describe('email HTML security', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['#101215', '#ffffff'],
+    ['#d9f4ff', '#111111'],
+    ['#999999', '#111111'],
+    ['#777', '#000000'],
+    ['unknown', '#ffffff'],
+  ])('renders the primary button on %s in %s', async (background, ink) => {
+    const fetchMock = mockResend();
+    await sendAdminLoginEmail({ ...env, EMAIL_COLOR_PRIMARY: background }, {
+      email: 'admin@example.com', loginUrl: env.SITE_BASE + '/admin/', lang: 'en'
+    });
+    expect(getEmailPayload(fetchMock).html).toContain('background: ' + background + '; color: ' + ink + ';');
   });
 
   it('escapes campaign and pledge item content in supporter emails and drops invalid instagram links', async () => {

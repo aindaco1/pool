@@ -1876,6 +1876,7 @@ describe('worker operational integrity', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(await response.text()).toContain('data:image/png;base64,iVBORw==');
     expect(fetchedUrls).toContain('https://pool.test/assets/images/defaults/dust-wave-square.png');
     expect(fetchedUrls).not.toContain('https://pool.test/assets/images/campaigns/hand-relations/hand-relations-wide.png');
   });
