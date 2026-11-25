@@ -39,9 +39,12 @@ export async function resolvePaymentCustomer(stripe, {
     }
     return customer.id;
   } catch (error) {
-    // Another completion (including an older deployment) may have attached it.
-    // Otherwise fail closed so the webhook/browser can retry, never save null.
-    const recoveredCustomer = await attachedCustomer();
+    let recoveredCustomer = await attachedCustomer();
+    if (!recoveredCustomer && error?.code === 'idempotency_key_in_use') {
+      // The competing completion may still be attaching this payment method.
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      recoveredCustomer = await attachedCustomer();
+    }
     if (recoveredCustomer) return recoveredCustomer;
     throw error;
   }
