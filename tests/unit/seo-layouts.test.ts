@@ -33,7 +33,7 @@ function localScriptTags(source: string) {
 }
 
 describe('SEO templates', () => {
-  it('reports missing HTML language links declared for the localized home page', () => {
+  it('reports missing HTML language links and an inactive canonical sitemap directive', () => {
     const site = fs.mkdtempSync(path.join(os.tmpdir(), 'seo-alternates-'));
     try {
       fs.writeFileSync(path.join(site, 'index.html'), '<html lang="en"><head><link rel="canonical" href="https://site.test/"></head></html>');
@@ -41,12 +41,14 @@ describe('SEO templates', () => {
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
           <url><loc>https://site.test/</loc><xhtml:link rel="alternate" hreflang="es" href="https://site.test/es/"/></url>
         </urlset>`);
+      fs.writeFileSync(path.join(site, 'robots.txt'), '# Sitemap: https://site.test/sitemap.xml\n');
       const audit = spawnSync(process.execPath, ['scripts/audit-seo.mjs'], {
         cwd: repoRoot,
         env: { ...process.env, SEO_SITE_DIR: site, SEO_SITE_BASE: 'https://site.test' },
         encoding: 'utf8'
       });
       expect(audit.stderr + audit.stdout).toContain('/: hreflang alternates missing es');
+      expect(audit.stderr + audit.stdout).toContain('robots.txt: sitemap directive is missing or not canonical');
     } finally {
       fs.rmSync(site, { recursive: true, force: true });
     }

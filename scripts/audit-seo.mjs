@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { hasCanonicalSitemap } from '../shared/dust-wave-platform/packages/test-core/src/robots.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -220,7 +221,7 @@ if (fs.existsSync(robotsPath)) {
   ]) {
     if (!robotsText.includes(required)) errors.push(`robots.txt: missing ${required}`);
   }
-  if (!robotsText.includes(`Sitemap: ${siteBase}/sitemap.xml`)) {
+  if (!hasCanonicalSitemap(robotsText, siteBase)) {
     errors.push('robots.txt: sitemap directive is missing or not canonical');
   }
 }
