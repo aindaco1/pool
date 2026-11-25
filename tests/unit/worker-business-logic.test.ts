@@ -5139,9 +5139,12 @@ describe('Worker business logic hardening', () => {
       } } } };
     mockStripeClient.checkout.sessions.retrieve.mockResolvedValue(session);
     mockStripeClient.setupIntents.retrieve.mockResolvedValue({ payment_method: 'pm_saved', customer: null });
-    mockStripeClient.paymentMethods.retrieve.mockResolvedValue({ id: 'pm_saved', customer: null });
+    const unattached = { id: 'pm_saved', customer: null };
+    mockStripeClient.paymentMethods.retrieve.mockResolvedValue(unattached);
     mockStripeClient.customers.create.mockResolvedValue({ id: 'cus_shared' });
-    mockStripeClient.paymentMethods.attach.mockRejectedValue(new Error('idempotency_key_in_use'));
+    mockStripeClient.paymentMethods.attach.mockRejectedValue(
+      Object.assign(new Error('Concurrent attachment'), { code: 'idempotency_key_in_use' })
+    );
     const complete = () => worker.fetch(new Request(`https://pool.test/${path === 'webhook' ? 'webhooks/stripe' : 'checkout-intent/complete'}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'stripe-signature': 'sig_test' },
       body: JSON.stringify(path === 'webhook'
@@ -5150,11 +5153,15 @@ describe('Worker business logic hardening', () => {
     }), env, ctx);
     const failed = await complete();
     expect(failed.status).toBeGreaterThanOrEqual(500);
+    expect(mockStripeClient.paymentMethods.retrieve).toHaveBeenCalledTimes(3);
     expect(await env.PLEDGES.get(`pledge:${orderId}`)).toBeNull();
     expect(mockSendSupporterEmail).not.toHaveBeenCalled();
     expect(mockStripeClient.customers.create).toHaveBeenCalledWith({ email: 'buyer@example.com' }, { idempotencyKey: `customer:checkout:${orderId}` });
-    // A later retry discovers the successful attachment from the competing path.
-    mockStripeClient.paymentMethods.retrieve.mockResolvedValue({ id: 'pm_saved', customer: 'cus_shared' });
+    // On the next attempt, the winner's attachment appears only on the delayed read.
+    mockStripeClient.paymentMethods.retrieve
+      .mockResolvedValueOnce(unattached)
+      .mockResolvedValueOnce(unattached)
+      .mockResolvedValue({ ...unattached, customer: 'cus_shared' });
     const retried = await complete();
     expect(await retried.clone().json()).not.toHaveProperty('error');
     expect(retried.status).toBe(200);

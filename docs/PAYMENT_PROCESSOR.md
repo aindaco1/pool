@@ -265,9 +265,11 @@ This makes duplicate webhooks safe and transient failures retryable.
 
 Browser completion and webhook completion use the same customer-creation and
 payment-method attachment idempotency keys. When a saved payment method already
-belongs to a Stripe customer, that attachment is reused. If Stripe cannot confirm
-the customer attachment, completion fails retryably before pledge persistence;
-it never saves an active pledge with a missing payment identity.
+belongs to a Stripe customer, Pool reuses that attachment. If Stripe reports
+`idempotency_key_in_use` and the immediate lookup finds no attached customer,
+Pool waits one second and reads the payment method once more. If it still
+cannot verify the attachment, Pool leaves the pledge unsaved and returns an
+error so completion can retry.
 
 
 The custom checkout sidecar also has a guarded recovery path:
