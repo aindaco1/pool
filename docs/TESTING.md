@@ -607,6 +607,10 @@ describe('myFunction', () => {
 
 Browser-based tests for full user flows in `tests/e2e/`.
 
+The cart tests use two local campaign pages rendered from `tests/fixtures/cart-campaign.html`
+when `show_test_campaigns` is enabled. Their tiers stay open independently of the
+calendar. Production builds exclude both pages.
+
 ### Coverage
 
 **Campaign Page Structure:**
